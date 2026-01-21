@@ -23,12 +23,12 @@ export default async function Home() {
       <main className="flex flex-col items-center justify-center min-h-screen p-6 pb-24">
         <div className="text-center space-y-6">
           <Image
-            src="/BroMadness.JPG"
+            src="/logo.png"
             alt="Bro Madness"
-            width={268}
-            height={178}
+            width={300}
+            height={200}
             priority
-            className="mx-auto rounded-xl shadow-lg"
+            className="mx-auto"
           />
 
           <p className="text-zinc-400 max-w-xs">
