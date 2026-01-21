@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 export function CreateTournament() {
   const [name, setName] = useState('')
@@ -10,7 +9,6 @@ export function CreateTournament() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const supabase = createClient()
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,34 +16,14 @@ export function CreateTournament() {
     setError('')
 
     try {
-      // Create tournament
-      const { data: tournament, error: tournamentError } = await supabase
-        .from('tournaments')
-        .insert({
-          year,
-          name: name.trim(),
-          start_date: `${year}-03-15`,
-          end_date: `${year}-04-08`,
-          is_active: true,
-        })
-        .select()
-        .single()
+      const res = await fetch('/api/admin/tournament', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), year }),
+      })
 
-      if (tournamentError) throw tournamentError
-
-      // Create regions
-      const regions = ['East', 'West', 'South', 'Midwest']
-      const { error: regionsError } = await supabase
-        .from('regions')
-        .insert(
-          regions.map((name, index) => ({
-            tournament_id: tournament.id,
-            name,
-            position: index + 1,
-          }))
-        )
-
-      if (regionsError) throw regionsError
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
 
       router.refresh()
     } catch (err) {

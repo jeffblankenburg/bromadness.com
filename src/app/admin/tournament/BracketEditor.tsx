@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TeamSelector } from './TeamSelector'
+import { ROUND1_MATCHUPS } from '@/lib/bracket/generate'
 
 interface Region {
   id: string
@@ -19,6 +20,19 @@ interface Team {
   region_id: string
 }
 
+interface Game {
+  id: string
+  round: number
+  region_id: string | null
+  game_number: number
+  team1_id: string | null
+  team2_id: string | null
+  winner_id: string | null
+  team1_score: number | null
+  team2_score: number | null
+  scheduled_at: string | null
+}
+
 interface Tournament {
   id: string
   name: string
@@ -29,21 +43,10 @@ interface Props {
   tournament: Tournament
   regions: Region[]
   teams: Team[]
+  games: Game[]
 }
 
-// Bracket matchups in order
-const MATCHUPS = [
-  [1, 16],
-  [8, 9],
-  [5, 12],
-  [4, 13],
-  [6, 11],
-  [3, 14],
-  [7, 10],
-  [2, 15],
-]
-
-export function BracketEditor({ tournament, regions, teams }: Props) {
+export function BracketEditor({ tournament, regions, teams, games }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<{ regionId: string; seed: number } | null>(null)
   const [activeRegion, setActiveRegion] = useState<string>(regions[0]?.id || '')
   const [saving, setSaving] = useState(false)
@@ -56,20 +59,46 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
     return teams.find(t => t.region_id === regionId && t.seed === seed)
   }
 
+  const getGameForMatchup = (regionId: string, gameNumber: number) => {
+    return games.find(g => g.region_id === regionId && g.round === 1 && g.game_number === gameNumber)
+  }
+
+  const getTeamById = (teamId: string | null) => {
+    if (!teamId) return null
+    return teams.find(t => t.id === teamId)
+  }
+
+  // Find which game number a seed belongs to, and whether it's team1 or team2
+  const getGameInfoForSeed = (seed: number): { gameNumber: number; isTeam1: boolean } | null => {
+    for (let i = 0; i < ROUND1_MATCHUPS.length; i++) {
+      const [seed1, seed2] = ROUND1_MATCHUPS[i]
+      if (seed === seed1) return { gameNumber: i + 1, isTeam1: true }
+      if (seed === seed2) return { gameNumber: i + 1, isTeam1: false }
+    }
+    return null
+  }
+
   const handleTeamSelect = async (teamName: string, shortName: string) => {
     if (!selectedSlot) return
 
     setSaving(true)
     const existingTeam = getTeamForSlot(selectedSlot.regionId, selectedSlot.seed)
+    const gameInfo = getGameInfoForSeed(selectedSlot.seed)
+    const game = gameInfo ? getGameForMatchup(selectedSlot.regionId, gameInfo.gameNumber) : null
 
     try {
+      let teamId: string
+
       if (existingTeam) {
+        // Update existing team
         await supabase
           .from('teams')
           .update({ name: teamName, short_name: shortName })
           .eq('id', existingTeam.id)
+        teamId = existingTeam.id
       } else {
-        await supabase
+        // Create new team
+        const { data: newTeam } = await supabase
           .from('teams')
           .insert({
             tournament_id: tournament.id,
@@ -78,6 +107,17 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
             short_name: shortName,
             seed: selectedSlot.seed,
           })
+          .select()
+          .single()
+        teamId = newTeam?.id
+      }
+
+      // Update the round 1 game with the team
+      if (game && teamId && gameInfo) {
+        await supabase
+          .from('games')
+          .update(gameInfo.isTeam1 ? { team1_id: teamId } : { team2_id: teamId })
+          .eq('id', game.id)
       }
 
       router.refresh()
@@ -98,8 +138,20 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
       return
     }
 
+    const gameInfo = getGameInfoForSeed(selectedSlot.seed)
+    const game = gameInfo ? getGameForMatchup(selectedSlot.regionId, gameInfo.gameNumber) : null
+
     setSaving(true)
     try {
+      // Clear from game first
+      if (game && gameInfo) {
+        await supabase
+          .from('games')
+          .update(gameInfo.isTeam1 ? { team1_id: null } : { team2_id: null })
+          .eq('id', game.id)
+      }
+
+      // Delete team
       await supabase.from('teams').delete().eq('id', existingTeam.id)
       router.refresh()
     } catch (err) {
@@ -107,6 +159,18 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
     } finally {
       setSaving(false)
       setSelectedSlot(null)
+    }
+  }
+
+  const handleScheduleChange = async (gameId: string, datetime: string) => {
+    try {
+      await supabase
+        .from('games')
+        .update({ scheduled_at: datetime || null })
+        .eq('id', gameId)
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to update schedule:', err)
     }
   }
 
@@ -148,16 +212,28 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
           </div>
 
           {/* Matchups */}
-          <div className="space-y-2">
-            {MATCHUPS.map(([seed1, seed2], idx) => {
+          <div className="space-y-3">
+            {ROUND1_MATCHUPS.map(([seed1, seed2], idx) => {
+              const gameNumber = idx + 1
+              const game = getGameForMatchup(activeRegion, gameNumber)
               const team1 = getTeamForSlot(activeRegion, seed1)
               const team2 = getTeamForSlot(activeRegion, seed2)
               const isSelected1 = selectedSlot?.regionId === activeRegion && selectedSlot?.seed === seed1
               const isSelected2 = selectedSlot?.regionId === activeRegion && selectedSlot?.seed === seed2
 
               return (
-                <div key={idx} className="bg-zinc-800/50 rounded-xl p-3 space-y-1">
-                  <div className="text-xs text-zinc-500 mb-2">Game {idx + 1}</div>
+                <div key={idx} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">Game {gameNumber}</span>
+                    {game && (
+                      <input
+                        type="datetime-local"
+                        value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                        onChange={(e) => handleScheduleChange(game.id, e.target.value)}
+                        className="text-xs bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-300"
+                      />
+                    )}
+                  </div>
 
                   <button
                     onClick={() => setSelectedSlot({ regionId: activeRegion, seed: seed1 })}

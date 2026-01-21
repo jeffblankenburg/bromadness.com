@@ -21,7 +21,7 @@ export default async function TournamentPage() {
     .limit(1)
     .single()
 
-  // Get teams if tournament exists
+  // Get teams and games if tournament exists
   let teams: Array<{
     id: string
     name: string
@@ -30,13 +30,34 @@ export default async function TournamentPage() {
     region_id: string
   }> = []
 
+  let games: Array<{
+    id: string
+    round: number
+    region_id: string | null
+    game_number: number
+    team1_id: string | null
+    team2_id: string | null
+    winner_id: string | null
+    team1_score: number | null
+    team2_score: number | null
+    scheduled_at: string | null
+  }> = []
+
   if (tournament) {
-    const { data } = await supabase
+    const { data: teamsData } = await supabase
       .from('teams')
       .select('id, name, short_name, seed, region_id')
       .eq('tournament_id', tournament.id)
       .order('seed')
-    teams = data || []
+    teams = teamsData || []
+
+    const { data: gamesData } = await supabase
+      .from('games')
+      .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at')
+      .eq('tournament_id', tournament.id)
+      .order('round')
+      .order('game_number')
+    games = gamesData || []
   }
 
   return (
@@ -70,6 +91,7 @@ export default async function TournamentPage() {
             tournament={tournament}
             regions={tournament.regions || []}
             teams={teams}
+            games={games}
           />
         </div>
       )}
