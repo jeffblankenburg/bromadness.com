@@ -46,9 +46,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
       >
-        {children}
+        <main className="min-h-screen pt-safe pb-20">
+          {children}
+        </main>
         <BottomNav />
       </body>
     </html>

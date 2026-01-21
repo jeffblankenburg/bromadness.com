@@ -19,9 +19,8 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
-      <main className="flex flex-col items-center justify-center min-h-screen p-6 pb-24">
-        <div className="text-center space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white flex flex-col items-center justify-center p-6">
+      <div className="text-center space-y-6">
           <Image
             src="/logo.png"
             alt="Bro Madness"
@@ -73,9 +72,7 @@ export default async function Home() {
               </Link>
             </div>
           )}
-        </div>
-
-      </main>
+      </div>
 
       {/* DEV ONLY - Remove before launch */}
       {user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
