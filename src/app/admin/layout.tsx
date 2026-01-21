@@ -39,6 +39,9 @@ export default async function AdminLayout({
             <Link href="/admin/tournament" className="text-zinc-400 hover:text-white">
               Tournament
             </Link>
+            <Link href="/admin/results" className="text-zinc-400 hover:text-white">
+              Results
+            </Link>
             <Link href="/admin/users" className="text-zinc-400 hover:text-white">
               Users
             </Link>
