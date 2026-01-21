@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import Image from 'next/image'
 import { DevTools } from '@/components/DevTools'
 
 export default async function Home() {
@@ -21,13 +22,14 @@ export default async function Home() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white">
       <main className="flex flex-col items-center justify-center min-h-screen p-6">
         <div className="text-center space-y-6">
-          <div className="w-24 h-24 mx-auto bg-orange-500 rounded-3xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-            <span className="text-4xl font-bold">BM</span>
-          </div>
-
-          <h1 className="text-4xl font-bold tracking-tight">
-            Bromadness
-          </h1>
+          <Image
+            src="/BroMadness.JPG"
+            alt="Bro Madness"
+            width={268}
+            height={178}
+            priority
+            className="mx-auto rounded-xl shadow-lg"
+          />
 
           <p className="text-zinc-400 max-w-xs">
             March Madness brackets, daily pick&apos;em, and casino games
