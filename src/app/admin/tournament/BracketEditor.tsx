@@ -31,15 +31,26 @@ interface Props {
   teams: Team[]
 }
 
+// Bracket matchups in order
+const MATCHUPS = [
+  [1, 16],
+  [8, 9],
+  [5, 12],
+  [4, 13],
+  [6, 11],
+  [3, 14],
+  [7, 10],
+  [2, 15],
+]
+
 export function BracketEditor({ tournament, regions, teams }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<{ regionId: string; seed: number } | null>(null)
+  const [activeRegion, setActiveRegion] = useState<string>(regions[0]?.id || '')
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
-  // Bracket order: matchups are 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
-  const seeds = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
 
   const getTeamForSlot = (regionId: string, seed: number) => {
     return teams.find(t => t.region_id === regionId && t.seed === seed)
@@ -53,13 +64,11 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
 
     try {
       if (existingTeam) {
-        // Update existing team
         await supabase
           .from('teams')
           .update({ name: teamName, short_name: shortName })
           .eq('id', existingTeam.id)
       } else {
-        // Create new team
         await supabase
           .from('teams')
           .insert({
@@ -101,48 +110,92 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
     }
   }
 
+  const currentRegion = sortedRegions.find(r => r.id === activeRegion)
+  const regionTeamCount = teams.filter(t => t.region_id === activeRegion).length
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Bracket Editor</h3>
-        <span className="text-sm text-zinc-400">
-          Tap a slot to assign a team
-        </span>
+    <div className="space-y-4">
+      {/* Region Tabs */}
+      <div className="flex gap-1 bg-zinc-800/50 p-1 rounded-xl">
+        {sortedRegions.map((region) => {
+          const count = teams.filter(t => t.region_id === region.id).length
+          const isActive = region.id === activeRegion
+          return (
+            <button
+              key={region.id}
+              onClick={() => setActiveRegion(region.id)}
+              className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-orange-500 text-white'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+              }`}
+            >
+              <div>{region.name}</div>
+              <div className={`text-xs ${isActive ? 'text-orange-200' : 'text-zinc-500'}`}>
+                {count}/16
+              </div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Bracket Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {sortedRegions.map((region) => (
-          <div key={region.id} className="bg-zinc-800/50 rounded-xl p-3">
-            <h4 className="text-sm font-semibold text-orange-400 mb-3">{region.name}</h4>
-            <div className="space-y-1">
-              {seeds.map((seed) => {
-                const team = getTeamForSlot(region.id, seed)
-                const isSelected = selectedSlot?.regionId === region.id && selectedSlot?.seed === seed
+      {/* Current Region */}
+      {currentRegion && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-orange-400">{currentRegion.name} Region</h3>
+            <span className="text-sm text-zinc-400">{regionTeamCount}/16 teams</span>
+          </div>
 
-                return (
+          {/* Matchups */}
+          <div className="space-y-2">
+            {MATCHUPS.map(([seed1, seed2], idx) => {
+              const team1 = getTeamForSlot(activeRegion, seed1)
+              const team2 = getTeamForSlot(activeRegion, seed2)
+              const isSelected1 = selectedSlot?.regionId === activeRegion && selectedSlot?.seed === seed1
+              const isSelected2 = selectedSlot?.regionId === activeRegion && selectedSlot?.seed === seed2
+
+              return (
+                <div key={idx} className="bg-zinc-800/50 rounded-xl p-3 space-y-1">
+                  <div className="text-xs text-zinc-500 mb-2">Game {idx + 1}</div>
+
                   <button
-                    key={seed}
-                    onClick={() => setSelectedSlot({ regionId: region.id, seed })}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                      isSelected
+                    onClick={() => setSelectedSlot({ regionId: activeRegion, seed: seed1 })}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      isSelected1
                         ? 'bg-orange-500 text-white'
-                        : team
+                        : team1
                         ? 'bg-zinc-700 hover:bg-zinc-600'
                         : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
                     }`}
                   >
-                    <span className="w-5 text-xs text-zinc-400 font-mono">{seed}</span>
-                    <span className={`flex-1 text-sm truncate ${!team ? 'text-zinc-500 italic' : ''}`}>
-                      {team ? team.name : 'Empty'}
+                    <span className="w-6 text-sm font-mono text-zinc-400">{seed1}</span>
+                    <span className={`flex-1 truncate ${!team1 ? 'text-zinc-500 italic' : ''}`}>
+                      {team1 ? team1.name : 'Select team...'}
                     </span>
                   </button>
-                )
-              })}
-            </div>
+
+                  <button
+                    onClick={() => setSelectedSlot({ regionId: activeRegion, seed: seed2 })}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      isSelected2
+                        ? 'bg-orange-500 text-white'
+                        : team2
+                        ? 'bg-zinc-700 hover:bg-zinc-600'
+                        : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
+                    }`}
+                  >
+                    <span className="w-6 text-sm font-mono text-zinc-400">{seed2}</span>
+                    <span className={`flex-1 truncate ${!team2 ? 'text-zinc-500 italic' : ''}`}>
+                      {team2 ? team2.name : 'Select team...'}
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Team Selector Modal */}
       {selectedSlot && (
