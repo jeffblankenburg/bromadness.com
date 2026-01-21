@@ -19,8 +19,8 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white">
-      <main className="flex flex-col items-center justify-center min-h-screen p-6">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
+      <main className="flex flex-col items-center justify-center min-h-screen p-6 pb-24">
         <div className="text-center space-y-6">
           <Image
             src="/BroMadness.JPG"
@@ -75,9 +75,6 @@ export default async function Home() {
           )}
         </div>
 
-        <footer className="absolute bottom-20 text-zinc-600 text-sm">
-          {user ? 'More features coming soon' : 'Install this app to your home screen'}
-        </footer>
       </main>
 
       {/* DEV ONLY - Remove before launch */}
