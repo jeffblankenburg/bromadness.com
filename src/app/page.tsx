@@ -25,8 +25,8 @@ export default async function Home() {
           <Image
             src="/logo.png"
             alt="Bro Madness"
-            width={300}
-            height={200}
+            width={380}
+            height={253}
             priority
             className="mx-auto"
           />
