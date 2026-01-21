@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { CreateTournament } from './CreateTournament'
 import { BracketEditor } from './BracketEditor'
+import { DeleteTournament } from './DeleteTournament'
 
 export default async function TournamentPage() {
   const supabase = await createClient()
@@ -54,11 +55,14 @@ export default async function TournamentPage() {
                   {tournament.year} • {tournament.regions?.length || 0} regions • {teams.length}/64 teams
                 </p>
               </div>
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                tournament.is_active ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-400'
-              }`}>
-                {tournament.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  tournament.is_active ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-400'
+                }`}>
+                  {tournament.is_active ? 'Active' : 'Inactive'}
+                </span>
+                <DeleteTournament tournamentId={tournament.id} tournamentName={tournament.name} />
+              </div>
             </div>
           </div>
 
