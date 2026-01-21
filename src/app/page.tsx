@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { DevTools } from '@/components/DevTools'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -72,10 +73,13 @@ export default async function Home() {
           )}
         </div>
 
-        <footer className="absolute bottom-6 text-zinc-600 text-sm">
+        <footer className="absolute bottom-20 text-zinc-600 text-sm">
           {user ? 'More features coming soon' : 'Install this app to your home screen'}
         </footer>
       </main>
+
+      {/* DEV ONLY - Remove before launch */}
+      {user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
     </div>
   )
 }
