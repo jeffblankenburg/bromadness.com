@@ -14,12 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bromadness",
+  title: "Bro Madness",
   description: "March Madness bracket pool, daily pick'em, and casino",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Bromadness",
+    title: "Bro Madness",
   },
   formatDetection: {
     telephone: false,

@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Bromadness',
-    short_name: 'Bromadness',
+    name: 'Bro Madness',
+    short_name: 'Bro Madness',
     description: 'March Madness bracket pool, daily pick\'em, and casino',
     start_url: '/',
     display: 'standalone',

@@ -70,7 +70,7 @@ export default function LoginPage() {
             <div className="w-16 h-16 mx-auto bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
               <span className="text-2xl font-bold">BM</span>
             </div>
-            <h1 className="text-2xl font-bold">Welcome to Bromadness</h1>
+            <h1 className="text-2xl font-bold">Welcome to Bro Madness</h1>
             <p className="text-zinc-400">Enter your phone number to sign in</p>
           </div>
 
