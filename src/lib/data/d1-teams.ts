@@ -10,10 +10,10 @@ export interface D1Team {
   espnId?: number // For logo URL: https://a.espncdn.com/i/teamlogos/ncaa/500/{espnId}.png
 }
 
-// Helper to get logo URL
+// Helper to get logo URL (local files)
 export function getTeamLogoUrl(team: D1Team): string | null {
   if (!team.espnId) return null
-  return `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.espnId}.png`
+  return `/logos/${team.abbreviation.toLowerCase()}.png`
 }
 
 export const D1_TEAMS: D1Team[] = [
