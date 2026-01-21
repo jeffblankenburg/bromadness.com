@@ -25,7 +25,7 @@ export function DevTools({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className="fixed bottom-24 left-4 right-4 bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-xl p-3 z-50">
+    <div className="fixed bottom-16 left-4 right-4 bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-xl p-3 z-50">
       <div className="flex items-center justify-between">
         <span className="text-xs text-zinc-400 uppercase tracking-wide">Dev Tools</span>
         <button
