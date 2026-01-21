@@ -111,7 +111,7 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
       </div>
 
       {/* Bracket Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sortedRegions.map((region) => (
           <div key={region.id} className="bg-zinc-800/50 rounded-xl p-3">
             <h4 className="text-sm font-semibold text-orange-400 mb-3">{region.name}</h4>
