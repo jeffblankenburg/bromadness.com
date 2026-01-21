@@ -31,6 +31,8 @@ interface Game {
   scheduled_at: string | null
   next_game_id: string | null
   is_team1_slot: boolean | null
+  spread: number | null
+  favorite_team_id: string | null
 }
 
 interface Tournament {
@@ -135,6 +137,44 @@ export function GameResults({ tournament, regions, teams, games }: Props) {
     }
   }
 
+  const handleSetSpread = async (game: Game, spread: number, favoriteTeamId: string) => {
+    setSaving(game.id)
+    try {
+      await supabase
+        .from('games')
+        .update({
+          spread,
+          favorite_team_id: favoriteTeamId,
+        })
+        .eq('id', game.id)
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to set spread:', err)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const handleClearSpread = async (game: Game) => {
+    setSaving(game.id)
+    try {
+      await supabase
+        .from('games')
+        .update({
+          spread: null,
+          favorite_team_id: null,
+        })
+        .eq('id', game.id)
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to clear spread:', err)
+    } finally {
+      setSaving(null)
+    }
+  }
+
   // Group games by region for rounds 1-4
   const gamesByRegion = activeRound <= 4
     ? sortedRegions.map(region => ({
@@ -190,6 +230,8 @@ export function GameResults({ tournament, regions, teams, games }: Props) {
                 saving={saving === game.id}
                 onSetWinner={handleSetWinner}
                 onClearResult={handleClearResult}
+                onSetSpread={handleSetSpread}
+                onClearSpread={handleClearSpread}
               />
             ))}
 
@@ -210,20 +252,35 @@ interface GameCardProps {
   saving: boolean
   onSetWinner: (game: Game, winnerId: string, team1Score: number, team2Score: number) => void
   onClearResult: (game: Game) => void
+  onSetSpread: (game: Game, spread: number, favoriteTeamId: string) => void
+  onClearSpread: (game: Game) => void
 }
 
-function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: GameCardProps) {
+function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult, onSetSpread, onClearSpread }: GameCardProps) {
   const [team1Score, setTeam1Score] = useState(game.team1_score?.toString() || '')
   const [team2Score, setTeam2Score] = useState(game.team2_score?.toString() || '')
   const [showScoreInput, setShowScoreInput] = useState(false)
   const [pendingWinner, setPendingWinner] = useState<string | null>(null)
+  const [showSpreadInput, setShowSpreadInput] = useState(false)
+  const [spreadValue, setSpreadValue] = useState(game.spread?.toString() || '')
 
   const hasResult = game.winner_id !== null
   const canEnterResult = team1 && team2
+  const hasSpread = game.spread !== null && game.favorite_team_id !== null
+
+  // Get spread display for each team
+  const getSpreadDisplay = (teamId: string | null) => {
+    if (!hasSpread || !teamId) return null
+    if (teamId === game.favorite_team_id) {
+      return `-${game.spread}`
+    } else {
+      return `+${game.spread}`
+    }
+  }
 
   const handleTeamClick = (teamId: string) => {
     if (!canEnterResult || saving) return
-    if (hasResult) return // Already has result
+    if (hasResult) return
 
     setPendingWinner(teamId)
     setShowScoreInput(true)
@@ -245,6 +302,13 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
     setTeam2Score(game.team2_score?.toString() || '')
   }
 
+  const handleSetFavorite = (teamId: string) => {
+    const spread = parseFloat(spreadValue)
+    if (isNaN(spread) || spread <= 0) return
+    onSetSpread(game, spread, teamId)
+    setShowSpreadInput(false)
+  }
+
   const formatDate = (date: string | null) => {
     if (!date) return null
     return new Date(date).toLocaleString('en-US', {
@@ -259,7 +323,9 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
     <div className={`bg-zinc-800/50 rounded-xl p-3 space-y-2 ${saving ? 'opacity-50' : ''}`}>
       <div className="flex items-center justify-between text-xs text-zinc-500">
         <span>Game {game.game_number}</span>
-        {game.scheduled_at && <span>{formatDate(game.scheduled_at)}</span>}
+        <div className="flex items-center gap-2">
+          {game.scheduled_at && <span>{formatDate(game.scheduled_at)}</span>}
+        </div>
       </div>
 
       {/* Team 1 */}
@@ -278,6 +344,11 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
       >
         <span className="w-6 text-sm font-mono text-zinc-400">{team1?.seed || '?'}</span>
         <span className="flex-1 truncate">{team1?.name || 'TBD'}</span>
+        {hasSpread && team1 && (
+          <span className={`text-xs font-medium ${game.favorite_team_id === team1.id ? 'text-yellow-400' : 'text-zinc-400'}`}>
+            {getSpreadDisplay(team1.id)}
+          </span>
+        )}
         {hasResult && game.team1_score !== null && (
           <span className="font-bold">{game.team1_score}</span>
         )}
@@ -299,10 +370,54 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
       >
         <span className="w-6 text-sm font-mono text-zinc-400">{team2?.seed || '?'}</span>
         <span className="flex-1 truncate">{team2?.name || 'TBD'}</span>
+        {hasSpread && team2 && (
+          <span className={`text-xs font-medium ${game.favorite_team_id === team2.id ? 'text-yellow-400' : 'text-zinc-400'}`}>
+            {getSpreadDisplay(team2.id)}
+          </span>
+        )}
         {hasResult && game.team2_score !== null && (
           <span className="font-bold">{game.team2_score}</span>
         )}
       </button>
+
+      {/* Spread Input */}
+      {showSpreadInput && canEnterResult && (
+        <div className="pt-2 border-t border-zinc-700 space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.5"
+              value={spreadValue}
+              onChange={(e) => setSpreadValue(e.target.value)}
+              placeholder="Spread (e.g. 14.5)"
+              className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-sm"
+            />
+          </div>
+          <div className="text-xs text-zinc-400 mb-1">Select favorite:</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => team1 && handleSetFavorite(team1.id)}
+              disabled={!spreadValue || parseFloat(spreadValue) <= 0}
+              className="flex-1 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-sm rounded truncate"
+            >
+              {team1?.short_name || 'Team 1'}
+            </button>
+            <button
+              onClick={() => team2 && handleSetFavorite(team2.id)}
+              disabled={!spreadValue || parseFloat(spreadValue) <= 0}
+              className="flex-1 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-sm rounded truncate"
+            >
+              {team2?.short_name || 'Team 2'}
+            </button>
+            <button
+              onClick={() => setShowSpreadInput(false)}
+              className="px-2 py-1 bg-zinc-800 text-zinc-400 text-sm rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Score Input */}
       {showScoreInput && (
@@ -337,15 +452,36 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
         </div>
       )}
 
-      {/* Clear Result Button */}
-      {hasResult && !showScoreInput && (
-        <button
-          onClick={() => onClearResult(game)}
-          disabled={saving}
-          className="text-xs text-red-400 hover:text-red-300"
-        >
-          Clear result
-        </button>
+      {/* Action Buttons */}
+      {!showScoreInput && !showSpreadInput && (
+        <div className="flex items-center gap-3 text-xs">
+          {canEnterResult && !hasSpread && (
+            <button
+              onClick={() => setShowSpreadInput(true)}
+              className="text-zinc-400 hover:text-white"
+            >
+              Set spread
+            </button>
+          )}
+          {hasSpread && (
+            <button
+              onClick={() => onClearSpread(game)}
+              disabled={saving}
+              className="text-zinc-400 hover:text-white"
+            >
+              Edit spread
+            </button>
+          )}
+          {hasResult && (
+            <button
+              onClick={() => onClearResult(game)}
+              disabled={saving}
+              className="text-red-400 hover:text-red-300"
+            >
+              Clear result
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
