@@ -46,7 +46,9 @@ export default async function Home() {
                     Credits: <span className="text-white">{profile.casino_credits?.toLocaleString()}</span>
                   </span>
                   {profile.is_admin && (
-                    <span className="text-orange-500 font-medium">Admin</span>
+                    <Link href="/admin" className="text-orange-500 font-medium hover:text-orange-400">
+                      Admin →
+                    </Link>
                   )}
                 </div>
               )}
