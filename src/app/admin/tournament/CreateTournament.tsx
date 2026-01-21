@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export function CreateTournament() {
+  const [name, setName] = useState('')
   const [year, setYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -22,7 +23,7 @@ export function CreateTournament() {
         .from('tournaments')
         .insert({
           year,
-          name: `March Madness ${year}`,
+          name: name.trim(),
           start_date: `${year}-03-15`,
           end_date: `${year}-04-08`,
           is_active: true,
@@ -60,6 +61,17 @@ export function CreateTournament() {
 
       <form onSubmit={handleCreate} className="space-y-4">
         <div>
+          <label className="block text-sm text-zinc-400 mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. March Madness 2025"
+            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500"
+          />
+        </div>
+
+        <div>
           <label className="block text-sm text-zinc-400 mb-1">Year</label>
           <input
             type="number"
@@ -75,7 +87,7 @@ export function CreateTournament() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !name.trim()}
           className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 text-white font-medium rounded-lg transition-colors"
         >
           {loading ? 'Creating...' : 'Create Tournament'}
