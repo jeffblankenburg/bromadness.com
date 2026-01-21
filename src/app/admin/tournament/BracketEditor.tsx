@@ -38,7 +38,8 @@ export function BracketEditor({ tournament, regions, teams }: Props) {
   const supabase = createClient()
 
   const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
-  const seeds = Array.from({ length: 16 }, (_, i) => i + 1)
+  // Bracket order: matchups are 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
+  const seeds = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
 
   const getTeamForSlot = (regionId: string, seed: number) => {
     return teams.find(t => t.region_id === regionId && t.seed === seed)
