@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { D1_TEAMS } from '@/lib/data/d1-teams'
+import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 
 interface Team {
   id: string
@@ -83,18 +83,37 @@ export function TeamSelector({ regionName, seed, currentTeam, onSelect, onClear,
 
             {/* Suggestions dropdown */}
             {showSuggestions && filteredTeams.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-10 max-h-48 overflow-y-auto">
-                {filteredTeams.map((team) => (
-                  <button
-                    key={team.name}
-                    type="button"
-                    onClick={() => handleSelectSuggestion(team)}
-                    className="w-full px-4 py-2 text-left hover:bg-zinc-800 text-sm"
-                  >
-                    <span className="text-white">{team.name}</span>
-                    <span className="text-zinc-500 ml-2">({team.shortName})</span>
-                  </button>
-                ))}
+              <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-10 max-h-64 overflow-y-auto">
+                {filteredTeams.map((team) => {
+                  const logoUrl = getTeamLogoUrl(team)
+                  return (
+                    <button
+                      key={team.name}
+                      type="button"
+                      onClick={() => handleSelectSuggestion(team)}
+                      className="w-full px-3 py-2 text-left hover:bg-zinc-800 flex items-center gap-3"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: team.primaryColor }}
+                      >
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <span className="text-xs font-bold text-white">{team.abbreviation.slice(0, 2)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white text-sm truncate">{team.name}</div>
+                        <div className="text-zinc-500 text-xs">{team.abbreviation}</div>
+                      </div>
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: team.primaryColor }}
+                      />
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
