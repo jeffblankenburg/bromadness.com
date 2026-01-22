@@ -115,7 +115,7 @@ export function InlineTeamSearch({ seed, currentTeamName, onSelect, onClear, onC
                   style={{ backgroundColor: team.primaryColor }}
                 >
                   {logoUrl ? (
-                    <img src={logoUrl} alt="" className="w-4 h-4 object-contain" />
+                    <img src={logoUrl} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                   ) : (
                     <span className="text-[8px] font-bold text-white">{team.abbreviation.slice(0, 2)}</span>
                   )}

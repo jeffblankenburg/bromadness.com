@@ -98,7 +98,7 @@ export function TeamSelector({ regionName, seed, currentTeam, onSelect, onClear,
                         style={{ backgroundColor: team.primaryColor }}
                       >
                         {logoUrl ? (
-                          <img src={logoUrl} alt="" className="w-6 h-6 object-contain" />
+                          <img src={logoUrl} alt="" className="w-6 h-6 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                         ) : (
                           <span className="text-xs font-bold text-white">{team.abbreviation.slice(0, 2)}</span>
                         )}

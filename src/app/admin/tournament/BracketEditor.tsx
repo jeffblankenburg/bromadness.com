@@ -438,7 +438,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team1.primaryColor }}
                             >
                               {logo1 ? (
-                                <img src={logo1} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
                               )}
@@ -503,7 +503,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team2.primaryColor }}
                             >
                               {logo2 ? (
-                                <img src={logo2} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
                               )}
@@ -600,7 +600,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                                   style={{ backgroundColor: d1Team1.primaryColor }}
                                 >
                                   {logo1 ? (
-                                    <img src={logo1} alt="" className="w-5 h-5 object-contain" />
+                                    <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                                   ) : (
                                     <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
                                   )}
@@ -650,7 +650,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                                   style={{ backgroundColor: d1Team2.primaryColor }}
                                 >
                                   {logo2 ? (
-                                    <img src={logo2} alt="" className="w-5 h-5 object-contain" />
+                                    <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                                   ) : (
                                     <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
                                   )}
@@ -745,7 +745,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team1.primaryColor }}
                             >
                               {logo1 ? (
-                                <img src={logo1} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
                               )}
@@ -794,7 +794,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team2.primaryColor }}
                             >
                               {logo2 ? (
-                                <img src={logo2} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
                               )}
@@ -886,7 +886,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team1.primaryColor }}
                             >
                               {logo1 ? (
-                                <img src={logo1} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
                               )}
@@ -935,7 +935,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                               style={{ backgroundColor: d1Team2.primaryColor }}
                             >
                               {logo2 ? (
-                                <img src={logo2} alt="" className="w-5 h-5 object-contain" />
+                                <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
                                 <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
                               )}
