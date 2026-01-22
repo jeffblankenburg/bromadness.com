@@ -546,10 +546,18 @@ export function PickemClient({
 
       {/* My Picks Tab */}
       {activeTab === 'picks' && (() => {
-        const session1GameIds = session1Games.map(g => g.id)
-        const session2GameIds = session2Games.map(g => g.id)
-        const session1Correct = userDayPicks.filter(p => p.game_id && session1GameIds.includes(p.game_id) && p.is_correct === true).length
-        const session2Correct = userDayPicks.filter(p => p.game_id && session2GameIds.includes(p.game_id) && p.is_correct === true).length
+        const countCorrectPicks = (sessionGames: Game[]) => {
+          return sessionGames.filter(game => {
+            if (!game.winner_id) return false
+            const pick = userDayPicks.find(p => p.game_id === game.id)
+            if (!pick) return false
+            // Use saved is_correct if available, otherwise calculate
+            if (pick.is_correct !== null) return pick.is_correct
+            return isPickCorrect(game, pick.picked_team_id) === true
+          }).length
+        }
+        const session1Correct = countCorrectPicks(session1Games)
+        const session2Correct = countCorrectPicks(session2Games)
         const session1HasResults = session1Games.some(g => g.winner_id !== null)
         const session2HasResults = session2Games.some(g => g.winner_id !== null)
 
