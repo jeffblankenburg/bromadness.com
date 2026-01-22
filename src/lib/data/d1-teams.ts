@@ -192,12 +192,12 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Sam Houston Bearkats", shortName: "Sam Houston", abbreviation: "SHSU", primaryColor: "#F76300", secondaryColor: "#FFFFFF", espnId: 2534 },
 
   // Ivy League
-  { name: "Brown Bears", shortName: "Brown", abbreviation: "BRWN", primaryColor: "#4E3629", secondaryColor: "#C00404" },
-  { name: "Columbia Lions", shortName: "Columbia", abbreviation: "CLMB", primaryColor: "#9BCBEB", secondaryColor: "#FFFFFF" },
-  { name: "Cornell Big Red", shortName: "Cornell", abbreviation: "COR", primaryColor: "#B31B1B", secondaryColor: "#FFFFFF" },
-  { name: "Dartmouth Big Green", shortName: "Dartmouth", abbreviation: "DART", primaryColor: "#00693E", secondaryColor: "#FFFFFF" },
-  { name: "Harvard Crimson", shortName: "Harvard", abbreviation: "HARV", primaryColor: "#A51C30", secondaryColor: "#000000" },
-  { name: "Penn Quakers", shortName: "Penn", abbreviation: "PENN", primaryColor: "#011F5B", secondaryColor: "#990000" },
+  { name: "Brown Bears", shortName: "Brown", abbreviation: "BRWN", primaryColor: "#4E3629", secondaryColor: "#C00404", espnId: 225 },
+  { name: "Columbia Lions", shortName: "Columbia", abbreviation: "CLMB", primaryColor: "#9BCBEB", secondaryColor: "#FFFFFF", espnId: 171 },
+  { name: "Cornell Big Red", shortName: "Cornell", abbreviation: "COR", primaryColor: "#B31B1B", secondaryColor: "#FFFFFF", espnId: 172 },
+  { name: "Dartmouth Big Green", shortName: "Dartmouth", abbreviation: "DART", primaryColor: "#00693E", secondaryColor: "#FFFFFF", espnId: 159 },
+  { name: "Harvard Crimson", shortName: "Harvard", abbreviation: "HARV", primaryColor: "#A51C30", secondaryColor: "#000000", espnId: 108 },
+  { name: "Penn Quakers", shortName: "Penn", abbreviation: "PENN", primaryColor: "#011F5B", secondaryColor: "#990000", espnId: 219 },
 
   // MEAC/SWAC (HBCU programs)
   { name: "Alabama State Hornets", shortName: "Alabama St", abbreviation: "ALST", primaryColor: "#000000", secondaryColor: "#C99700", espnId: 2011 },
