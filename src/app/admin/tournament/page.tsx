@@ -1,12 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { CreateTournament } from './CreateTournament'
 import { BracketEditor } from './BracketEditor'
-import { DeleteTournament } from './DeleteTournament'
 
 export default async function TournamentPage() {
   const supabase = await createClient()
 
-  // Get active tournament or most recent
+  // Get the tournament
   const { data: tournament } = await supabase
     .from('tournaments')
     .select(`
@@ -41,6 +39,11 @@ export default async function TournamentPage() {
     team1_score: number | null
     team2_score: number | null
     scheduled_at: string | null
+    spread: number | null
+    favorite_team_id: string | null
+    channel: string | null
+    next_game_id: string | null
+    is_team1_slot: boolean | null
   }> = []
 
   if (tournament) {
@@ -53,48 +56,33 @@ export default async function TournamentPage() {
 
     const { data: gamesData } = await supabase
       .from('games')
-      .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at')
+      .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at, spread, favorite_team_id, channel, next_game_id, is_team1_slot')
       .eq('tournament_id', tournament.id)
       .order('round')
       .order('game_number')
     games = gamesData || []
   }
 
+  if (!tournament) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold">Tournament Setup</h2>
+        <p className="text-zinc-400">No tournament found. Please set up the tournament in the database.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold">Tournament Setup</h2>
+      <p className="text-sm text-zinc-400">{teams.length}/64 teams</p>
 
-      {!tournament ? (
-        <CreateTournament />
-      ) : (
-        <div className="space-y-6">
-          <div className="bg-zinc-800/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">{tournament.name}</h3>
-                <p className="text-sm text-zinc-400">
-                  {tournament.year} • {tournament.regions?.length || 0} regions • {teams.length}/64 teams
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  tournament.is_active ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-400'
-                }`}>
-                  {tournament.is_active ? 'Active' : 'Inactive'}
-                </span>
-                <DeleteTournament tournamentId={tournament.id} tournamentName={tournament.name} />
-              </div>
-            </div>
-          </div>
-
-          <BracketEditor
-            tournament={tournament}
-            regions={tournament.regions || []}
-            teams={teams}
-            games={games}
-          />
-        </div>
-      )}
+      <BracketEditor
+        tournament={tournament}
+        regions={tournament.regions || []}
+        teams={teams}
+        games={games}
+      />
     </div>
   )
 }

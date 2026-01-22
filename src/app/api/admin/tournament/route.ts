@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { name, year } = await request.json()
+    const { name, year, startDate } = await request.json()
 
     if (!name || !year) {
       return NextResponse.json({ error: 'Name and year are required' }, { status: 400 })
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       .insert({
         year,
         name: name.trim(),
-        start_date: `${year}-03-15`,
+        start_date: startDate || `${year}-03-15`,
         end_date: `${year}-04-08`,
         is_active: true,
       })

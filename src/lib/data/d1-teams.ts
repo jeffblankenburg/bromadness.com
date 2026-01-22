@@ -200,6 +200,7 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Penn Quakers", shortName: "Penn", abbreviation: "PENN", primaryColor: "#011F5B", secondaryColor: "#990000" },
 
   // MEAC/SWAC (HBCU programs)
+  { name: "Alabama State Hornets", shortName: "Alabama St", abbreviation: "ALST", primaryColor: "#000000", secondaryColor: "#C99700", espnId: 2011 },
   { name: "Howard Bison", shortName: "Howard", abbreviation: "HOW", primaryColor: "#003A63", secondaryColor: "#E51937" },
   { name: "Norfolk State Spartans", shortName: "Norfolk St", abbreviation: "NORF", primaryColor: "#007A53", secondaryColor: "#F0AB00" },
   { name: "North Carolina A&T Aggies", shortName: "NC A&T", abbreviation: "NCAT", primaryColor: "#004684", secondaryColor: "#FFC82E" },
