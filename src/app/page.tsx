@@ -41,7 +41,7 @@ export default async function Home() {
   // Get active tournament and menu items
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, start_date')
+    .select('id, start_date, auction_payouts')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -62,6 +62,7 @@ export default async function Home() {
   }> = []
   let userTotalPoints = 0
   let userPlace = 0
+  let userPayout = 0
 
   if (tournament) {
     const { data } = await supabase
@@ -99,11 +100,46 @@ export default async function Home() {
     const sortedUsers = Object.entries(userPoints)
       .sort(([, a], [, b]) => b - a)
 
-    // Find current user's place
+    // Find current user's place and calculate payout
     if (user) {
       userTotalPoints = userPoints[user.id] || 0
       const userIndex = sortedUsers.findIndex(([id]) => id === user.id)
       userPlace = userIndex >= 0 ? userIndex + 1 : 0
+
+      // Calculate payout considering ties
+      const payouts = tournament.auction_payouts as {
+        points_1st?: number
+        points_2nd?: number
+        points_3rd?: number
+        points_4th?: number
+      } | null
+
+      if (payouts && userPlace > 0 && userPlace <= 4) {
+        const payoutAmounts = [
+          payouts.points_1st || 0,
+          payouts.points_2nd || 0,
+          payouts.points_3rd || 0,
+          payouts.points_4th || 0,
+        ]
+
+        // Find all users tied with current user
+        const tiedUsers = sortedUsers.filter(([, pts]) => pts === userTotalPoints)
+        const tiedCount = tiedUsers.length
+
+        // Find the starting position (1-indexed)
+        const startPos = sortedUsers.findIndex(([, pts]) => pts === userTotalPoints) + 1
+
+        // Sum up all payouts for positions occupied by tied users
+        let totalPayout = 0
+        for (let i = startPos; i < startPos + tiedCount && i <= 4; i++) {
+          totalPayout += payoutAmounts[i - 1]
+        }
+
+        // Split equally among tied users
+        if (totalPayout > 0) {
+          userPayout = Math.round((totalPayout / tiedCount) * 100) / 100
+        }
+      }
 
       // Get user's teams
       const userTeams = (allAuctionData || []).filter(a => a.user_id === user.id)
@@ -153,7 +189,17 @@ export default async function Home() {
                       </span>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-orange-400">{userTotalPoints} pts</span>
+                  <div className="flex items-center gap-2">
+                    {userPayout > 0 && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                        </svg>
+                        <span className="text-sm font-bold text-green-400">${userPayout.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <span className="text-sm font-bold text-orange-400">{userTotalPoints} pts</span>
+                  </div>
                 </div>
                 {userAuctionTeams.length > 0 ? (
                   <div className="space-y-1">
