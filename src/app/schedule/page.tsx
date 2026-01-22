@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { D1_TEAMS } from '@/lib/data/d1-teams'
 import { CHANNELS } from '@/lib/data/channels'
+import { ScheduleClient } from './ScheduleClient'
 
 interface Team {
   id: string
@@ -18,6 +19,8 @@ interface Game {
   channel: string | null
   team1_id: string | null
   team2_id: string | null
+  team1_score: number | null
+  team2_score: number | null
 }
 
 function findD1Team(teamName: string) {
@@ -94,7 +97,7 @@ export default async function SchedulePage() {
   // Get all games
   const { data: games } = await supabase
     .from('games')
-    .select('id, round, scheduled_at, winner_id, channel, team1_id, team2_id')
+    .select('id, round, scheduled_at, winner_id, channel, team1_id, team2_id, team1_score, team2_score')
     .eq('tournament_id', tournament.id)
     .order('scheduled_at')
 
@@ -110,70 +113,80 @@ export default async function SchedulePage() {
   const sortedDates = Object.keys(gamesByDate).sort()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
-      <div className="p-4 max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
-          <h1 className="text-lg font-bold text-orange-500">Schedule</h1>
-          <div className="w-10"></div>
-        </div>
-
-        {sortedDates.length === 0 ? (
-          <p className="text-zinc-400 text-center text-sm">No games scheduled yet.</p>
-        ) : (
-          <div className="space-y-4">
-            {sortedDates.map(dateKey => (
-              <div key={dateKey}>
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
-                  {formatDate(dateKey)}
-                </h2>
-                <div className="space-y-1">
-                  {gamesByDate[dateKey].map(game => {
-                    const team1 = game.team1_id ? teamsById[game.team1_id] : null
-                    const team2 = game.team2_id ? teamsById[game.team2_id] : null
-
-                    if (!team1 || !team2) return null
-
-                    const d1Team1 = findD1Team(team1.name)
-                    const d1Team2 = findD1Team(team2.name)
-                    const time = formatTime(game.scheduled_at)
-                    const channel = getChannelDisplay(game.channel)
-                    const isComplete = game.winner_id !== null
-
-                    return (
-                      <div
-                        key={game.id}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm ${isComplete ? 'opacity-50' : ''}`}
-                      >
-                        {/* Time */}
-                        <span className="w-14 text-xs text-zinc-500 flex-shrink-0">
-                          {time || '—'}
-                        </span>
-
-                        {/* Matchup */}
-                        <span className="flex-1 truncate text-zinc-200">
-                          <span className="text-zinc-500">{team1.seed}</span>{' '}
-                          <span>{d1Team1?.shortName || team1.short_name || team1.name}</span>
-                          <span className="text-zinc-600 mx-1">vs</span>
-                          <span className="text-zinc-500">{team2.seed}</span>{' '}
-                          <span>{d1Team2?.shortName || team2.short_name || team2.name}</span>
-                        </span>
-
-                        {/* Channel */}
-                        {channel && (
-                          <span className="text-xs text-zinc-500 flex-shrink-0">
-                            {channel}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+    <ScheduleClient>
+      <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
+        <div className="p-4 max-w-md mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
+            <h1 className="text-lg font-bold text-orange-500">Schedule</h1>
+            <div className="w-10"></div>
           </div>
-        )}
+
+          {sortedDates.length === 0 ? (
+            <p className="text-zinc-400 text-center text-sm">No games scheduled yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {sortedDates.map(dateKey => (
+                <div key={dateKey}>
+                  <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+                    {formatDate(dateKey)}
+                  </h2>
+                  <div className="space-y-1">
+                    {gamesByDate[dateKey].map(game => {
+                      const team1 = game.team1_id ? teamsById[game.team1_id] : null
+                      const team2 = game.team2_id ? teamsById[game.team2_id] : null
+
+                      if (!team1 || !team2) return null
+
+                      const d1Team1 = findD1Team(team1.name)
+                      const d1Team2 = findD1Team(team2.name)
+                      const time = formatTime(game.scheduled_at)
+                      const channel = getChannelDisplay(game.channel)
+                      const isComplete = game.winner_id !== null
+                      const team1Won = game.winner_id === team1.id
+                      const team2Won = game.winner_id === team2.id
+
+                      return (
+                        <div
+                          key={game.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm ${isComplete ? 'bg-zinc-800/50' : ''}`}
+                        >
+                          {/* Time */}
+                          <span className="w-14 text-xs text-zinc-500 flex-shrink-0">
+                            {time || '—'}
+                          </span>
+
+                          {/* Matchup */}
+                          <span className="flex-1 truncate text-zinc-200">
+                            <span className="text-zinc-500">{team1.seed}</span>{' '}
+                            <span className={team1Won ? 'font-bold text-orange-400' : ''}>{d1Team1?.shortName || team1.short_name || team1.name}</span>
+                            <span className="text-zinc-600 mx-1">vs</span>
+                            <span className="text-zinc-500">{team2.seed}</span>{' '}
+                            <span className={team2Won ? 'font-bold text-orange-400' : ''}>{d1Team2?.shortName || team2.short_name || team2.name}</span>
+                          </span>
+
+                          {/* Channel or Score */}
+                          <span className="text-xs flex-shrink-0">
+                            {isComplete ? (
+                              <span className="font-bold">
+                                <span className={team1Won ? 'text-orange-400' : 'text-zinc-500'}>{game.team1_score}</span>
+                                <span className="text-zinc-500">-</span>
+                                <span className={team2Won ? 'text-orange-400' : 'text-zinc-500'}>{game.team2_score}</span>
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500">{channel || ''}</span>
+                            )}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </ScheduleClient>
   )
 }
