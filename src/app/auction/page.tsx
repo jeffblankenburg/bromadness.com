@@ -181,53 +181,44 @@ export default async function AuctionPage() {
     <div className="p-4 pb-20 space-y-4">
       <h1 className="text-xl font-bold text-orange-500">Auction</h1>
 
-      {/* My Teams Grid */}
+      {/* My Teams Row */}
       {currentUserTeams.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-400">My Teams</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {currentUserTeams.map(t => {
-              const teamColor = t.d1Team?.primaryColor || '#666666'
-              const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <span className="text-xs text-zinc-500 flex-shrink-0">My Teams:</span>
+          {currentUserTeams.map(t => {
+            const teamColor = t.d1Team?.primaryColor || '#666666'
+            const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
 
-              return (
+            return (
+              <div
+                key={t.id}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded ${
+                  t.isEliminated ? 'opacity-40' : ''
+                }`}
+                style={{ backgroundColor: `${teamColor}30` }}
+              >
                 <div
-                  key={t.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg ${
-                    t.isEliminated ? 'opacity-50' : ''
-                  }`}
-                  style={{ backgroundColor: `${teamColor}20` }}
+                  className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: teamColor }}
                 >
-                  <div
-                    className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: teamColor }}
-                  >
-                    {logoUrl ? (
-                      <img
-                        src={logoUrl}
-                        alt={t.team?.name || ''}
-                        className="w-7 h-7 object-contain"
-                      />
-                    ) : (
-                      <span className="text-white text-xs font-bold">
-                        {t.team?.short_name?.charAt(0) || '?'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className={`text-sm font-medium truncate ${t.isEliminated ? 'line-through text-zinc-500' : ''}`}>
-                      #{t.team?.seed} {t.team?.short_name || t.team?.name}
-                    </div>
-                    {t.wins > 0 && (
-                      <div className="text-xs text-green-400">
-                        +{t.points} pts ({t.wins}W)
-                      </div>
-                    )}
-                  </div>
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={t.team?.name || ''}
+                      className="w-4 h-4 object-contain"
+                    />
+                  ) : (
+                    <span className="text-white text-[10px] font-bold">
+                      {t.team?.short_name?.charAt(0) || '?'}
+                    </span>
+                  )}
                 </div>
-              )
-            })}
-          </div>
+                <span className={`text-xs whitespace-nowrap ${t.isEliminated ? 'line-through text-zinc-500' : ''}`}>
+                  #{t.team?.seed} {t.team?.short_name || t.team?.name}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
 
