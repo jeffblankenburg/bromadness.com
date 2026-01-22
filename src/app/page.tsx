@@ -61,6 +61,7 @@ export default async function Home() {
     points: number
   }> = []
   let userTotalPoints = 0
+  let userPlace = 0
 
   if (tournament) {
     const { data } = await supabase
@@ -70,26 +71,46 @@ export default async function Home() {
       .order('sort_order')
     menuItems = data || []
 
-    // Get user's auction teams with win data
+    // Get completed games to count wins
+    const { data: games } = await supabase
+      .from('games')
+      .select('winner_id')
+      .eq('tournament_id', tournament.id)
+      .not('winner_id', 'is', null)
+
+    // Get ALL auction teams to calculate standings
+    const { data: allAuctionData } = await supabase
+      .from('auction_teams')
+      .select('user_id, bid_amount, team:teams(id, name, short_name, seed)')
+      .eq('tournament_id', tournament.id)
+
+    // Calculate points per user
+    const userPoints: Record<string, number> = {}
+    for (const a of allAuctionData || []) {
+      const teamData = a.team as unknown as { id: string; seed: number } | null
+      if (teamData) {
+        const wins = (games || []).filter(g => g.winner_id === teamData.id).length
+        const points = teamData.seed * wins
+        userPoints[a.user_id] = (userPoints[a.user_id] || 0) + points
+      }
+    }
+
+    // Sort users by points to get rankings
+    const sortedUsers = Object.entries(userPoints)
+      .sort(([, a], [, b]) => b - a)
+
+    // Find current user's place
     if (user) {
-      const { data: auctionData } = await supabase
-        .from('auction_teams')
-        .select('bid_amount, team_id, team:teams(id, name, short_name, seed)')
-        .eq('tournament_id', tournament.id)
-        .eq('user_id', user.id)
+      userTotalPoints = userPoints[user.id] || 0
+      const userIndex = sortedUsers.findIndex(([id]) => id === user.id)
+      userPlace = userIndex >= 0 ? userIndex + 1 : 0
 
-      // Get completed games to count wins
-      const { data: games } = await supabase
-        .from('games')
-        .select('winner_id')
-        .eq('tournament_id', tournament.id)
-        .not('winner_id', 'is', null)
-
-      userAuctionTeams = (auctionData || []).map(a => {
+      // Get user's teams
+      const userTeams = (allAuctionData || []).filter(a => a.user_id === user.id)
+      userAuctionTeams = userTeams.map(a => {
         const teamData = a.team as unknown as { id: string; name: string; short_name: string | null; seed: number } | null
         const wins = teamData ? (games || []).filter(g => g.winner_id === teamData.id).length : 0
         const points = teamData ? teamData.seed * wins : 0
-        userTotalPoints += points
         return {
           team: teamData,
           bid_amount: a.bid_amount,
@@ -122,12 +143,17 @@ export default async function Home() {
               {/* User's Auction Teams */}
               <Link href="/auction" className="block w-full bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-orange-400">
-                    Your Teams
-                  </h3>
-                  {userTotalPoints > 0 && (
-                    <span className="text-sm font-bold text-orange-400">{userTotalPoints} pts</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-orange-400">
+                      Your Auction Teams
+                    </h3>
+                    {userPlace > 0 && (
+                      <span className="text-xs text-zinc-500">
+                        ({userPlace === 1 ? '1st' : userPlace === 2 ? '2nd' : userPlace === 3 ? '3rd' : `${userPlace}th`} place)
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold text-orange-400">{userTotalPoints} pts</span>
                 </div>
                 {userAuctionTeams.length > 0 ? (
                   <div className="space-y-1">
@@ -138,9 +164,10 @@ export default async function Home() {
                           <div className="flex items-center gap-2">
                             <span className="w-5 text-xs text-zinc-500">{at.team?.seed}</span>
                             <span className={at.wins > 0 ? 'text-green-400' : ''}>{at.team?.short_name || at.team?.name}</span>
+                            <span className="text-xs text-zinc-500">${at.bid_amount}</span>
                           </div>
-                          <span className="text-xs text-zinc-500">
-                            {at.points > 0 ? `+${at.points} pts` : `$${at.bid_amount}`}
+                          <span className="text-xs text-zinc-400">
+                            {at.points > 0 ? `+${at.points}` : '—'}
                           </span>
                         </div>
                       ))}
