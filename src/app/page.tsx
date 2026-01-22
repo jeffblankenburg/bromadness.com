@@ -107,25 +107,15 @@ export default async function Home() {
       {/* DEV ONLY - Remove before launch */}
       {user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
 
-      <div className="text-center space-y-6">
-          <Image
-            src="/logo.png"
-            alt="Bro Madness"
-            width={380}
-            height={253}
-            priority
-            className="mx-auto"
-          />
-
-          <p className="text-zinc-400 max-w-xs">
-            March Madness brackets, daily pick&apos;em, and casino games
-          </p>
-
+      <div className="text-center space-y-6 w-full max-w-sm">
           {user ? (
-            <div className="pt-6 space-y-4">
-              <p className="text-orange-400">
-                Welcome{profile?.display_name ? `, ${profile.display_name}` : ''}!
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-3xl font-bold text-orange-400 tracking-tight">QUACK</p>
+                {profile?.display_name && (
+                  <p className="text-xl font-bold text-white">{profile.display_name}</p>
+                )}
+              </div>
 
               {profile?.is_admin && (
                 <div className="flex justify-center text-sm">
@@ -136,7 +126,7 @@ export default async function Home() {
               )}
 
               {/* User's Auction Teams */}
-              <div className="w-full max-w-sm bg-zinc-800/50 rounded-xl p-4">
+              <Link href="/auction" className="block w-full bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-orange-400">
                     Your Teams
@@ -164,19 +154,15 @@ export default async function Home() {
                 ) : (
                   <p className="text-sm text-zinc-500 text-center">No teams yet</p>
                 )}
-              </div>
+              </Link>
 
               {/* Today's Menu */}
               {menuItems.length > 0 && (
-                <div className="pt-4 space-y-2">
-                  <MenuDisplay items={menuItems} currentDay={currentDay} hideAlwaysAvailable />
-                  <Link
-                    href="/menu"
-                    className="block text-center text-sm text-zinc-400 hover:text-white"
-                  >
-                    View full menu →
-                  </Link>
-                </div>
+                <Link href="/menu" className="block pt-4">
+                  <div className="hover:opacity-80 transition-opacity">
+                    <MenuDisplay items={menuItems} currentDay={currentDay} hideAlwaysAvailable />
+                  </div>
+                </Link>
               )}
 
               <div className="pt-4">
@@ -191,7 +177,15 @@ export default async function Home() {
               </div>
             </div>
           ) : (
-            <div className="pt-8">
+            <div className="space-y-8">
+              <Image
+                src="/logo.png"
+                alt="Bro Madness"
+                width={300}
+                height={200}
+                priority
+                className="mx-auto"
+              />
               <Link
                 href="/login"
                 className="inline-flex items-center justify-center px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
