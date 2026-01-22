@@ -1,4 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+
+function findD1Team(teamName: string) {
+  return D1_TEAMS.find(t =>
+    t.name.toLowerCase() === teamName.toLowerCase() ||
+    t.shortName.toLowerCase() === teamName.toLowerCase()
+  )
+}
 
 interface AuctionPayouts {
   championship_winner: number
@@ -11,6 +19,9 @@ interface AuctionPayouts {
 
 export default async function AuctionPage() {
   const supabase = await createClient()
+
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Get active tournament with settings
   const { data: tournament } = await supabase
@@ -145,9 +156,80 @@ export default async function AuctionPage() {
     return firstWithPoints + 1
   }
 
+  // Get current user's teams
+  const currentUserTeams = user
+    ? (auctionTeams || [])
+        .filter(a => a.user_id === user.id)
+        .map(a => {
+          const team = (teams || []).find(t => t.id === a.team_id)
+          const d1Team = team ? findD1Team(team.name) : null
+          const wins = (games || []).filter(g => g.winner_id === a.team_id).length
+          const isEliminated = team?.is_eliminated ?? false
+          return {
+            ...a,
+            team,
+            d1Team,
+            wins,
+            isEliminated,
+            points: team ? team.seed * wins : 0,
+          }
+        })
+        .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
+    : []
+
   return (
     <div className="p-4 pb-20 space-y-4">
       <h1 className="text-xl font-bold text-orange-500">Auction</h1>
+
+      {/* My Teams Grid */}
+      {currentUserTeams.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-zinc-400">My Teams</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {currentUserTeams.map(t => {
+              const teamColor = t.d1Team?.primaryColor || '#666666'
+              const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
+
+              return (
+                <div
+                  key={t.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg ${
+                    t.isEliminated ? 'opacity-50' : ''
+                  }`}
+                  style={{ backgroundColor: `${teamColor}20` }}
+                >
+                  <div
+                    className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: teamColor }}
+                  >
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt={t.team?.name || ''}
+                        className="w-7 h-7 object-contain"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold">
+                        {t.team?.short_name?.charAt(0) || '?'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`text-sm font-medium truncate ${t.isEliminated ? 'line-through text-zinc-500' : ''}`}>
+                      #{t.team?.seed} {t.team?.short_name || t.team?.name}
+                    </div>
+                    {t.wins > 0 && (
+                      <div className="text-xs text-green-400">
+                        +{t.points} pts ({t.wins}W)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Payouts Info */}
       <div className="bg-zinc-800/50 rounded-xl p-4">
