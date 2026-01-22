@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Black_Ops_One } from "next/font/google";
+import { Geist, Geist_Mono, Graduate } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const blackOps = Black_Ops_One({
+const graduate = Graduate({
   weight: "400",
   variable: "--font-display",
   subsets: ["latin"],
@@ -52,7 +52,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${blackOps.variable} antialiased bg-black`}
+        className={`${geistSans.variable} ${geistMono.variable} ${graduate.variable} antialiased bg-black`}
       >
         <main className="min-h-screen pt-safe pb-14">
           {children}
