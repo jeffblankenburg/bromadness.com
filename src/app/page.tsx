@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { DevTools } from '@/components/DevTools'
 import { MenuDisplay } from '@/components/MenuDisplay'
 import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
@@ -32,7 +32,12 @@ export default async function Home() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // If logged in, try to get user profile
+  // Redirect to login if not authenticated
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Get user profile
   let profile = null
   if (user) {
     const { data } = await supabase
@@ -402,7 +407,6 @@ export default async function Home() {
       {SHOW_DEV_TOOLS && user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
 
       <div className="text-center space-y-6 w-full max-w-sm">
-          {user ? (
             <div className="space-y-4">
               {profile?.display_name && (
                 <h1
@@ -448,24 +452,6 @@ export default async function Home() {
                 </Link>
               )}
             </div>
-          ) : (
-            <div className="space-y-8">
-              <Image
-                src="/logo.png"
-                alt="Bro Madness"
-                width={300}
-                height={200}
-                priority
-                className="mx-auto"
-              />
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
-              >
-                Sign in
-              </Link>
-            </div>
-          )}
       </div>
     </div>
   )
