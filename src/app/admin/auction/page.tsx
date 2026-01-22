@@ -2,15 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { AuctionEditor } from './AuctionEditor'
 import { AuctionSettings } from './AuctionSettings'
 
-interface AuctionPayouts {
-  championship_winner: number
-  championship_runnerup: number
-  points_1st: number
-  points_2nd: number
-  points_3rd: number
-  points_4th: number
-}
-
 export default async function AuctionPage() {
   const supabase = await createClient()
 
@@ -74,14 +65,6 @@ export default async function AuctionPage() {
     entryFee: tournament.entry_fee ?? 20,
     salaryCap: tournament.salary_cap ?? 100,
     bidIncrement: tournament.bid_increment ?? 5,
-    payouts: (tournament.auction_payouts as AuctionPayouts) ?? {
-      championship_winner: 80,
-      championship_runnerup: 50,
-      points_1st: 110,
-      points_2nd: 80,
-      points_3rd: 60,
-      points_4th: 40,
-    },
   }
 
   return (

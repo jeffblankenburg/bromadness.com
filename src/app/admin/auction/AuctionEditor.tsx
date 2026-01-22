@@ -45,20 +45,10 @@ interface Game {
   team2_id: string | null
 }
 
-interface AuctionPayouts {
-  championship_winner: number
-  championship_runnerup: number
-  points_1st: number
-  points_2nd: number
-  points_3rd: number
-  points_4th: number
-}
-
 interface Settings {
   entryFee: number
   salaryCap: number
   bidIncrement: number
-  payouts: AuctionPayouts
 }
 
 interface Props {
