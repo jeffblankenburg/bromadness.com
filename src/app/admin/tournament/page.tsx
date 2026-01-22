@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { BracketEditor } from './BracketEditor'
+import { RegionOrderEditor } from './RegionOrderEditor'
 
 export default async function TournamentPage() {
   const supabase = await createClient()
@@ -83,6 +84,8 @@ export default async function TournamentPage() {
         teams={teams}
         games={games}
       />
+
+      <RegionOrderEditor regions={tournament.regions || []} />
     </div>
   )
 }
