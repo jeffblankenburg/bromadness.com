@@ -162,7 +162,7 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Northern Iowa Panthers", shortName: "N Iowa", abbreviation: "UNI", primaryColor: "#4B116F", secondaryColor: "#FFC82E", espnId: 2460 },
 
   // Other notable programs (simplified - no ESPN ID, use defaults)
-  { name: "Akron Zips", shortName: "Akron", abbreviation: "AKR", primaryColor: "#041E42", secondaryColor: "#A89968" },
+  { name: "Akron Zips", shortName: "Akron", abbreviation: "AKR", primaryColor: "#041E42", secondaryColor: "#A89968", espnId: 2006 },
   { name: "Ball State Cardinals", shortName: "Ball State", abbreviation: "BALL", primaryColor: "#BA0C2F", secondaryColor: "#FFFFFF" },
   { name: "Bowling Green Falcons", shortName: "Bowling Green", abbreviation: "BGSU", primaryColor: "#FE5000", secondaryColor: "#4F2C1D" },
   { name: "Buffalo Bulls", shortName: "Buffalo", abbreviation: "BUFF", primaryColor: "#005BBB", secondaryColor: "#FFFFFF" },
