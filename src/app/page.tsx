@@ -85,6 +85,7 @@ export default async function Home() {
   let userAuctionTeamIds: string[] = []
   let userPickemTeamIds: string[] = []
   let userPickemPayout = 0
+  let tripBalance = 0
 
   if (tournament) {
     const { data } = await supabase
@@ -372,6 +373,24 @@ export default async function Home() {
           }
         }
       }
+
+      // Get user's trip cost balance
+      const { data: tripCost } = await supabase
+        .from('trip_costs')
+        .select('id, amount_owed')
+        .eq('tournament_id', tournament.id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (tripCost) {
+        const { data: tripPayments } = await supabase
+          .from('trip_payments')
+          .select('amount')
+          .eq('trip_cost_id', tripCost.id)
+
+        const totalPaid = (tripPayments || []).reduce((sum, p) => sum + p.amount, 0)
+        tripBalance = tripCost.amount_owed - totalPaid
+      }
     }
   }
 
@@ -392,6 +411,15 @@ export default async function Home() {
                 >
                   {profile.display_name}
                 </h1>
+              )}
+
+              {/* Trip Balance Reminder */}
+              {tripBalance > 0 && (
+                <div className="rotating-border p-3">
+                  <div className="relative z-10 text-red-400 text-sm font-medium">
+                    You still owe Bro <span className="text-red-300 font-bold">${tripBalance.toFixed(0)}</span> for the trip!!
+                  </div>
+                </div>
               )}
 
               {/* Current Games */}

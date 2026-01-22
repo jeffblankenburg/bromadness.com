@@ -1,11 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { AuctionClient } from './AuctionClient'
 
 function findD1Team(teamName: string) {
   return D1_TEAMS.find(t =>
     t.name.toLowerCase() === teamName.toLowerCase() ||
     t.shortName.toLowerCase() === teamName.toLowerCase()
   )
+}
+
+// Simple seeded random for consistent throwout order
+function seededShuffle<T>(array: T[], seed: string): T[] {
+  const result = [...array]
+  // Simple hash function
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i)
+    hash = hash & hash
+  }
+  // Fisher-Yates shuffle with seeded random
+  for (let i = result.length - 1; i > 0; i--) {
+    hash = (hash * 1103515245 + 12345) & 0x7fffffff
+    const j = hash % (i + 1)
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 // Payout percentages
@@ -77,7 +96,7 @@ export default async function AuctionPage() {
   // Get active tournament with settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, auction_payouts')
+    .select('id, name, year, entry_fee, salary_cap, auction_payouts, auction_order_seed, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -93,10 +112,11 @@ export default async function AuctionPage() {
   const salaryCap = tournament.salary_cap ?? 100
   const entryFee = tournament.entry_fee ?? 50
 
-  // Get all users
+  // Get all active users
   const { data: users } = await supabase
     .from('users')
-    .select('id, display_name, phone')
+    .select('id, display_name, phone, is_active')
+    .eq('is_active', true)
     .order('display_name')
 
   // Get all teams
@@ -109,6 +129,12 @@ export default async function AuctionPage() {
   const { data: auctionTeams } = await supabase
     .from('auction_teams')
     .select('id, user_id, team_id, bid_amount')
+    .eq('tournament_id', tournament.id)
+
+  // Get auction entries (payment status)
+  const { data: auctionEntries } = await supabase
+    .from('auction_entries')
+    .select('id, user_id, has_paid')
     .eq('tournament_id', tournament.id)
 
   // Get completed games to determine winners
@@ -176,12 +202,15 @@ export default async function AuctionPage() {
   const leaderboard = (users || [])
     .map(user => {
       const totalSpent = getUserTotalSpent(user.id)
+      const auctionEntry = (auctionEntries || []).find(e => e.user_id === user.id)
+      const hasPaid = auctionEntry?.has_paid ?? false
       return {
         user,
         points: calculateUserPoints(user.id),
         teams: getUserTeamsWithStatus(user.id),
         totalSpent,
         remaining: salaryCap - totalSpent,
+        hasPaid,
         hasChampion: getUserTeamsWithStatus(user.id).some(t => t.team_id === championshipWinnerId),
         hasRunnerup: getUserTeamsWithStatus(user.id).some(t =>
           championshipTeamIds.has(t.team_id) && t.team_id !== championshipWinnerId
@@ -224,11 +253,46 @@ export default async function AuctionPage() {
         .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
     : []
 
+  // Check if auction is complete (manually ended or all teams assigned)
+  const totalTeams = (teams || []).length
+  const assignedTeams = (auctionTeams || []).length
+  const auctionComplete = (tournament.auction_complete ?? false) || (totalTeams > 0 && assignedTeams >= totalTeams)
+
+  // Build draft board data (teams per user in bid order)
+  const getDraftBoardData = () => {
+    return (users || [])
+      .map(u => {
+        const userTeams = (auctionTeams || [])
+          .filter(a => a.user_id === u.id)
+          .map(a => {
+            const team = (teams || []).find(t => t.id === a.team_id)
+            return { ...a, team }
+          })
+          .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
+        const auctionEntry = (auctionEntries || []).find(e => e.user_id === u.id)
+        return {
+          user: u,
+          teams: userTeams,
+          totalSpent: userTeams.reduce((sum, t) => sum + t.bid_amount, 0),
+          hasPaid: auctionEntry?.has_paid ?? false,
+        }
+      })
+  }
+
+  const draftBoardUnsorted = getDraftBoardData()
+  const orderSeed = tournament.auction_order_seed || tournament.id
+  const draftBoard = seededShuffle(draftBoardUnsorted, orderSeed)
+  const maxTeamsPerUser = Math.max(...draftBoard.map(d => d.teams.length), 3)
+
+  // Calculate whose turn it is to throw out a team
+  const currentThrowerIndex = draftBoard.length > 0 ? assignedTeams % draftBoard.length : 0
+
   return (
+    <AuctionClient auctionComplete={auctionComplete}>
     <div className="p-4 pb-20 space-y-4">
       <h1 className="text-xl font-bold text-orange-500">NCAA Auction</h1>
 
-      {/* My Teams Row */}
+      {/* My Teams Row - show during auction too */}
       {currentUserTeams.length > 0 && (
         <div className="flex items-center gap-3">
           {currentUserTeams.map(t => {
@@ -267,8 +331,71 @@ export default async function AuctionPage() {
         </div>
       )}
 
-      {/* Payouts Info */}
-      <div className="bg-zinc-800/50 rounded-xl p-4">
+      {/* Draft Board - show during auction */}
+      {!auctionComplete && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-zinc-800">
+                <th className="text-left px-2 py-2 text-zinc-400 font-medium">Player</th>
+                {Array.from({ length: maxTeamsPerUser }).map((_, i) => (
+                  <th key={i} className="text-center px-2 py-2 text-zinc-400 font-medium w-24">
+                    Bid {i + 1}
+                  </th>
+                ))}
+                <th className="text-right px-2 py-2 text-zinc-400 font-medium">Spent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {draftBoard.map((entry, idx) => {
+                const isCurrentThrower = idx === currentThrowerIndex
+                return (
+                <tr
+                  key={entry.user.id}
+                  className={idx % 2 === 0 ? 'bg-zinc-900/40' : 'bg-zinc-700/40'}
+                >
+                  <td className={`relative px-2 py-1.5 ${isCurrentThrower ? 'font-bold text-orange-400' : 'font-medium text-zinc-200'}`}>
+                    {/* Subtle background text for unpaid users */}
+                    {!entry.hasPaid && (
+                      <span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 text-center text-red-500/15 text-sm font-black whitespace-nowrap tracking-widest pointer-events-none" style={{ width: '400%' }}>
+                        PAY BRO ${entryFee}
+                      </span>
+                    )}
+                    <span className="relative">{entry.user.display_name || entry.user.phone}</span>
+                  </td>
+                  {Array.from({ length: maxTeamsPerUser }).map((_, i) => {
+                    const teamEntry = entry.teams[i]
+                    const d1Team = teamEntry?.team ? findD1Team(teamEntry.team.name) : null
+                    return (
+                      <td key={i} className="text-center px-1 py-1">
+                        {teamEntry ? (
+                          <div className="flex flex-col items-center text-xs leading-tight">
+                            <span className="text-zinc-400">${teamEntry.bid_amount}</span>
+                            <span className="text-zinc-200 font-medium">
+                              {teamEntry.team?.seed} {d1Team?.abbreviation || teamEntry.team?.short_name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-700">—</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                  <td className="text-right px-2 py-1.5 text-white text-base font-bold">
+                    ${entry.totalSpent}
+                  </td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+          <p className="text-xs text-zinc-500 mt-2 text-center">
+            {assignedTeams}/{totalTeams} teams assigned
+          </p>
+        </div>
+      )}
+
+      {/* Payouts Info - show after auction complete */}
+      {auctionComplete && <div className="bg-zinc-800/50 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-orange-400">Payouts</h3>
           <span className="text-xs text-zinc-500">{participantCount} players · ${pot} pot</span>
@@ -299,10 +426,10 @@ export default async function AuctionPage() {
             <span>${payouts.points_4th}</span>
           </div>
         </div>
-      </div>
+      </div>}
 
-      {/* Leaderboard */}
-      <div className="space-y-3">
+      {/* Leaderboard - show after auction complete */}
+      {auctionComplete && <div className="space-y-3">
         {leaderboard.map((entry, idx) => {
           const rank = getRank(idx, entry.points)
           const isTop4 = rank <= 4
@@ -310,10 +437,18 @@ export default async function AuctionPage() {
           return (
             <div
               key={entry.user.id}
-              className={`bg-zinc-800/50 rounded-xl p-4 ${
+              className={`relative overflow-hidden bg-zinc-800/50 rounded-xl p-4 ${
                 isTop4 ? 'ring-1 ring-orange-500/30' : ''
               }`}
             >
+              {/* Diagonal ribbon for unpaid */}
+              {!entry.hasPaid && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="rotate-[15deg] bg-red-600/90 text-white text-xs font-bold py-1 w-[200%] text-center shadow-lg">
+                    NEEDS TO PAY BRO ${entryFee}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <span className={`text-lg font-bold w-6 ${
@@ -363,13 +498,9 @@ export default async function AuctionPage() {
             </div>
           )
         })}
-      </div>
+      </div>}
 
-      {leaderboard.length === 0 && (
-        <div className="text-center text-zinc-500 py-8">
-          No teams assigned yet
-        </div>
-      )}
     </div>
+    </AuctionClient>
   )
 }

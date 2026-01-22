@@ -46,12 +46,12 @@ interface Props {
 }
 
 const ROUND_NAMES: Record<number, string> = {
-  1: 'Round of 64',
-  2: 'Round of 32',
+  1: 'Rd of 64',
+  2: 'Rd of 32',
   3: 'Sweet 16',
   4: 'Elite 8',
   5: 'Final Four',
-  6: 'Championship',
+  6: 'Champ',
 }
 
 const formatGameTime = (dateStr: string | null) => {

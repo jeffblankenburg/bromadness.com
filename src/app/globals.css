@@ -38,3 +38,50 @@ body {
 .mb-safe {
   margin-bottom: env(safe-area-inset-bottom);
 }
+
+/* Rotating border animation */
+@keyframes rotate-border {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rotating-border {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: rgb(127 29 29 / 0.3);
+  isolation: isolate;
+}
+
+.rotating-border::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: -100%;
+  background: conic-gradient(
+    from 0deg,
+    #991b1b,
+    #ef4444,
+    #f97316,
+    #ef4444,
+    #991b1b,
+    #ef4444,
+    #f97316,
+    #ef4444,
+    #991b1b
+  );
+  animation: rotate-border 3s linear infinite;
+}
+
+.rotating-border::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 2px;
+  background: rgb(30 10 10 / 0.95);
+  border-radius: calc(0.5rem - 2px);
+}

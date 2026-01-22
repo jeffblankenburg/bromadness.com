@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { AuctionEditor } from './AuctionEditor'
 import { AuctionSettings } from './AuctionSettings'
+import { AuctionFinishButton } from './AuctionFinishButton'
 
 export default async function AuctionPage() {
   const supabase = await createClient()
@@ -8,7 +9,7 @@ export default async function AuctionPage() {
   // Get active tournament with auction settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, bid_increment, auction_payouts')
+    .select('id, name, year, entry_fee, salary_cap, bid_increment, auction_payouts, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -84,6 +85,13 @@ export default async function AuctionPage() {
         games={games || []}
         settings={settings}
       />
+
+      <div className="pt-6 border-t border-zinc-700">
+        <AuctionFinishButton
+          tournamentId={tournament.id}
+          auctionComplete={tournament.auction_complete ?? false}
+        />
+      </div>
     </div>
   )
 }

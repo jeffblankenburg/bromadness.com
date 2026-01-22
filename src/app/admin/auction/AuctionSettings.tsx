@@ -132,6 +132,24 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
               >
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>
+
+              <div className="pt-4 border-t border-zinc-700">
+                <label className="block text-sm text-zinc-400 mb-2">Throwout Order</label>
+                <button
+                  onClick={async () => {
+                    const newSeed = crypto.randomUUID()
+                    await supabase
+                      .from('tournaments')
+                      .update({ auction_order_seed: newSeed })
+                      .eq('id', tournamentId)
+                    router.refresh()
+                  }}
+                  className="w-full py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
+                >
+                  Shuffle Order
+                </button>
+                <p className="text-xs text-zinc-500 mt-1">Randomizes the throwout order for the draft board</p>
+              </div>
             </div>
           </div>
         </div>
