@@ -169,17 +169,46 @@ export function PickemClient({
   const session1Games = dayGames.slice(0, midpoint)
   const session2Games = dayGames.slice(midpoint)
 
-  // Calculate session payouts
+  // Calculate session payouts with $5 rounding
   const paidEntriesForDay = allEntries.filter(
     e => e.pickem_day_id === currentDay.id && e.has_paid === true
   ).length
   const dayPot = paidEntriesForDay * entryFee
-  const sessionPot = dayPot / 2
-  const sessionPayouts = {
-    first: Math.floor(sessionPot * 0.6),
-    second: Math.floor(sessionPot * 0.3),
-    third: Math.floor(sessionPot * 0.1),
+  const sessionPot = Math.round((dayPot / 2) / 5) * 5 // Round session pot to $5
+
+  // Calculate payouts rounded to $5, ensuring total equals session pot
+  const calculateSessionPayouts = (pot: number) => {
+    const percentages = { first: 0.6, second: 0.3, third: 0.1 }
+    const entries = Object.entries(percentages).map(([key, pct]) => {
+      const raw = pot * pct
+      const rounded = Math.round(raw / 5) * 5
+      const diff = raw - rounded
+      return { key, raw, rounded, diff }
+    })
+
+    let total = entries.reduce((sum, e) => sum + e.rounded, 0)
+    let adjustment = pot - total
+
+    while (adjustment !== 0) {
+      if (adjustment > 0) {
+        entries.sort((a, b) => b.diff - a.diff)
+        entries[0].rounded += 5
+        entries[0].diff -= 5
+        adjustment -= 5
+      } else {
+        entries.sort((a, b) => a.diff - b.diff)
+        entries[0].rounded -= 5
+        entries[0].diff += 5
+        adjustment += 5
+      }
+    }
+
+    const result: Record<string, number> = {}
+    entries.forEach(e => { result[e.key] = e.rounded })
+    return result as { first: number; second: number; third: number }
   }
+
+  const sessionPayouts = calculateSessionPayouts(sessionPot)
 
   // Check if day is locked
   const firstGameTime = dayGames[0]?.scheduled_at
@@ -404,7 +433,7 @@ export function PickemClient({
     )
   }
 
-  const renderLeaderboard = (sessionGames: Game[], sessionLabel: string) => {
+  const renderLeaderboard = (sessionGames: Game[], _sessionLabel: string) => {
     const standings = calculateSessionStandings(sessionGames)
     if (standings.length === 0) {
       return (

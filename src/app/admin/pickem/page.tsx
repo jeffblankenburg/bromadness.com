@@ -5,9 +5,6 @@ import { PickemSettings } from './PickemSettings'
 
 interface PickemPayouts {
   entry_fee: number
-  session_1st: number
-  session_2nd: number
-  session_3rd: number
 }
 
 export default async function AdminPickemPage() {
@@ -117,9 +114,6 @@ export default async function AdminPickemPage() {
 
   const payouts = (tournament.pickem_payouts as PickemPayouts) || {
     entry_fee: 10,
-    session_1st: 0,
-    session_2nd: 0,
-    session_3rd: 0,
   }
 
   return (
@@ -128,7 +122,7 @@ export default async function AdminPickemPage() {
         <h2 className="text-xl font-bold">Pick&apos;em</h2>
         <PickemSettings
           tournamentId={tournament.id}
-          payouts={payouts}
+          entryFee={payouts.entry_fee}
         />
       </div>
 
