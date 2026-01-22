@@ -49,7 +49,7 @@ export default async function PickemPage() {
   }
 
   // Get games with team info
-  const { data: games } = await supabase
+  const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, round, scheduled_at, team1_score, team2_score, winner_id,
@@ -58,6 +58,13 @@ export default async function PickemPage() {
     `)
     .eq('tournament_id', tournament.id)
     .eq('round', 1)
+
+  // Transform games to extract team objects from arrays
+  const games = (gamesRaw || []).map(g => ({
+    ...g,
+    team1: Array.isArray(g.team1) ? g.team1[0] || null : g.team1,
+    team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
+  }))
 
   // Get pickem games
   const { data: pickemGames } = await supabase
@@ -93,7 +100,7 @@ export default async function PickemPage() {
     <PickemClient
       userId={user.id}
       pickemDays={pickemDays}
-      games={games || []}
+      games={games}
       pickemGames={pickemGames || []}
       users={users || []}
       pickemEntries={pickemEntries || []}
