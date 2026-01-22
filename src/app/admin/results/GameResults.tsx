@@ -3,12 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-interface Region {
-  id: string
-  name: string
-  position: number
-}
+import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { CHANNELS } from '@/lib/data/channels'
 
 interface Team {
   id: string
@@ -33,6 +29,8 @@ interface Game {
   is_team1_slot: boolean | null
   spread: number | null
   favorite_team_id: string | null
+  location: string | null
+  channel: string | null
 }
 
 interface Tournament {
@@ -43,7 +41,6 @@ interface Tournament {
 
 interface Props {
   tournament: Tournament
-  regions: Region[]
   teams: Team[]
   games: Game[]
 }
@@ -57,22 +54,40 @@ const ROUND_NAMES: Record<number, string> = {
   6: 'Championship',
 }
 
-export function GameResults({ tournament, regions, teams, games }: Props) {
+const formatGameTime = (dateStr: string | null) => {
+  if (!dateStr) return null
+  // Parse directly without timezone conversion
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return null
+  const [, year, month, day, hours, mins] = match
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const dayName = days[date.getDay()]
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'p' : 'a'
+  return `${dayName} ${hour12}:${mins}${ampm}`
+}
+
+const getD1TeamData = (teamName: string) => {
+  return D1_TEAMS.find(t => t.name.toLowerCase() === teamName.toLowerCase())
+}
+
+const getChannelNumber = (channelName: string | null) => {
+  if (!channelName) return null
+  const channel = CHANNELS.find(c => c.name.toLowerCase() === channelName.toLowerCase())
+  return channel ? channel.number : null
+}
+
+export function GameResults({ tournament, teams, games }: Props) {
   const [activeRound, setActiveRound] = useState(1)
   const [saving, setSaving] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
-  const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
-
   const getTeamById = (teamId: string | null): Team | null => {
     if (!teamId) return null
     return teams.find(t => t.id === teamId) || null
-  }
-
-  const getRegionById = (regionId: string | null) => {
-    if (!regionId) return null
-    return regions.find(r => r.id === regionId)
   }
 
   const roundGames = games.filter(g => g.round === activeRound)
@@ -99,11 +114,84 @@ export function GameResults({ tournament, regions, teams, games }: Props) {
           .eq('id', game.next_game_id)
       }
 
+      // Update pick'em results
+      await updatePickemResults(game, team1Score, team2Score)
+
       router.refresh()
     } catch (err) {
       console.error('Failed to save result:', err)
     } finally {
       setSaving(null)
+    }
+  }
+
+  // Update pick'em when game result is entered
+  const updatePickemResults = async (game: Game, team1Score: number, team2Score: number) => {
+    try {
+      // Find the pickem_game for this game
+      const { data: pickemGame } = await supabase
+        .from('pickem_games')
+        .select('id, spread, favorite_team_id')
+        .eq('game_id', game.id)
+        .single()
+
+      if (!pickemGame) return // No pick'em for this game
+
+      // Calculate who covered the spread
+      // The team that "wins" against the spread
+      const margin = team1Score - team2Score // positive = team1 won outright
+      const team1IsFavorite = game.favorite_team_id === game.team1_id
+      const spread = pickemGame.spread
+
+      // Adjusted margin from team1's perspective
+      // If team1 is favorite, subtract spread from their margin
+      // If team2 is favorite (team1 is underdog), add spread to team1's margin
+      const adjustedMargin = team1IsFavorite
+        ? margin - spread  // favorite must win by more than spread
+        : margin + spread  // underdog gets spread points added
+
+      // Winner against the spread
+      const spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
+
+      // Update the pickem_game with the spread winner
+      await supabase
+        .from('pickem_games')
+        .update({ winner_team_id: spreadWinnerId })
+        .eq('id', pickemGame.id)
+
+      // Get all picks for this pickem_game
+      const { data: picks } = await supabase
+        .from('pickem_picks')
+        .select('id, picked_team_id, entry_id')
+        .eq('pickem_game_id', pickemGame.id)
+
+      if (!picks || picks.length === 0) return
+
+      // Update is_correct for each pick
+      for (const pick of picks) {
+        const isCorrect = pick.picked_team_id === spreadWinnerId
+        await supabase
+          .from('pickem_picks')
+          .update({ is_correct: isCorrect })
+          .eq('id', pick.id)
+      }
+
+      // Update correct_picks count for each affected entry
+      const entryIds = [...new Set(picks.map(p => p.entry_id))]
+      for (const entryId of entryIds) {
+        const { count } = await supabase
+          .from('pickem_picks')
+          .select('*', { count: 'exact', head: true })
+          .eq('entry_id', entryId)
+          .eq('is_correct', true)
+
+        await supabase
+          .from('pickem_entries')
+          .update({ correct_picks: count || 0 })
+          .eq('id', entryId)
+      }
+    } catch (err) {
+      console.error('Failed to update pick\'em results:', err)
     }
   }
 
@@ -137,51 +225,21 @@ export function GameResults({ tournament, regions, teams, games }: Props) {
     }
   }
 
-  const handleSetSpread = async (game: Game, spread: number, favoriteTeamId: string) => {
-    setSaving(game.id)
-    try {
-      await supabase
-        .from('games')
-        .update({
-          spread,
-          favorite_team_id: favoriteTeamId,
-        })
-        .eq('id', game.id)
-
-      router.refresh()
-    } catch (err) {
-      console.error('Failed to set spread:', err)
-    } finally {
-      setSaving(null)
-    }
+  // Sort games: incomplete first (by time), then completed (by time)
+  const sortGames = (gamesToSort: Game[]) => {
+    return [...gamesToSort].sort((a, b) => {
+      // First: games without results come before games with results
+      const aHasResult = a.winner_id !== null
+      const bHasResult = b.winner_id !== null
+      if (aHasResult !== bHasResult) {
+        return aHasResult ? 1 : -1
+      }
+      // Then sort by scheduled time
+      const aTime = a.scheduled_at ? new Date(a.scheduled_at).getTime() : 0
+      const bTime = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0
+      return aTime - bTime
+    })
   }
-
-  const handleClearSpread = async (game: Game) => {
-    setSaving(game.id)
-    try {
-      await supabase
-        .from('games')
-        .update({
-          spread: null,
-          favorite_team_id: null,
-        })
-        .eq('id', game.id)
-
-      router.refresh()
-    } catch (err) {
-      console.error('Failed to clear spread:', err)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  // Group games by region for rounds 1-4
-  const gamesByRegion = activeRound <= 4
-    ? sortedRegions.map(region => ({
-        region,
-        games: roundGames.filter(g => g.region_id === region.id),
-      }))
-    : [{ region: null, games: roundGames }]
 
   return (
     <div className="space-y-4">
@@ -211,35 +269,22 @@ export function GameResults({ tournament, regions, teams, games }: Props) {
       </div>
 
       {/* Games */}
-      <div className="space-y-4">
-        {gamesByRegion.map(({ region, games: regionGames }) => (
-          <div key={region?.id || 'final'} className="space-y-2">
-            {region && (
-              <h3 className="text-sm font-semibold text-orange-400">{region.name} Region</h3>
-            )}
-            {!region && activeRound >= 5 && (
-              <h3 className="text-sm font-semibold text-orange-400">{ROUND_NAMES[activeRound]}</h3>
-            )}
-
-            {regionGames.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                team1={getTeamById(game.team1_id)}
-                team2={getTeamById(game.team2_id)}
-                saving={saving === game.id}
-                onSetWinner={handleSetWinner}
-                onClearResult={handleClearResult}
-                onSetSpread={handleSetSpread}
-                onClearSpread={handleClearSpread}
-              />
-            ))}
-
-            {regionGames.length === 0 && (
-              <p className="text-zinc-500 text-sm">No games in this round yet.</p>
-            )}
-          </div>
+      <div className="space-y-2">
+        {sortGames(roundGames).map((game) => (
+          <GameCard
+            key={game.id}
+            game={game}
+            team1={getTeamById(game.team1_id)}
+            team2={getTeamById(game.team2_id)}
+            saving={saving === game.id}
+            onSetWinner={handleSetWinner}
+            onClearResult={handleClearResult}
+          />
         ))}
+
+        {roundGames.length === 0 && (
+          <p className="text-zinc-500 text-sm">No games in this round yet.</p>
+        )}
       </div>
     </div>
   )
@@ -252,235 +297,168 @@ interface GameCardProps {
   saving: boolean
   onSetWinner: (game: Game, winnerId: string, team1Score: number, team2Score: number) => void
   onClearResult: (game: Game) => void
-  onSetSpread: (game: Game, spread: number, favoriteTeamId: string) => void
-  onClearSpread: (game: Game) => void
 }
 
-function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult, onSetSpread, onClearSpread }: GameCardProps) {
+function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: GameCardProps) {
   const [team1Score, setTeam1Score] = useState(game.team1_score?.toString() || '')
   const [team2Score, setTeam2Score] = useState(game.team2_score?.toString() || '')
-  const [showScoreInput, setShowScoreInput] = useState(false)
-  const [pendingWinner, setPendingWinner] = useState<string | null>(null)
-  const [showSpreadInput, setShowSpreadInput] = useState(false)
-  const [spreadValue, setSpreadValue] = useState(game.spread?.toString() || '')
 
   const hasResult = game.winner_id !== null
   const canEnterResult = team1 && team2
-  const hasSpread = game.spread !== null && game.favorite_team_id !== null
+  const hasSpread = game.spread !== null
 
-  // Get spread display for each team
-  const getSpreadDisplay = (teamId: string | null) => {
-    if (!hasSpread || !teamId) return null
-    if (teamId === game.favorite_team_id) {
-      return `-${game.spread}`
+  const d1Team1 = team1 ? getD1TeamData(team1.name) : null
+  const d1Team2 = team2 ? getD1TeamData(team2.name) : null
+  const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
+  const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
+
+  // Get spread display for a team based on seed comparison
+  const getSpreadDisplay = (team: Team | null, otherTeam: Team | null) => {
+    if (!hasSpread || !team || !otherTeam) return null
+    if (team.seed < otherTeam.seed) {
+      // Lower seed - show spread as-is
+      return `${game.spread! > 0 ? '+' : ''}${game.spread}`
     } else {
-      return `+${game.spread}`
+      // Higher seed - show inverted spread
+      const inverted = game.spread! * -1
+      return `${inverted > 0 ? '+' : ''}${inverted}`
     }
   }
 
-  const handleTeamClick = (teamId: string) => {
+  const handleScoreBlur = () => {
     if (!canEnterResult || saving) return
-    if (hasResult) return
 
-    setPendingWinner(teamId)
-    setShowScoreInput(true)
+    const t1 = team1Score.trim()
+    const t2 = team2Score.trim()
+
+    // Only save if both scores are entered
+    if (t1 === '' || t2 === '') return
+
+    const t1Score = parseInt(t1)
+    const t2Score = parseInt(t2)
+
+    if (isNaN(t1Score) || isNaN(t2Score)) return
+
+    // Determine winner based on scores
+    const winnerId = t1Score > t2Score ? team1!.id : team2!.id
+
+    // Only save if something changed
+    if (game.team1_score === t1Score && game.team2_score === t2Score && game.winner_id === winnerId) return
+
+    onSetWinner(game, winnerId, t1Score, t2Score)
   }
 
-  const handleSubmitScore = () => {
-    if (!pendingWinner) return
-    const t1Score = parseInt(team1Score) || 0
-    const t2Score = parseInt(team2Score) || 0
-    onSetWinner(game, pendingWinner, t1Score, t2Score)
-    setShowScoreInput(false)
-    setPendingWinner(null)
-  }
-
-  const handleCancel = () => {
-    setShowScoreInput(false)
-    setPendingWinner(null)
-    setTeam1Score(game.team1_score?.toString() || '')
-    setTeam2Score(game.team2_score?.toString() || '')
-  }
-
-  const handleSetFavorite = (teamId: string) => {
-    const spread = parseFloat(spreadValue)
-    if (isNaN(spread) || spread <= 0) return
-    onSetSpread(game, spread, teamId)
-    setShowSpreadInput(false)
-  }
-
-  const formatDate = (date: string | null) => {
-    if (!date) return null
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+  const channelNum = getChannelNumber(game.channel)
 
   return (
     <div className={`bg-zinc-800/50 rounded-xl p-3 space-y-2 ${saving ? 'opacity-50' : ''}`}>
-      <div className="flex items-center justify-between text-xs text-zinc-500">
-        <span>Game {game.game_number}</span>
-        <div className="flex items-center gap-2">
-          {game.scheduled_at && <span>{formatDate(game.scheduled_at)}</span>}
-        </div>
-      </div>
-
-      {/* Team 1 */}
-      <button
-        onClick={() => team1 && handleTeamClick(team1.id)}
-        disabled={!canEnterResult || saving || hasResult}
-        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-          game.winner_id === team1?.id
-            ? 'bg-green-600 text-white'
-            : pendingWinner === team1?.id
-            ? 'bg-orange-500 text-white'
-            : team1
-            ? 'bg-zinc-700 hover:bg-zinc-600'
-            : 'bg-zinc-900 text-zinc-500'
-        }`}
-      >
-        <span className="w-6 text-sm font-mono text-zinc-400">{team1?.seed || '?'}</span>
-        <span className="flex-1 truncate">{team1?.name || 'TBD'}</span>
-        {hasSpread && team1 && (
-          <span className={`text-xs font-medium ${game.favorite_team_id === team1.id ? 'text-yellow-400' : 'text-zinc-400'}`}>
-            {getSpreadDisplay(team1.id)}
-          </span>
-        )}
-        {hasResult && game.team1_score !== null && (
-          <span className="font-bold">{game.team1_score}</span>
-        )}
-      </button>
-
-      {/* Team 2 */}
-      <button
-        onClick={() => team2 && handleTeamClick(team2.id)}
-        disabled={!canEnterResult || saving || hasResult}
-        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-          game.winner_id === team2?.id
-            ? 'bg-green-600 text-white'
-            : pendingWinner === team2?.id
-            ? 'bg-orange-500 text-white'
-            : team2
-            ? 'bg-zinc-700 hover:bg-zinc-600'
-            : 'bg-zinc-900 text-zinc-500'
-        }`}
-      >
-        <span className="w-6 text-sm font-mono text-zinc-400">{team2?.seed || '?'}</span>
-        <span className="flex-1 truncate">{team2?.name || 'TBD'}</span>
-        {hasSpread && team2 && (
-          <span className={`text-xs font-medium ${game.favorite_team_id === team2.id ? 'text-yellow-400' : 'text-zinc-400'}`}>
-            {getSpreadDisplay(team2.id)}
-          </span>
-        )}
-        {hasResult && game.team2_score !== null && (
-          <span className="font-bold">{game.team2_score}</span>
-        )}
-      </button>
-
-      {/* Spread Input */}
-      {showSpreadInput && canEnterResult && (
-        <div className="pt-2 border-t border-zinc-700 space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.5"
-              value={spreadValue}
-              onChange={(e) => setSpreadValue(e.target.value)}
-              placeholder="Spread (e.g. 14.5)"
-              className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-sm"
-            />
-          </div>
-          <div className="text-xs text-zinc-400 mb-1">Select favorite:</div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => team1 && handleSetFavorite(team1.id)}
-              disabled={!spreadValue || parseFloat(spreadValue) <= 0}
-              className="flex-1 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-sm rounded truncate"
-            >
-              {team1?.short_name || 'Team 1'}
-            </button>
-            <button
-              onClick={() => team2 && handleSetFavorite(team2.id)}
-              disabled={!spreadValue || parseFloat(spreadValue) <= 0}
-              className="flex-1 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-sm rounded truncate"
-            >
-              {team2?.short_name || 'Team 2'}
-            </button>
-            <button
-              onClick={() => setShowSpreadInput(false)}
-              className="px-2 py-1 bg-zinc-800 text-zinc-400 text-sm rounded"
-            >
-              Cancel
-            </button>
-          </div>
+      {/* Header: Date/Time, Location, Channel */}
+      {(game.scheduled_at || game.location || game.channel) && (
+        <div className="flex items-center gap-2 text-[10px] text-zinc-400">
+          {game.scheduled_at && (
+            <span className="px-1 py-0.5 bg-zinc-800 rounded">{formatGameTime(game.scheduled_at)}</span>
+          )}
+          {game.location && (
+            <span className="flex-1 truncate">{game.location}</span>
+          )}
+          {game.channel && (
+            <span className="px-1 py-0.5 bg-zinc-800 rounded">
+              {game.channel}{channelNum ? ` (${channelNum})` : ''}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Score Input */}
-      {showScoreInput && (
-        <div className="flex items-center gap-2 pt-2 border-t border-zinc-700">
+      {/* Team 1 */}
+      <div
+        className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg ${
+          hasResult && game.winner_id === team1?.id ? 'ring-2 ring-green-500' : ''
+        }`}
+        style={{ backgroundColor: d1Team1 ? d1Team1.primaryColor + '40' : '#3f3f4640' }}
+      >
+        <span className="w-5 text-xs font-mono text-zinc-400">{team1?.seed || '?'}</span>
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: d1Team1?.primaryColor || '#3f3f46' }}
+        >
+          {logo1 ? (
+            <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+          ) : (
+            <span className="text-[10px] font-bold text-white">{d1Team1?.abbreviation?.slice(0, 2) || team1?.short_name?.slice(0, 2) || '?'}</span>
+          )}
+        </div>
+        <span className="flex-1 truncate text-sm text-white">
+          {d1Team1?.shortName || team1?.short_name || team1?.name || 'TBD'}
+          {hasSpread && team1 && team2 && (
+            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team1, team2)}</span>
+          )}
+        </span>
+        {canEnterResult ? (
           <input
             type="number"
             value={team1Score}
             onChange={(e) => setTeam1Score(e.target.value)}
-            placeholder={team1?.short_name || 'T1'}
-            className="w-16 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-sm"
+            onBlur={handleScoreBlur}
+            placeholder=""
+            className={`w-14 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-sm font-bold appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+              hasResult && game.winner_id === team1?.id ? 'text-green-400' : 'text-white'
+            }`}
           />
-          <span className="text-zinc-500">-</span>
+        ) : (
+          <span className="w-14 text-center text-zinc-500">—</span>
+        )}
+      </div>
+
+      {/* Team 2 */}
+      <div
+        className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg ${
+          hasResult && game.winner_id === team2?.id ? 'ring-2 ring-green-500' : ''
+        }`}
+        style={{ backgroundColor: d1Team2 ? d1Team2.primaryColor + '40' : '#3f3f4640' }}
+      >
+        <span className="w-5 text-xs font-mono text-zinc-400">{team2?.seed || '?'}</span>
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: d1Team2?.primaryColor || '#3f3f46' }}
+        >
+          {logo2 ? (
+            <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+          ) : (
+            <span className="text-[10px] font-bold text-white">{d1Team2?.abbreviation?.slice(0, 2) || team2?.short_name?.slice(0, 2) || '?'}</span>
+          )}
+        </div>
+        <span className="flex-1 truncate text-sm text-white">
+          {d1Team2?.shortName || team2?.short_name || team2?.name || 'TBD'}
+          {hasSpread && team1 && team2 && (
+            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team2, team1)}</span>
+          )}
+        </span>
+        {canEnterResult ? (
           <input
             type="number"
             value={team2Score}
             onChange={(e) => setTeam2Score(e.target.value)}
-            placeholder={team2?.short_name || 'T2'}
-            className="w-16 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-sm"
+            onBlur={handleScoreBlur}
+            placeholder=""
+            className={`w-14 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-sm font-bold appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+              hasResult && game.winner_id === team2?.id ? 'text-green-400' : 'text-white'
+            }`}
           />
-          <button
-            onClick={handleSubmitScore}
-            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleCancel}
-            className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+        ) : (
+          <span className="w-14 text-center text-zinc-500">—</span>
+        )}
+      </div>
 
-      {/* Action Buttons */}
-      {!showScoreInput && !showSpreadInput && (
+      {/* Clear Result Button */}
+      {hasResult && (
         <div className="flex items-center gap-3 text-xs">
-          {canEnterResult && !hasSpread && (
-            <button
-              onClick={() => setShowSpreadInput(true)}
-              className="text-zinc-400 hover:text-white"
-            >
-              Set spread
-            </button>
-          )}
-          {hasSpread && (
-            <button
-              onClick={() => onClearSpread(game)}
-              disabled={saving}
-              className="text-zinc-400 hover:text-white"
-            >
-              Edit spread
-            </button>
-          )}
-          {hasResult && (
-            <button
-              onClick={() => onClearResult(game)}
-              disabled={saving}
-              className="text-red-400 hover:text-red-300"
-            >
-              Clear result
-            </button>
-          )}
+          <button
+            onClick={() => onClearResult(game)}
+            disabled={saving}
+            className="text-red-400 hover:text-red-300"
+          >
+            Clear result
+          </button>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { DevTools } from '@/components/DevTools'
 import { MenuDisplay } from '@/components/MenuDisplay'
+import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 
 // Get tournament day based on start_date (Wednesday)
 // Returns Wednesday, Thursday, Friday, Saturday, or Sunday
@@ -160,7 +161,7 @@ export default async function Home() {
   const currentDay = getTournamentDay(tournament?.start_date ?? null)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white flex flex-col items-center p-6 pt-8">
       {/* DEV ONLY - Remove before launch */}
       {user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
 
@@ -177,44 +178,11 @@ export default async function Home() {
               )}
 
               {/* User's Auction Teams */}
-              <Link href="/auction" className="block w-full bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-orange-400">
-                    Your Auction Teams
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    {userPayout > 0 && (
-                      <div className="flex items-center gap-1">
-                        <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                        </svg>
-                        <span className="text-sm font-bold text-green-400">${userPayout.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <span className="text-sm font-bold text-orange-400">{userTotalPoints} pts</span>
-                  </div>
-                </div>
-                {userAuctionTeams.length > 0 ? (
-                  <div className="space-y-1">
-                    {userAuctionTeams
-                      .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
-                      .map((at, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 text-xs text-zinc-500">{at.team?.seed}</span>
-                            <span className={at.wins > 0 ? 'text-green-400' : ''}>{at.team?.short_name || at.team?.name}</span>
-                            <span className="text-xs text-zinc-500">${at.bid_amount}</span>
-                          </div>
-                          <span className="text-xs text-zinc-400">
-                            {at.points}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-500 text-center">No teams yet</p>
-                )}
-              </Link>
+              <AuctionTeamsCard
+                teams={userAuctionTeams}
+                totalPoints={userTotalPoints}
+                payout={userPayout}
+              />
 
               {/* Today's Menu */}
               {menuItems.length > 0 && (
@@ -224,17 +192,6 @@ export default async function Home() {
                   </div>
                 </Link>
               )}
-
-              <div className="pt-4">
-                <form action="/api/auth/signout" method="POST">
-                  <button
-                    type="submit"
-                    className="text-zinc-500 hover:text-zinc-300 text-sm"
-                  >
-                    Sign out
-                  </button>
-                </form>
-              </div>
             </div>
           ) : (
             <div className="space-y-8">

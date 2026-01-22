@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { InlineTeamSearch } from './InlineTeamSearch'
 import { ROUND1_MATCHUPS } from '@/lib/bracket/generate'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { CHANNELS } from '@/lib/data/channels'
 
 interface Region {
   id: string
@@ -35,11 +36,11 @@ interface Game {
   spread: number | null
   favorite_team_id: string | null
   channel: string | null
+  location: string | null
   next_game_id: string | null
   is_team1_slot: boolean | null
 }
 
-const CHANNELS = ['CBS', 'TBS', 'TNT', 'truTV']
 
 const ROUND_NAMES: Record<number, string> = {
   1: 'Round of 64',
@@ -199,13 +200,18 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
   const formatGameTime = (dateStr: string | null) => {
     if (!dateStr) return '—'
-    const date = new Date(dateStr)
+    // Parse directly without timezone conversion
+    const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+    if (!match) return '—'
+    const [, year, month, day, hours, mins] = match
+    // Create date just to get day of week
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
     const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-    const day = days[date.getDay()]
-    const hours = date.getHours()
-    const mins = date.getMinutes().toString().padStart(2, '0')
-    const hour12 = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours
-    return `${day} ${hour12}:${mins}`
+    const dayName = days[date.getDay()]
+    const hour = parseInt(hours)
+    const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+    const ampm = hour >= 12 ? 'p' : 'a'
+    return `${dayName} ${hour12}:${mins}${ampm}`
   }
 
   const handleSpreadChange = async (gameId: string, value: string) => {
@@ -245,6 +251,20 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     if (error) {
       console.error('Failed to update channel:', error)
       alert('Failed to save channel: ' + error.message)
+    } else {
+      router.refresh()
+    }
+  }
+
+  const handleLocationChange = async (gameId: string, location: string) => {
+    const { error } = await supabase
+      .from('games')
+      .update({ location: location || null })
+      .eq('id', gameId)
+
+    if (error) {
+      console.error('Failed to update location:', error)
+      alert('Failed to save location: ' + error.message)
     } else {
       router.refresh()
     }
@@ -370,42 +390,53 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
               const isSelected2 = selectedSlot?.regionId === activeTab && selectedSlot?.seed === seed2
 
               return (
-                <div key={idx} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
-                  {/* Header: DateTime (left), Channel (right) */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {/* DateTime */}
-                      <label className="relative">
-                        <span className={`block px-2 py-1 rounded text-[11px] text-center cursor-pointer ${
-                          game?.scheduled_at
-                            ? 'bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                            : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
-                        }`}>
-                          {game?.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
-                        </span>
-                        <input
-                          type="datetime-local"
-                          value={game?.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
-                          onChange={(e) => game && handleScheduleChange(game.id, e.target.value)}
-                          disabled={!game}
-                          className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-default"
-                        />
-                      </label>
+                <div key={`${activeTab}-${idx}`} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
+                  {/* Header: DateTime, Location, Channel */}
+                  <div className="flex items-center gap-1">
+                    {/* DateTime - compact display + picker */}
+                    <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                      game?.scheduled_at
+                        ? 'bg-zinc-800 border border-zinc-600'
+                        : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                    } ${!game ? 'opacity-30' : ''}`}>
+                      <span className={game?.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
+                        {game?.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={game?.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                        onChange={(e) => game && handleScheduleChange(game.id, e.target.value)}
+                        disabled={!game}
+                        className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
+                      />
                     </div>
-                    {/* Channel selector - same width as spread */}
+                    {/* Location */}
+                    <input
+                      type="text"
+                      defaultValue={game?.location || ''}
+                      onBlur={(e) => game && handleLocationChange(game.id, e.target.value)}
+                      disabled={!game}
+                      placeholder="Location"
+                      className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] disabled:opacity-30 ${
+                        game?.location
+                          ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                          : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                      }`}
+                    />
+                    {/* Channel selector */}
                     <select
                       value={game?.channel || ''}
                       onChange={(e) => game && handleChannelChange(game.id, e.target.value)}
                       disabled={!game}
-                      className={`w-[72px] px-1 py-1 rounded text-[11px] text-center cursor-pointer ${
+                      className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
                         game?.channel
-                          ? 'bg-zinc-900 border border-zinc-700 text-zinc-300'
-                          : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
+                          ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                          : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                       } disabled:opacity-30`}
                     >
-                      <option value="">Channel</option>
+                      <option value="">Ch</option>
                       {CHANNELS.map(ch => (
-                        <option key={ch} value={ch}>{ch}</option>
+                        <option key={ch.name} value={ch.name}>{ch.name}</option>
                       ))}
                     </select>
                   </div>
@@ -547,39 +578,49 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
                     return (
                       <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
-                        {/* Header: DateTime (left), Channel (right) */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {/* DateTime */}
-                            <label className="relative">
-                              <span className={`block px-2 py-1 rounded text-[11px] text-center cursor-pointer ${
-                                game.scheduled_at
-                                  ? 'bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                                  : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
-                              }`}>
-                                {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
-                              </span>
-                              <input
-                                type="datetime-local"
-                                value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
-                                onChange={(e) => handleScheduleChange(game.id, e.target.value)}
-                                className="absolute inset-0 opacity-0 cursor-pointer"
-                              />
-                            </label>
+                        {/* Header: DateTime, Location, Channel */}
+                        <div className="flex items-center gap-1">
+                          {/* DateTime - compact display + picker */}
+                          <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                            game.scheduled_at
+                              ? 'bg-zinc-800 border border-zinc-600'
+                              : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                          }`}>
+                            <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
+                              {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
+                            </span>
+                            <input
+                              type="datetime-local"
+                              value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                              onChange={(e) => handleScheduleChange(game.id, e.target.value)}
+                              className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
+                            />
                           </div>
+                          {/* Location */}
+                          <input
+                            type="text"
+                            defaultValue={game.location || ''}
+                            onBlur={(e) => handleLocationChange(game.id, e.target.value)}
+                            placeholder="Location"
+                            className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
+                              game.location
+                                ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                            }`}
+                          />
                           {/* Channel selector */}
                           <select
                             value={game.channel || ''}
                             onChange={(e) => handleChannelChange(game.id, e.target.value)}
-                            className={`w-[60px] px-1 py-1 rounded text-[11px] text-center cursor-pointer ${
+                            className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
                               game.channel
-                                ? 'bg-zinc-900 border border-zinc-700 text-zinc-300'
-                                : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
+                                ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                             }`}
                           >
-                            <option value="">Channel</option>
+                            <option value="">Ch</option>
                             {CHANNELS.map(ch => (
-                              <option key={ch} value={ch}>{ch}</option>
+                              <option key={ch.name} value={ch.name}>{ch.name}</option>
                             ))}
                           </select>
                         </div>
@@ -612,7 +653,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                             )}
                           </div>
                           {/* Spread input for team1 (favorite) */}
-                          <div className="w-[60px] flex-shrink-0">
+                          <div className="w-[72px] flex-shrink-0">
                             {game.spread ? (
                               <input
                                 type="text"
@@ -662,7 +703,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                             )}
                           </div>
                           {/* Spacer to match team1 spread width */}
-                          <div className="w-[60px] flex-shrink-0" />
+                          <div className="w-[72px] flex-shrink-0" />
                         </div>
                       </div>
                     )
@@ -696,35 +737,47 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
                 return (
                   <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
-                    {/* Header: DateTime (left), Channel (right) */}
-                    <div className="flex items-center justify-between">
-                      <label className="relative">
-                        <span className={`block px-2 py-1 rounded text-[11px] text-center cursor-pointer ${
-                          game.scheduled_at
-                            ? 'bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                            : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
-                        }`}>
+                    {/* Header: DateTime, Location, Channel */}
+                    <div className="flex items-center gap-1">
+                      {/* DateTime - compact display + picker */}
+                      <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                        game.scheduled_at
+                          ? 'bg-zinc-800 border border-zinc-600'
+                          : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                      }`}>
+                        <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
                           {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
                         </span>
                         <input
                           type="datetime-local"
                           value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
                           onChange={(e) => handleScheduleChange(game.id, e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
                         />
-                      </label>
+                      </div>
+                      <input
+                        type="text"
+                        defaultValue={game.location || ''}
+                        onBlur={(e) => handleLocationChange(game.id, e.target.value)}
+                        placeholder="Location"
+                        className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
+                          game.location
+                            ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                            : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                        }`}
+                      />
                       <select
                         value={game.channel || ''}
                         onChange={(e) => handleChannelChange(game.id, e.target.value)}
-                        className={`w-[72px] px-1 py-1 rounded text-[11px] text-center cursor-pointer ${
+                        className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
                           game.channel
-                            ? 'bg-zinc-900 border border-zinc-700 text-zinc-300'
-                            : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
+                            ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                            : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                         }`}
                       >
-                        <option value="">Channel</option>
+                        <option value="">Ch</option>
                         {CHANNELS.map(ch => (
-                          <option key={ch} value={ch}>{ch}</option>
+                          <option key={ch.name} value={ch.name}>{ch.name}</option>
                         ))}
                       </select>
                     </div>
@@ -837,35 +890,47 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
                 return (
                   <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
-                    {/* Header: DateTime (left), Channel (right) */}
-                    <div className="flex items-center justify-between">
-                      <label className="relative">
-                        <span className={`block px-2 py-1 rounded text-[11px] text-center cursor-pointer ${
-                          game.scheduled_at
-                            ? 'bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                            : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
-                        }`}>
+                    {/* Header: DateTime, Location, Channel */}
+                    <div className="flex items-center gap-1">
+                      {/* DateTime - compact display + picker */}
+                      <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                        game.scheduled_at
+                          ? 'bg-zinc-800 border border-zinc-600'
+                          : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                      }`}>
+                        <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
                           {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
                         </span>
                         <input
                           type="datetime-local"
                           value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
                           onChange={(e) => handleScheduleChange(game.id, e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
                         />
-                      </label>
+                      </div>
+                      <input
+                        type="text"
+                        defaultValue={game.location || ''}
+                        onBlur={(e) => handleLocationChange(game.id, e.target.value)}
+                        placeholder="Location"
+                        className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
+                          game.location
+                            ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                            : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                        }`}
+                      />
                       <select
                         value={game.channel || ''}
                         onChange={(e) => handleChannelChange(game.id, e.target.value)}
-                        className={`w-[72px] px-1 py-1 rounded text-[11px] text-center cursor-pointer ${
+                        className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
                           game.channel
-                            ? 'bg-zinc-900 border border-zinc-700 text-zinc-300'
-                            : 'bg-zinc-900/50 border border-dashed border-zinc-700 text-zinc-500'
+                            ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                            : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                         }`}
                       >
-                        <option value="">Channel</option>
+                        <option value="">Ch</option>
                         {CHANNELS.map(ch => (
-                          <option key={ch} value={ch}>{ch}</option>
+                          <option key={ch.name} value={ch.name}>{ch.name}</option>
                         ))}
                       </select>
                     </div>

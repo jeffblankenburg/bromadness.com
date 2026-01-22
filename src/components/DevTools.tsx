@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 // DEV ONLY - Remove before launch
 export function DevTools({ isAdmin }: { isAdmin: boolean }) {
   const [admin, setAdmin] = useState(isAdmin)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const toggleAdmin = async () => {
     setLoading(true)
@@ -16,7 +14,8 @@ export function DevTools({ isAdmin }: { isAdmin: boolean }) {
       const data = await res.json()
       if (res.ok) {
         setAdmin(data.is_admin)
-        router.refresh()
+        // Full reload to update all components including BottomNav
+        window.location.reload()
       }
     } catch (e) {
       console.error('Failed to toggle admin:', e)

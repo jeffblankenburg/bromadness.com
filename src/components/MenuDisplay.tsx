@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+
 interface MenuItem {
   id: string
   day: string
@@ -13,19 +17,38 @@ interface Props {
 }
 
 const MEAL_ORDER = ['Breakfast', 'Dinner', 'Misc']
+const DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export function MenuDisplay({ items, currentDay, hideAlwaysAvailable = false }: Props) {
-  // Get today's items and always-available items
-  const todayItems = items.filter(item => item.day === currentDay)
-  const randomItems = hideAlwaysAvailable ? [] : items.filter(item => item.day === 'Random')
+  const [selectedDay, setSelectedDay] = useState(currentDay)
 
-  if (todayItems.length === 0 && randomItems.length === 0) {
-    return null
+  const currentIndex = DAYS.indexOf(selectedDay)
+  const canGoBack = currentIndex > 0
+  const canGoForward = currentIndex < DAYS.length - 1
+
+  const goBack = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (canGoBack) {
+      setSelectedDay(DAYS[currentIndex - 1])
+    }
   }
 
-  // Group today's items by meal type
+  const goForward = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (canGoForward) {
+      setSelectedDay(DAYS[currentIndex + 1])
+    }
+  }
+
+  // Get selected day's items and always-available items
+  const dayItems = items.filter(item => item.day === selectedDay)
+  const randomItems = hideAlwaysAvailable ? [] : items.filter(item => item.day === 'Random')
+
+  // Group day's items by meal type
   const groupedItems = MEAL_ORDER.reduce((acc, mealType) => {
-    const mealItems = todayItems.filter(item => item.meal_type === mealType)
+    const mealItems = dayItems.filter(item => item.meal_type === mealType)
     if (mealItems.length > 0) {
       acc[mealType] = mealItems
     }
@@ -34,9 +57,33 @@ export function MenuDisplay({ items, currentDay, hideAlwaysAvailable = false }: 
 
   return (
     <div className="w-full max-w-sm bg-zinc-800/50 rounded-xl p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-orange-400 text-center">
-        {currentDay}&apos;s Menu
-      </h3>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={goBack}
+          disabled={!canGoBack}
+          className={`p-1 rounded ${canGoBack ? 'text-zinc-400 hover:text-white' : 'text-zinc-700'}`}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <h3 className="text-sm font-semibold text-orange-400 text-center">
+          {selectedDay}&apos;s Menu
+        </h3>
+        <button
+          onClick={goForward}
+          disabled={!canGoForward}
+          className={`p-1 rounded ${canGoForward ? 'text-zinc-400 hover:text-white' : 'text-zinc-700'}`}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+      </div>
+
+      {dayItems.length === 0 && (
+        <p className="text-sm text-zinc-500 text-center py-2">No menu items yet</p>
+      )}
 
       {Object.entries(groupedItems).map(([mealType, mealItems]) => (
         <div key={mealType}>

@@ -69,6 +69,24 @@ export default function InfoPage() {
             </Link>
           ))}
         </div>
+
+        <div className="mt-8 pt-6 border-t border-zinc-800">
+          <form action="/api/auth/signout" method="POST">
+            <button
+              type="submit"
+              className="w-full flex items-center gap-4 p-4 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-colors text-left"
+            >
+              <div className="text-zinc-500">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-zinc-300">Sign out</div>
+              </div>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )

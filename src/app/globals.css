@@ -26,8 +26,9 @@ body {
 }
 
 /* Safe area utilities for iOS */
+/* Extra padding (12px) added for Dynamic Island clearance */
 .pt-safe {
-  padding-top: env(safe-area-inset-top);
+  padding-top: calc(env(safe-area-inset-top) + 12px);
 }
 
 .pb-safe {

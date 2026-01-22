@@ -43,6 +43,7 @@ export default async function TournamentPage() {
     spread: number | null
     favorite_team_id: string | null
     channel: string | null
+    location: string | null
     next_game_id: string | null
     is_team1_slot: boolean | null
   }> = []
@@ -57,7 +58,7 @@ export default async function TournamentPage() {
 
     const { data: gamesData } = await supabase
       .from('games')
-      .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at, spread, favorite_team_id, channel, next_game_id, is_team1_slot')
+      .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at, spread, favorite_team_id, channel, location, next_game_id, is_team1_slot')
       .eq('tournament_id', tournament.id)
       .order('round')
       .order('game_number')
