@@ -183,7 +183,7 @@ export default async function AuctionPage() {
 
       {/* My Teams Row */}
       {currentUserTeams.length > 0 && (
-        <div className="flex items-center gap-3 justify-center">
+        <div className="flex items-center gap-3">
           {currentUserTeams.map(t => {
             const teamColor = t.d1Team?.primaryColor || '#666666'
             const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
@@ -211,7 +211,7 @@ export default async function AuctionPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-zinc-400 font-medium mt-1">
+                <span className="text-[10px] text-zinc-400 font-medium mt-1">
                   {t.team?.seed} {t.d1Team?.abbreviation || t.team?.short_name}
                 </span>
               </div>
