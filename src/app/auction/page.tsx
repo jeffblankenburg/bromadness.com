@@ -8,13 +8,64 @@ function findD1Team(teamName: string) {
   )
 }
 
-interface AuctionPayouts {
-  championship_winner: number
-  championship_runnerup: number
-  points_1st: number
-  points_2nd: number
-  points_3rd: number
-  points_4th: number
+// Payout percentages
+const PAYOUT_PERCENTAGES = {
+  championship_winner: 0.18,  // 18% - NCAA Champion
+  championship_runnerup: 0.12, // 12% - NCAA Runner-up
+  points_1st: 0.28,           // 28% - 1st in points
+  points_2nd: 0.21,           // 21% - 2nd in points
+  points_3rd: 0.14,           // 14% - 3rd in points
+  points_4th: 0.07,           // 7% - 4th in points
+}
+
+// Calculate payouts rounded to nearest $5, ensuring total equals pot exactly
+function calculateAuctionPayouts(pot: number) {
+  // Round pot to nearest $5 if needed (shouldn't happen with typical entry fees)
+  const adjustedPot = Math.round(pot / 5) * 5
+
+  // Calculate raw amounts and initial $5 rounding
+  const entries = Object.entries(PAYOUT_PERCENTAGES).map(([key, pct]) => {
+    const raw = adjustedPot * pct
+    const rounded = Math.round(raw / 5) * 5
+    // diff tracks how much we rounded: positive = rounded down, negative = rounded up
+    const diff = raw - rounded
+    return { key, raw, rounded, diff }
+  })
+
+  // Calculate total and adjustment needed
+  let total = entries.reduce((sum, e) => sum + e.rounded, 0)
+  let adjustment = adjustedPot - total
+
+  // Adjust in $5 increments, prioritizing items closest to rounding the other way
+  while (adjustment !== 0) {
+    if (adjustment > 0) {
+      // Need to increase total - find item that was rounded down the most
+      entries.sort((a, b) => b.diff - a.diff)
+      entries[0].rounded += 5
+      entries[0].diff -= 5
+      adjustment -= 5
+    } else {
+      // Need to decrease total - find item that was rounded up the most
+      entries.sort((a, b) => a.diff - b.diff)
+      entries[0].rounded -= 5
+      entries[0].diff += 5
+      adjustment += 5
+    }
+  }
+
+  // Convert back to object
+  const result: Record<string, number> = {}
+  entries.forEach(e => {
+    result[e.key] = e.rounded
+  })
+  return result as {
+    championship_winner: number
+    championship_runnerup: number
+    points_1st: number
+    points_2nd: number
+    points_3rd: number
+    points_4th: number
+  }
 }
 
 export default async function AuctionPage() {
@@ -39,16 +90,8 @@ export default async function AuctionPage() {
     )
   }
 
-  const payouts = (tournament.auction_payouts as AuctionPayouts) ?? {
-    championship_winner: 80,
-    championship_runnerup: 50,
-    points_1st: 110,
-    points_2nd: 80,
-    points_3rd: 60,
-    points_4th: 40,
-  }
-
   const salaryCap = tournament.salary_cap ?? 100
+  const entryFee = tournament.entry_fee ?? 50
 
   // Get all users
   const { data: users } = await supabase
@@ -83,7 +126,6 @@ export default async function AuctionPage() {
       .map(a => a.team_id)
 
     let totalPoints = 0
-    const winningTeamIds = new Set((games || []).map(g => g.winner_id))
 
     userTeamIds.forEach(teamId => {
       // Count how many games this team has won
@@ -150,11 +192,16 @@ export default async function AuctionPage() {
     .sort((a, b) => b.points - a.points)
 
   // Calculate ranks with ties
-  const getRank = (index: number, points: number) => {
+  const getRank = (_index: number, points: number) => {
     // Find the first person with this point total
     const firstWithPoints = leaderboard.findIndex(e => e.points === points)
     return firstWithPoints + 1
   }
+
+  // Calculate pot and payouts dynamically
+  const participantCount = leaderboard.length
+  const pot = participantCount * entryFee
+  const payouts = calculateAuctionPayouts(pot)
 
   // Get current user's teams
   const currentUserTeams = user
@@ -222,7 +269,10 @@ export default async function AuctionPage() {
 
       {/* Payouts Info */}
       <div className="bg-zinc-800/50 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-orange-400 mb-3">Payouts</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-orange-400">Payouts</h3>
+          <span className="text-xs text-zinc-500">{participantCount} players · ${pot} pot</span>
+        </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-zinc-400">Champion</span>
