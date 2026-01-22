@@ -119,14 +119,6 @@ export default async function Home() {
                 </h1>
               )}
 
-              {profile?.is_admin && (
-                <div className="flex justify-center text-sm">
-                  <Link href="/admin" className="text-orange-500 font-medium hover:text-orange-400">
-                    Admin →
-                  </Link>
-                </div>
-              )}
-
               {/* User's Auction Teams */}
               <Link href="/auction" className="block w-full bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors">
                 <div className="flex items-center justify-between mb-3">
