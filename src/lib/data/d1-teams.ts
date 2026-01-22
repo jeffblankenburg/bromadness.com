@@ -213,15 +213,15 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Prairie View A&M Panthers", shortName: "Prairie View", abbreviation: "PVAM", primaryColor: "#4F2D7F", secondaryColor: "#FFCC00", espnId: 2504 },
 
   // America East
-  { name: "Albany Great Danes", shortName: "Albany", abbreviation: "ALB", primaryColor: "#461660", secondaryColor: "#EEB211" },
-  { name: "Binghamton Bearcats", shortName: "Binghamton", abbreviation: "BING", primaryColor: "#005A43", secondaryColor: "#FFFFFF" },
-  { name: "Hartford Hawks", shortName: "Hartford", abbreviation: "HART", primaryColor: "#C8102E", secondaryColor: "#000000" },
-  { name: "Maine Black Bears", shortName: "Maine", abbreviation: "ME", primaryColor: "#003263", secondaryColor: "#B0D7FF" },
-  { name: "UMass Lowell River Hawks", shortName: "UMass Lowell", abbreviation: "UML", primaryColor: "#003DA5", secondaryColor: "#C8102E" },
-  { name: "New Hampshire Wildcats", shortName: "New Hampshire", abbreviation: "UNH", primaryColor: "#003DA5", secondaryColor: "#FFFFFF" },
-  { name: "NJIT Highlanders", shortName: "NJIT", abbreviation: "NJIT", primaryColor: "#D22630", secondaryColor: "#003B71" },
-  { name: "UMBC Retrievers", shortName: "UMBC", abbreviation: "UMBC", primaryColor: "#000000", secondaryColor: "#DEB018" },
-  { name: "Stony Brook Seawolves", shortName: "Stony Brook", abbreviation: "STON", primaryColor: "#990000", secondaryColor: "#6D6E71" },
+  { name: "Albany Great Danes", shortName: "Albany", abbreviation: "ALB", primaryColor: "#461660", secondaryColor: "#EEB211", espnId: 399 },
+  { name: "Binghamton Bearcats", shortName: "Binghamton", abbreviation: "BING", primaryColor: "#005A43", secondaryColor: "#FFFFFF", espnId: 2066 },
+  { name: "Hartford Hawks", shortName: "Hartford", abbreviation: "HART", primaryColor: "#C8102E", secondaryColor: "#000000", espnId: 42 },
+  { name: "Maine Black Bears", shortName: "Maine", abbreviation: "ME", primaryColor: "#003263", secondaryColor: "#B0D7FF", espnId: 311 },
+  { name: "UMass Lowell River Hawks", shortName: "UMass Lowell", abbreviation: "UML", primaryColor: "#003DA5", secondaryColor: "#C8102E", espnId: 2349 },
+  { name: "New Hampshire Wildcats", shortName: "New Hampshire", abbreviation: "UNH", primaryColor: "#003DA5", secondaryColor: "#FFFFFF", espnId: 160 },
+  { name: "NJIT Highlanders", shortName: "NJIT", abbreviation: "NJIT", primaryColor: "#D22630", secondaryColor: "#003B71", espnId: 2885 },
+  { name: "UMBC Retrievers", shortName: "UMBC", abbreviation: "UMBC", primaryColor: "#000000", secondaryColor: "#DEB018", espnId: 2378 },
+  { name: "Stony Brook Seawolves", shortName: "Stony Brook", abbreviation: "STON", primaryColor: "#990000", secondaryColor: "#6D6E71", espnId: 2619 },
 
   // Atlantic Sun
   { name: "Austin Peay Governors", shortName: "Austin Peay", abbreviation: "APSU", primaryColor: "#C8102E", secondaryColor: "#FFFFFF" },
