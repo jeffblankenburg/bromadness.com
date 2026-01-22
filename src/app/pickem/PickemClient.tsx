@@ -115,20 +115,38 @@ export function PickemClient({
   const [activeTab, setActiveTab] = useState<'picks' | 'leaderboard'>('picks')
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [earlyGamesExpanded, setEarlyGamesExpanded] = useState(true)
+  const [lateGamesExpanded, setLateGamesExpanded] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
-  // Persist tab selection
+  // Persist tab and expand states
   useEffect(() => {
-    const stored = localStorage.getItem('pickem-active-tab')
-    if (stored === 'picks' || stored === 'leaderboard') {
-      setActiveTab(stored)
+    const storedTab = localStorage.getItem('pickem-active-tab')
+    if (storedTab === 'picks' || storedTab === 'leaderboard') {
+      setActiveTab(storedTab)
     }
+    const storedEarly = localStorage.getItem('pickem-early-expanded')
+    const storedLate = localStorage.getItem('pickem-late-expanded')
+    if (storedEarly !== null) setEarlyGamesExpanded(storedEarly === 'true')
+    if (storedLate !== null) setLateGamesExpanded(storedLate === 'true')
   }, [])
 
   const handleTabChange = (tab: 'picks' | 'leaderboard') => {
     setActiveTab(tab)
     localStorage.setItem('pickem-active-tab', tab)
+  }
+
+  const toggleEarlyGames = () => {
+    const newValue = !earlyGamesExpanded
+    setEarlyGamesExpanded(newValue)
+    localStorage.setItem('pickem-early-expanded', String(newValue))
+  }
+
+  const toggleLateGames = () => {
+    const newValue = !lateGamesExpanded
+    setLateGamesExpanded(newValue)
+    localStorage.setItem('pickem-late-expanded', String(newValue))
   }
 
   const currentDay = pickemDays[selectedDayIndex]
@@ -296,7 +314,7 @@ export function PickemClient({
     return standings.findIndex(s => s.correct_picks === currentScore) + 1
   }
 
-  const renderGame = (game: Game, showSessionLabel?: string) => {
+  const renderGame = (game: Game) => {
     if (!game.team1 || !game.team2) return null
 
     const lowerSeedTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
@@ -371,9 +389,6 @@ export function PickemClient({
     return (
       <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
         <div className="flex items-center gap-2 text-[10px] text-zinc-400">
-          {showSessionLabel && (
-            <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded font-medium">{showSessionLabel}</span>
-          )}
           {game.scheduled_at && (
             <span className="px-1 py-0.5 bg-zinc-800 rounded">{formatGameTime(game.scheduled_at)}</span>
           )}
@@ -531,11 +546,54 @@ export function PickemClient({
 
       {/* My Picks Tab */}
       {activeTab === 'picks' && (
-        <div className="space-y-2">
-          {dayGames.map((game, index) => {
-            const sessionLabel = index === 0 ? 'S1' : (index === midpoint ? 'S2' : undefined)
-            return renderGame(game, sessionLabel)
-          })}
+        <div className="space-y-4">
+          {/* Early Games */}
+          <div>
+            <button
+              onClick={toggleEarlyGames}
+              className="w-full flex items-center justify-between py-2"
+            >
+              <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
+              <svg
+                className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {earlyGamesExpanded && (
+              <div className="space-y-2">
+                {session1Games.map(game => renderGame(game))}
+              </div>
+            )}
+          </div>
+
+          {/* Late Games */}
+          <div>
+            <button
+              onClick={toggleLateGames}
+              className="w-full flex items-center justify-between py-2"
+            >
+              <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
+              <svg
+                className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {lateGamesExpanded && (
+              <div className="space-y-2">
+                {session2Games.map(game => renderGame(game))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
