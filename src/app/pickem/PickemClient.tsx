@@ -562,7 +562,15 @@ export function PickemClient({
       {/* Simulated Time Banner */}
       {simulatedTime && (
         <div className="bg-purple-500/20 border border-purple-500/50 text-purple-300 rounded-lg px-4 py-2 text-xs">
-          <span className="font-bold">DEV MODE:</span> Simulated time is {getCurrentTime().toLocaleString()}
+          <span className="font-bold">DEV MODE:</span> Simulated time is {getCurrentTime().toLocaleString('en-US', {
+            timeZone: 'America/New_York',
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          })} ET
         </div>
       )}
 

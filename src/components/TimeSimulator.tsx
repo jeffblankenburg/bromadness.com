@@ -10,6 +10,28 @@ interface Props {
   firstGameTimes: { date: string; time: string }[]
 }
 
+// Format time in Eastern timezone for March Madness
+const formatEastern = (date: Date) => {
+  return date.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }) + ' ET'
+}
+
+const formatTimeOnly = (date: Date) => {
+  return date.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTimes }: Props) {
   const [saving, setSaving] = useState(false)
   const [customDate, setCustomDate] = useState('')
@@ -66,56 +88,64 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
 
       {currentSimulatedTime ? (
         <div className="text-sm">
-          <span className="text-zinc-400">Current simulated time: </span>
+          <span className="text-zinc-400">Simulated time: </span>
           <span className="text-purple-300 font-mono">
-            {new Date(currentSimulatedTime).toLocaleString()}
+            {formatEastern(new Date(currentSimulatedTime))}
           </span>
         </div>
       ) : (
         <div className="text-sm text-zinc-400">
-          Using real time. Set a simulated time to test pick locking.
+          Using real time ({formatEastern(new Date())}). Set a simulated time to test pick locking.
         </div>
       )}
 
       {/* Quick set buttons for each day's first game */}
       {firstGameTimes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-zinc-500">Quick set relative to first game:</p>
-          {firstGameTimes.map(({ date, time }) => (
-            <div key={date} className="flex flex-wrap gap-2">
-              <span className="text-xs text-zinc-400 w-20">
-                {new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}:
-              </span>
-              <button
-                onClick={() => handleQuickSet(-60, time)}
-                disabled={saving}
-                className="px-2 py-1 text-xs bg-zinc-700 rounded hover:bg-zinc-600 transition-colors"
-              >
-                1hr before
-              </button>
-              <button
-                onClick={() => handleQuickSet(-5, time)}
-                disabled={saving}
-                className="px-2 py-1 text-xs bg-zinc-700 rounded hover:bg-zinc-600 transition-colors"
-              >
-                5min before
-              </button>
-              <button
-                onClick={() => handleQuickSet(5, time)}
-                disabled={saving}
-                className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
-              >
-                5min after (locked)
-              </button>
-              <button
-                onClick={() => handleQuickSet(60, time)}
-                disabled={saving}
-                className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
-              >
-                1hr after (locked)
-              </button>
-            </div>
-          ))}
+        <div className="space-y-3">
+          <p className="text-xs text-zinc-500">Quick set relative to first game of the day:</p>
+          {firstGameTimes.map(({ date, time }) => {
+            const gameDate = new Date(time)
+            const dayName = gameDate.toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+            const gameTimeStr = formatTimeOnly(gameDate)
+
+            return (
+              <div key={date} className="space-y-1">
+                <div className="text-xs text-zinc-300">
+                  {dayName} - First game at <span className="text-orange-400 font-medium">{gameTimeStr} ET</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleQuickSet(-60, time)}
+                    disabled={saving}
+                    className="px-2 py-1 text-xs bg-zinc-700 rounded hover:bg-zinc-600 transition-colors"
+                  >
+                    1hr before
+                  </button>
+                  <button
+                    onClick={() => handleQuickSet(-5, time)}
+                    disabled={saving}
+                    className="px-2 py-1 text-xs bg-zinc-700 rounded hover:bg-zinc-600 transition-colors"
+                  >
+                    5min before
+                  </button>
+                  <button
+                    onClick={() => handleQuickSet(5, time)}
+                    disabled={saving}
+                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
+                  >
+                    5min after
+                  </button>
+                  <button
+                    onClick={() => handleQuickSet(60, time)}
+                    disabled={saving}
+                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
+                  >
+                    1hr after
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
