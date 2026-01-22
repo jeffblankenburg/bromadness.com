@@ -167,7 +167,7 @@ export default async function Home() {
                             <span className="text-xs text-zinc-500">${at.bid_amount}</span>
                           </div>
                           <span className="text-xs text-zinc-400">
-                            {at.points > 0 ? `+${at.points}` : '—'}
+                            {at.points > 0 ? `+${at.points}` : '0'}
                           </span>
                         </div>
                       ))}
