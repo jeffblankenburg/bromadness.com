@@ -183,42 +183,41 @@ export default async function AuctionPage() {
 
       {/* My Teams Row */}
       {currentUserTeams.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <span className="text-xs text-zinc-500 flex-shrink-0">My Teams:</span>
-          {currentUserTeams.map(t => {
-            const teamColor = t.d1Team?.primaryColor || '#666666'
-            const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">My Teams:</span>
+          <div className="flex items-center gap-1.5 flex-1 justify-start">
+            {currentUserTeams.map(t => {
+              const teamColor = t.d1Team?.primaryColor || '#666666'
+              const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
 
-            return (
-              <div
-                key={t.id}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded ${
-                  t.isEliminated ? 'opacity-40' : ''
-                }`}
-                style={{ backgroundColor: `${teamColor}30` }}
-              >
+              return (
                 <div
-                  className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                  key={t.id}
+                  className={`relative w-10 h-10 rounded flex items-center justify-center ${
+                    t.isEliminated ? 'opacity-40' : ''
+                  }`}
                   style={{ backgroundColor: teamColor }}
+                  title={`#${t.team?.seed} ${t.team?.name}`}
                 >
                   {logoUrl ? (
                     <img
                       src={logoUrl}
                       alt={t.team?.name || ''}
-                      className="w-4 h-4 object-contain"
+                      className="w-6 h-6 object-contain"
+                      style={{ filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 4px white)' }}
                     />
                   ) : (
-                    <span className="text-white text-[10px] font-bold">
+                    <span className="text-white text-xs font-bold">
                       {t.team?.short_name?.charAt(0) || '?'}
                     </span>
                   )}
+                  <span className="absolute -bottom-0.5 -right-0.5 bg-zinc-900 text-[10px] px-1 rounded text-zinc-300 font-medium">
+                    {t.team?.seed}
+                  </span>
                 </div>
-                <span className={`text-xs whitespace-nowrap ${t.isEliminated ? 'line-through text-zinc-500' : ''}`}>
-                  #{t.team?.seed} {t.team?.short_name || t.team?.name}
-                </span>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 
