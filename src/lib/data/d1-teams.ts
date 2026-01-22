@@ -224,17 +224,17 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Stony Brook Seawolves", shortName: "Stony Brook", abbreviation: "STON", primaryColor: "#990000", secondaryColor: "#6D6E71", espnId: 2619 },
 
   // Atlantic Sun
-  { name: "Austin Peay Governors", shortName: "Austin Peay", abbreviation: "APSU", primaryColor: "#C8102E", secondaryColor: "#FFFFFF" },
-  { name: "Bellarmine Knights", shortName: "Bellarmine", abbreviation: "BELL", primaryColor: "#C41230", secondaryColor: "#B8860B" },
-  { name: "Central Arkansas Bears", shortName: "C Arkansas", abbreviation: "UCA", primaryColor: "#4F2D7F", secondaryColor: "#A9A9A9" },
-  { name: "Eastern Kentucky Colonels", shortName: "E Kentucky", abbreviation: "EKU", primaryColor: "#861F41", secondaryColor: "#FFFFFF" },
-  { name: "Florida Gulf Coast Eagles", shortName: "FGCU", abbreviation: "FGCU", primaryColor: "#002D72", secondaryColor: "#00966C" },
-  { name: "Jacksonville Dolphins", shortName: "Jacksonville", abbreviation: "JAC", primaryColor: "#006747", secondaryColor: "#FFFFFF" },
-  { name: "Lipscomb Bisons", shortName: "Lipscomb", abbreviation: "LIP", primaryColor: "#4E2C8B", secondaryColor: "#CFB53B" },
-  { name: "North Alabama Lions", shortName: "N Alabama", abbreviation: "UNA", primaryColor: "#4B116F", secondaryColor: "#FFD700" },
-  { name: "North Florida Ospreys", shortName: "N Florida", abbreviation: "UNF", primaryColor: "#003087", secondaryColor: "#6C7579" },
-  { name: "Queens Royals", shortName: "Queens", abbreviation: "QU", primaryColor: "#0032A0", secondaryColor: "#A9A9A9" },
-  { name: "Stetson Hatters", shortName: "Stetson", abbreviation: "STET", primaryColor: "#006747", secondaryColor: "#FFFFFF" },
+  { name: "Austin Peay Governors", shortName: "Austin Peay", abbreviation: "APSU", primaryColor: "#C8102E", secondaryColor: "#FFFFFF", espnId: 2046 },
+  { name: "Bellarmine Knights", shortName: "Bellarmine", abbreviation: "BELL", primaryColor: "#C41230", secondaryColor: "#B8860B", espnId: 91 },
+  { name: "Central Arkansas Bears", shortName: "C Arkansas", abbreviation: "UCA", primaryColor: "#4F2D7F", secondaryColor: "#A9A9A9", espnId: 2110 },
+  { name: "Eastern Kentucky Colonels", shortName: "E Kentucky", abbreviation: "EKU", primaryColor: "#861F41", secondaryColor: "#FFFFFF", espnId: 2198 },
+  { name: "Florida Gulf Coast Eagles", shortName: "FGCU", abbreviation: "FGCU", primaryColor: "#002D72", secondaryColor: "#00966C", espnId: 526 },
+  { name: "Jacksonville Dolphins", shortName: "Jacksonville", abbreviation: "JAC", primaryColor: "#006747", secondaryColor: "#FFFFFF", espnId: 294 },
+  { name: "Lipscomb Bisons", shortName: "Lipscomb", abbreviation: "LIP", primaryColor: "#4E2C8B", secondaryColor: "#CFB53B", espnId: 288 },
+  { name: "North Alabama Lions", shortName: "N Alabama", abbreviation: "UNA", primaryColor: "#4B116F", secondaryColor: "#FFD700", espnId: 2453 },
+  { name: "North Florida Ospreys", shortName: "N Florida", abbreviation: "UNF", primaryColor: "#003087", secondaryColor: "#6C7579", espnId: 2454 },
+  { name: "Queens Royals", shortName: "Queens", abbreviation: "QU", primaryColor: "#0032A0", secondaryColor: "#A9A9A9", espnId: 2511 },
+  { name: "Stetson Hatters", shortName: "Stetson", abbreviation: "STET", primaryColor: "#006747", secondaryColor: "#FFFFFF", espnId: 56 },
 
   // Big Sky
   { name: "Eastern Washington Eagles", shortName: "E Washington", abbreviation: "EWU", primaryColor: "#A10022", secondaryColor: "#000000" },
