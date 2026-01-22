@@ -270,7 +270,7 @@ export const D1_TEAMS: D1Team[] = [
   { name: "UC Davis Aggies", shortName: "UC Davis", abbreviation: "UCD", primaryColor: "#002855", secondaryColor: "#B3A369" },
   { name: "UC Irvine Anteaters", shortName: "UC Irvine", abbreviation: "UCI", primaryColor: "#002B5C", secondaryColor: "#FFC82E" },
   { name: "UC Riverside Highlanders", shortName: "UC Riverside", abbreviation: "UCR", primaryColor: "#003DA5", secondaryColor: "#FFB81C" },
-  { name: "UC San Diego Tritons", shortName: "UCSD", abbreviation: "UCSD", primaryColor: "#006A96", secondaryColor: "#C69214" },
+  { name: "UC San Diego Tritons", shortName: "UCSD", abbreviation: "UCSD", primaryColor: "#006A96", secondaryColor: "#C69214", espnId: 28 },
   { name: "UC Santa Barbara Gauchos", shortName: "UCSB", abbreviation: "UCSB", primaryColor: "#003366", secondaryColor: "#FEBC11" },
 
   // CAA
