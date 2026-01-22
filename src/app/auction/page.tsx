@@ -185,7 +185,7 @@ export default async function AuctionPage() {
       {currentUserTeams.length > 0 && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500">My Teams:</span>
-          <div className="flex items-center gap-1.5 flex-1 justify-start">
+          <div className="flex items-center gap-2 flex-1 justify-start">
             {currentUserTeams.map(t => {
               const teamColor = t.d1Team?.primaryColor || '#666666'
               const logoUrl = t.d1Team ? getTeamLogoUrl(t.d1Team) : null
@@ -193,26 +193,28 @@ export default async function AuctionPage() {
               return (
                 <div
                   key={t.id}
-                  className={`relative w-10 h-10 rounded flex items-center justify-center ${
-                    t.isEliminated ? 'opacity-40' : ''
-                  }`}
-                  style={{ backgroundColor: teamColor }}
-                  title={`#${t.team?.seed} ${t.team?.name}`}
+                  className={`flex flex-col items-center ${t.isEliminated ? 'opacity-40' : ''}`}
+                  title={t.team?.name}
                 >
-                  {logoUrl ? (
-                    <img
-                      src={logoUrl}
-                      alt={t.team?.name || ''}
-                      className="w-6 h-6 object-contain"
-                      style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
-                    />
-                  ) : (
-                    <span className="text-white text-xs font-bold">
-                      {t.team?.short_name?.charAt(0) || '?'}
-                    </span>
-                  )}
-                  <span className="absolute -bottom-0.5 -right-0.5 bg-zinc-900 text-[10px] px-1 rounded text-zinc-300 font-medium">
-                    {t.team?.seed}
+                  <div
+                    className="w-10 h-10 rounded flex items-center justify-center"
+                    style={{ backgroundColor: teamColor }}
+                  >
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt={t.team?.name || ''}
+                        className="w-6 h-6 object-contain"
+                        style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold">
+                        {t.team?.short_name?.charAt(0) || '?'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                    {t.team?.seed} {t.team?.short_name}
                   </span>
                 </div>
               )
