@@ -240,7 +240,7 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Eastern Washington Eagles", shortName: "E Washington", abbreviation: "EWU", primaryColor: "#A10022", secondaryColor: "#000000" },
   { name: "Idaho Vandals", shortName: "Idaho", abbreviation: "IDHO", primaryColor: "#B5985A", secondaryColor: "#000000" },
   { name: "Idaho State Bengals", shortName: "Idaho State", abbreviation: "IDST", primaryColor: "#FF671F", secondaryColor: "#000000" },
-  { name: "Montana Grizzlies", shortName: "Montana", abbreviation: "MONT", primaryColor: "#6A0136", secondaryColor: "#999999" },
+  { name: "Montana Grizzlies", shortName: "Montana", abbreviation: "MONT", primaryColor: "#6A0136", secondaryColor: "#999999", espnId: 149 },
   { name: "Montana State Bobcats", shortName: "Montana St", abbreviation: "MTST", primaryColor: "#003875", secondaryColor: "#C5B783" },
   { name: "Northern Arizona Lumberjacks", shortName: "N Arizona", abbreviation: "NAU", primaryColor: "#003466", secondaryColor: "#FFC82E" },
   { name: "Northern Colorado Bears", shortName: "N Colorado", abbreviation: "UNCO", primaryColor: "#003366", secondaryColor: "#FFC82E" },
