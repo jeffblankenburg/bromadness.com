@@ -110,12 +110,14 @@ export default async function Home() {
       <div className="text-center space-y-6 w-full max-w-sm">
           {user ? (
             <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-3xl font-bold text-orange-400 tracking-tight">QUACK</p>
-                {profile?.display_name && (
-                  <p className="text-xl font-bold text-white">{profile.display_name}</p>
-                )}
-              </div>
+              {profile?.display_name && (
+                <h1
+                  className="text-4xl text-orange-400 uppercase tracking-wide"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {profile.display_name}
+                </h1>
+              )}
 
               {profile?.is_admin && (
                 <div className="flex justify-center text-sm">

@@ -9,7 +9,7 @@ const navItems = [
     href: '/',
     label: null, // No text label for home - just the logo
     icon: (
-      <Image src="/logo.png" alt="Home" width={32} height={21} className="object-contain" />
+      <Image src="/logo.png" alt="Home" height={60}  width={60}  className="object-contain" />
     ),
   },
   {
