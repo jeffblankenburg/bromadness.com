@@ -69,9 +69,10 @@ export default async function AuctionPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Auction</h2>
-
-      <AuctionSettings tournamentId={tournament.id} settings={settings} />
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Auction</h2>
+        <AuctionSettings tournamentId={tournament.id} settings={settings} />
+      </div>
 
       <AuctionEditor
         tournamentId={tournament.id}
