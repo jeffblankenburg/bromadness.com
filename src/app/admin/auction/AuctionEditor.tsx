@@ -39,6 +39,12 @@ interface AuctionEntry {
   paid_at: string | null
 }
 
+interface Game {
+  id: string
+  team1_id: string | null
+  team2_id: string | null
+}
+
 interface AuctionPayouts {
   championship_winner: number
   championship_runnerup: number
@@ -62,6 +68,7 @@ interface Props {
   regions: Region[]
   auctionTeams: AuctionTeam[]
   auctionEntries: AuctionEntry[]
+  games: Game[]
   settings: Settings
 }
 
@@ -69,7 +76,7 @@ const getD1TeamData = (teamName: string) => {
   return D1_TEAMS.find(t => t.name.toLowerCase() === teamName.toLowerCase())
 }
 
-export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeams, auctionEntries, settings }: Props) {
+export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeams, auctionEntries, games, settings }: Props) {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [selectedUser, setSelectedUser] = useState('')
   const [bidAmount, setBidAmount] = useState('')
@@ -120,6 +127,14 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
   const isUserPaid = (userId: string) => {
     const entry = auctionEntries.find(e => e.user_id === userId)
     return entry?.has_paid ?? false
+  }
+
+  const getOpponent = (teamId: string) => {
+    const game = games.find(g => g.team1_id === teamId || g.team2_id === teamId)
+    if (!game) return null
+    const opponentId = game.team1_id === teamId ? game.team2_id : game.team1_id
+    if (!opponentId) return null
+    return teams.find(t => t.id === opponentId) || null
   }
 
   const togglePayment = async (userId: string) => {
@@ -355,6 +370,19 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
               >
                 {saving ? 'Saving...' : wouldExceedCap ? 'Over Budget' : 'Assign Team'}
               </button>
+
+              {existingAssignment && (
+                <button
+                  onClick={() => {
+                    handleRemove(existingAssignment.id)
+                    setSelectedTeam(null)
+                  }}
+                  disabled={saving}
+                  className="w-full py-2 bg-zinc-700 hover:bg-red-600 disabled:bg-zinc-800 text-zinc-300 hover:text-white font-medium rounded-lg text-sm"
+                >
+                  Clear This Team
+                </button>
+              )}
             </div>
           </div>
         )
@@ -393,6 +421,8 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                   const owner = getTeamOwner(team.id)
                   const d1Team = getD1TeamData(team.name)
                   const logo = d1Team ? getTeamLogoUrl(d1Team) : null
+                  const opponent = getOpponent(team.id)
+                  const d1Opponent = opponent ? getD1TeamData(opponent.name) : null
 
                   return (
                     <div
@@ -430,25 +460,17 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                         </div>
                         <span className="flex-1 text-sm truncate text-white">
                           {d1Team?.shortName || team.short_name || team.name}
+                          {opponent && (
+                            <span className="text-xs text-zinc-500 ml-1">
+                              vs {d1Opponent?.shortName || opponent.short_name || opponent.name}
+                            </span>
+                          )}
                         </span>
                       </button>
                       {owner ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs bg-zinc-900/50 px-2 py-1 rounded">
-                            {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRemove(owner.auctionId)
-                            }}
-                            disabled={saving}
-                            className="text-red-400 hover:text-red-300 text-sm font-bold w-6 h-6 flex items-center justify-center cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </div>
+                        <span className="text-xs bg-zinc-900/50 px-2 py-1 rounded">
+                          {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
+                        </span>
                       ) : (
                         <span className="text-xs text-zinc-500 px-2">Unassigned</span>
                       )}

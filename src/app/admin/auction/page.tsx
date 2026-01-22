@@ -63,6 +63,13 @@ export default async function AuctionPage() {
     .select('id, user_id, has_paid, paid_at')
     .eq('tournament_id', tournament.id)
 
+  // Get round 1 games to show opponents
+  const { data: games } = await supabase
+    .from('games')
+    .select('id, team1_id, team2_id')
+    .eq('tournament_id', tournament.id)
+    .eq('round', 1)
+
   const settings = {
     entryFee: tournament.entry_fee ?? 20,
     salaryCap: tournament.salary_cap ?? 100,
@@ -90,6 +97,7 @@ export default async function AuctionPage() {
         regions={regions || []}
         auctionTeams={auctionTeams || []}
         auctionEntries={auctionEntries || []}
+        games={games || []}
         settings={settings}
       />
     </div>
