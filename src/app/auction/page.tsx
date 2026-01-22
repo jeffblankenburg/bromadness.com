@@ -204,7 +204,7 @@ export default async function AuctionPage() {
                       src={logoUrl}
                       alt={t.team?.name || ''}
                       className="w-6 h-6 object-contain"
-                      style={{ filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 4px white)' }}
+                      style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
                     />
                   ) : (
                     <span className="text-white text-xs font-bold">
