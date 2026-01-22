@@ -214,7 +214,7 @@ export default async function AuctionPage() {
                     )}
                   </div>
                   <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
-                    {t.team?.seed} {t.team?.short_name}
+                    {t.team?.seed} {t.d1Team?.shortName || t.team?.short_name}
                   </span>
                 </div>
               )
