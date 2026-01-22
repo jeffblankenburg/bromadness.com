@@ -456,7 +456,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         {game?.spread ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue={game.spread}
                             onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
                             className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
@@ -464,7 +463,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         ) : team1 ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue=""
                             onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
                             placeholder="Spread"
@@ -618,16 +616,14 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                             {game.spread ? (
                               <input
                                 type="text"
-                                inputMode="decimal"
-                                defaultValue={game.spread}
+                                                                defaultValue={game.spread}
                                 onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                                 className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
                               />
                             ) : team1 ? (
                               <input
                                 type="text"
-                                inputMode="decimal"
-                                defaultValue=""
+                                                                defaultValue=""
                                 onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                                 placeholder="Sprd"
                                 className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
@@ -764,7 +760,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         {game.spread ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue={game.spread}
                             onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                             className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
@@ -772,7 +767,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         ) : team1 ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue=""
                             onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                             placeholder="Spread"
@@ -907,7 +901,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         {game.spread ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue={game.spread}
                             onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                             className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
@@ -915,7 +908,6 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         ) : team1 ? (
                           <input
                             type="text"
-                            inputMode="decimal"
                             defaultValue=""
                             onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
                             placeholder="Spread"
