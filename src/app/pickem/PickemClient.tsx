@@ -546,20 +546,18 @@ export function PickemClient({
 
       {/* My Picks Tab */}
       {activeTab === 'picks' && (() => {
-        const countCorrectPicks = (sessionGames: Game[]) => {
-          return sessionGames.filter(game => {
-            if (!game.winner_id) return false
+        const getSessionStats = (sessionGames: Game[]) => {
+          const completedGames = sessionGames.filter(g => g.winner_id !== null)
+          const correctCount = completedGames.filter(game => {
             const pick = userDayPicks.find(p => p.game_id === game.id)
             if (!pick) return false
-            // Use saved is_correct if available, otherwise calculate
             if (pick.is_correct !== null) return pick.is_correct
             return isPickCorrect(game, pick.picked_team_id) === true
           }).length
+          return { correct: correctCount, total: completedGames.length }
         }
-        const session1Correct = countCorrectPicks(session1Games)
-        const session2Correct = countCorrectPicks(session2Games)
-        const session1HasResults = session1Games.some(g => g.winner_id !== null)
-        const session2HasResults = session2Games.some(g => g.winner_id !== null)
+        const session1Stats = getSessionStats(session1Games)
+        const session2Stats = getSessionStats(session2Games)
 
         return (
           <div className="space-y-4">
@@ -571,9 +569,9 @@ export function PickemClient({
               >
                 <h3 className="text-sm font-semibold text-orange-400">
                   Early Games
-                  {session1HasResults && (
+                  {session1Stats.total > 0 && (
                     <span className="text-zinc-400 font-normal ml-2">
-                      {session1Correct} Correct
+                      {session1Stats.correct}/{session1Stats.total} correct
                     </span>
                   )}
                 </h3>
@@ -602,9 +600,9 @@ export function PickemClient({
               >
                 <h3 className="text-sm font-semibold text-orange-400">
                   Late Games
-                  {session2HasResults && (
+                  {session2Stats.total > 0 && (
                     <span className="text-zinc-400 font-normal ml-2">
-                      {session2Correct} Correct
+                      {session2Stats.correct}/{session2Stats.total} correct
                     </span>
                   )}
                 </h3>
