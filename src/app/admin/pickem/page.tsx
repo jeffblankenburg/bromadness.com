@@ -58,7 +58,7 @@ export default async function AdminPickemPage() {
     .order('contest_date')
 
   // Get all games for this tournament (for assigning to pickem)
-  const { data: games } = await supabase
+  const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, round, game_number, scheduled_at, team1_score, team2_score, winner_id,
@@ -69,6 +69,13 @@ export default async function AdminPickemPage() {
     .eq('tournament_id', tournament.id)
     .eq('round', 1) // Only Round of 64 for pick'em
     .order('scheduled_at')
+
+  // Transform games to extract team objects from arrays
+  const games = (gamesRaw || []).map(g => ({
+    ...g,
+    team1: Array.isArray(g.team1) ? g.team1[0] || null : g.team1,
+    team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
+  }))
 
   // Get pickem games (already assigned)
   const { data: pickemGames } = await supabase
@@ -107,7 +114,7 @@ export default async function AdminPickemPage() {
           tournamentId={tournament.id}
           startDate={tournament.start_date}
           pickemDays={pickemDays || []}
-          games={games || []}
+          games={games}
           pickemGames={pickemGames || []}
           users={users || []}
           pickemEntries={pickemEntries || []}
