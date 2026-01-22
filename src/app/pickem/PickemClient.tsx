@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { CHANNELS } from '@/lib/data/channels'
 
 interface Team {
   id: string
@@ -14,11 +15,14 @@ interface Team {
 
 interface Game {
   id: string
-  round: number
   scheduled_at: string | null
   team1_score: number | null
   team2_score: number | null
   winner_id: string | null
+  spread: number | null
+  favorite_team_id: string | null
+  location?: string | null
+  channel?: string | null
   team1: Team | null
   team2: Team | null
 }
@@ -26,17 +30,6 @@ interface Game {
 interface PickemDay {
   id: string
   contest_date: string
-  is_locked: boolean
-}
-
-interface PickemGame {
-  id: string
-  pickem_day_id: string
-  game_id: string
-  spread: number
-  favorite_team_id: string
-  session: number
-  winner_team_id: string | null
 }
 
 interface User {
@@ -48,35 +41,28 @@ interface PickemEntry {
   id: string
   user_id: string
   pickem_day_id: string
-  has_paid: boolean
-  correct_picks: number
+  has_paid?: boolean
 }
 
 interface PickemPick {
   id: string
   entry_id: string
-  pickem_game_id: string
+  game_id: string | null
   picked_team_id: string
   is_correct: boolean | null
-}
-
-interface PickemPayouts {
-  entry_fee: number
-  session_1st: number
-  session_2nd: number
-  session_3rd: number
 }
 
 interface Props {
   userId: string
   pickemDays: PickemDay[]
   games: Game[]
-  pickemGames: PickemGame[]
   users: User[]
-  pickemEntries: PickemEntry[]
-  pickemPicks: PickemPick[]
   userEntries: PickemEntry[]
-  payouts: PickemPayouts
+  userPicks: PickemPick[]
+  allEntries: PickemEntry[]
+  allPicks: PickemPick[]
+  entryFee: number
+  simulatedTime: string | null
 }
 
 function findD1Team(teamName: string) {
@@ -86,59 +72,150 @@ function findD1Team(teamName: string) {
   )
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
+function formatDayName(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00')
   return date.toLocaleDateString('en-US', { weekday: 'long' })
 }
 
-function formatTime(dateStr: string | null): string {
-  if (!dateStr) return 'TBD'
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+const formatGameTime = (dateStr: string | null) => {
+  if (!dateStr) return null
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return null
+  const [, year, month, day, hours, mins] = match
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const dayName = days[date.getDay()]
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'p' : 'a'
+  return `${dayName} ${hour12}:${mins}${ampm}`
+}
+
+const getChannelNumber = (channelName: string | null) => {
+  if (!channelName) return null
+  const channel = CHANNELS.find(c => c.name.toLowerCase() === channelName.toLowerCase())
+  return channel ? channel.number : null
 }
 
 export function PickemClient({
   userId,
   pickemDays,
   games,
-  pickemGames,
   users,
-  pickemEntries,
-  pickemPicks,
   userEntries,
-  payouts,
+  userPicks,
+  allEntries,
+  allPicks,
+  entryFee,
+  simulatedTime,
 }: Props) {
+  // Use simulated time if set, otherwise real time
+  const getCurrentTime = () => simulatedTime ? new Date(simulatedTime) : new Date()
   const [selectedDayIndex, setSelectedDayIndex] = useState(0)
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [session1LeaderboardExpanded, setSession1LeaderboardExpanded] = useState(false)
+  const [session2LeaderboardExpanded, setSession2LeaderboardExpanded] = useState(false)
+  const [session1GamesExpanded, setSession1GamesExpanded] = useState(true)
+  const [session2GamesExpanded, setSession2GamesExpanded] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
+  // Persist expand states
+  useEffect(() => {
+    const storedLb1 = localStorage.getItem('pickem-session1-leaderboard-expanded')
+    const storedLb2 = localStorage.getItem('pickem-session2-leaderboard-expanded')
+    const storedGames1 = localStorage.getItem('pickem-session1-games-expanded')
+    const storedGames2 = localStorage.getItem('pickem-session2-games-expanded')
+    if (storedLb1 !== null) setSession1LeaderboardExpanded(storedLb1 === 'true')
+    if (storedLb2 !== null) setSession2LeaderboardExpanded(storedLb2 === 'true')
+    if (storedGames1 !== null) setSession1GamesExpanded(storedGames1 === 'true')
+    if (storedGames2 !== null) setSession2GamesExpanded(storedGames2 === 'true')
+  }, [])
+
+  const toggleSession1Leaderboard = () => {
+    const newValue = !session1LeaderboardExpanded
+    setSession1LeaderboardExpanded(newValue)
+    localStorage.setItem('pickem-session1-leaderboard-expanded', String(newValue))
+  }
+
+  const toggleSession2Leaderboard = () => {
+    const newValue = !session2LeaderboardExpanded
+    setSession2LeaderboardExpanded(newValue)
+    localStorage.setItem('pickem-session2-leaderboard-expanded', String(newValue))
+  }
+
+  const toggleSession1Games = () => {
+    const newValue = !session1GamesExpanded
+    setSession1GamesExpanded(newValue)
+    localStorage.setItem('pickem-session1-games-expanded', String(newValue))
+  }
+
+  const toggleSession2Games = () => {
+    const newValue = !session2GamesExpanded
+    setSession2GamesExpanded(newValue)
+    localStorage.setItem('pickem-session2-games-expanded', String(newValue))
+  }
+
   const currentDay = pickemDays[selectedDayIndex]
-  const dayPickemGames = pickemGames.filter(pg => pg.pickem_day_id === currentDay.id)
+  if (!currentDay) {
+    return (
+      <div className="p-4 space-y-4">
+        <h1 className="text-xl font-bold text-orange-500">Pick&apos;em</h1>
+        <p className="text-zinc-400">No games scheduled yet.</p>
+      </div>
+    )
+  }
+
+  // Get games for current day
+  const dayGames = games
+    .filter(g => g.scheduled_at?.split('T')[0] === currentDay.contest_date)
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+
+  // Split into sessions (first half = session 1, second half = session 2)
+  const midpoint = Math.ceil(dayGames.length / 2)
+  const session1Games = dayGames.slice(0, midpoint)
+  const session2Games = dayGames.slice(midpoint)
+
+  // Calculate session payouts based on paid entries for current day
+  // Entry fee is per day, split between 2 sessions
+  // 1st: 60%, 2nd: 30%, 3rd: 10% (rounded to whole dollars)
+  const paidEntriesForDay = allEntries.filter(
+    e => e.pickem_day_id === currentDay.id && e.has_paid === true
+  ).length
+  const dayPot = paidEntriesForDay * entryFee
+  const sessionPot = dayPot / 2
+  const sessionPayouts = {
+    first: Math.floor(sessionPot * 0.6),
+    second: Math.floor(sessionPot * 0.3),
+    third: Math.floor(sessionPot * 0.1),
+  }
+
+  // Check if day is locked (first game has started)
+  const firstGameTime = dayGames[0]?.scheduled_at
+  const isLocked = firstGameTime ? new Date(firstGameTime) <= getCurrentTime() : false
 
   // Get user's entry for current day
   const userEntry = userEntries.find(e => e.pickem_day_id === currentDay.id)
 
-  // Get user's picks for current day
-  const userPicks = userEntry
-    ? pickemPicks.filter(p => p.entry_id === userEntry.id)
-    : []
+  // Get user's picks for current day's games
+  const dayGameIds = dayGames.map(g => g.id)
+  const userDayPicks = userPicks.filter(p => p.game_id && dayGameIds.includes(p.game_id))
 
-  // Initialize local picks from saved picks
-  const getPickedTeamId = (pickemGameId: string): string => {
-    if (localPicks[pickemGameId]) return localPicks[pickemGameId]
-    const pick = userPicks.find(p => p.pickem_game_id === pickemGameId)
+  // Get picked team for a game
+  const getPickedTeamId = (gameId: string): string => {
+    if (localPicks[gameId]) return localPicks[gameId]
+    const pick = userDayPicks.find(p => p.game_id === gameId)
     return pick?.picked_team_id || ''
   }
 
-  const handlePick = (pickemGameId: string, teamId: string) => {
-    if (currentDay.is_locked) return
-    setLocalPicks(prev => ({ ...prev, [pickemGameId]: teamId }))
-  }
+  const handlePick = async (gameId: string, teamId: string) => {
+    if (isLocked || saving) return
 
-  const savePicks = async () => {
+    // Optimistic update
+    setLocalPicks(prev => ({ ...prev, [gameId]: teamId }))
     setSaving(true)
+
     try {
       // Create or get entry
       let entryId = userEntry?.id
@@ -157,78 +234,58 @@ export function PickemClient({
         entryId = newEntry.id
       }
 
-      // Save all picks
-      const picksToSave = dayPickemGames.map(pg => ({
-        entry_id: entryId,
-        pickem_game_id: pg.id,
-        picked_team_id: getPickedTeamId(pg.id),
-      })).filter(p => p.picked_team_id)
-
-      // Delete existing picks for this entry
-      await supabase
+      // Upsert pick (insert or update if exists) - atomic operation to prevent duplicates
+      const { error: pickError } = await supabase
         .from('pickem_picks')
-        .delete()
-        .eq('entry_id', entryId)
+        .upsert({
+          entry_id: entryId,
+          game_id: gameId,
+          picked_team_id: teamId,
+          is_correct: null, // Reset correctness when pick changes
+        }, {
+          onConflict: 'entry_id,game_id',
+        })
 
-      // Insert new picks
-      if (picksToSave.length > 0) {
-        const { error: picksError } = await supabase
-          .from('pickem_picks')
-          .insert(picksToSave)
+      if (pickError) throw pickError
 
-        if (picksError) throw picksError
-      }
-
-      setLocalPicks({})
       router.refresh()
     } catch (error) {
-      console.error('Failed to save picks:', error)
-      alert('Failed to save picks')
+      console.error('Failed to save pick:', error)
+      // Revert optimistic update
+      setLocalPicks(prev => {
+        const next = { ...prev }
+        delete next[gameId]
+        return next
+      })
     }
     setSaving(false)
   }
 
-  // Check if all games have picks
-  const allGamesPicked = dayPickemGames.every(pg => getPickedTeamId(pg.id))
-  const hasUnsavedChanges = Object.keys(localPicks).length > 0
-
-  // Group games by session
-  const session1Games = dayPickemGames.filter(pg => pg.session === 1)
-    .sort((a, b) => {
-      const gameA = games.find(g => g.id === a.game_id)
-      const gameB = games.find(g => g.id === b.game_id)
-      return new Date(gameA?.scheduled_at || 0).getTime() - new Date(gameB?.scheduled_at || 0).getTime()
-    })
-
-  const session2Games = dayPickemGames.filter(pg => pg.session === 2)
-    .sort((a, b) => {
-      const gameA = games.find(g => g.id === a.game_id)
-      const gameB = games.find(g => g.id === b.game_id)
-      return new Date(gameA?.scheduled_at || 0).getTime() - new Date(gameB?.scheduled_at || 0).getTime()
-    })
-
-  // Calculate standings for a session
-  const calculateSessionStandings = (session: number) => {
-    const sessionGameIds = dayPickemGames
-      .filter(pg => pg.session === session)
-      .map(pg => pg.id)
-
-    const dayEntries = pickemEntries.filter(e => e.pickem_day_id === currentDay.id)
+  // Calculate standings for a session (only paid users)
+  const calculateSessionStandings = (sessionGames: Game[]) => {
+    // Only count games that have a winner (completed games)
+    const completedGames = sessionGames.filter(g => g.winner_id !== null)
+    const completedGameIds = completedGames.map(g => g.id)
+    const sessionGameIds = sessionGames.map(g => g.id)
+    const dayEntries = allEntries.filter(e => e.pickem_day_id === currentDay.id && e.has_paid === true)
 
     return dayEntries.map(entry => {
       const user = users.find(u => u.id === entry.user_id)
-      const entryPicks = pickemPicks.filter(p =>
-        p.entry_id === entry.id && sessionGameIds.includes(p.pickem_game_id)
+      const entryPicks = allPicks.filter(p =>
+        p.entry_id === entry.id && p.game_id && sessionGameIds.includes(p.game_id)
       )
 
-      const correctPicks = entryPicks.filter(p => p.is_correct === true).length
-      const totalPicks = entryPicks.length
+      // Only count correct picks for completed games
+      const correctPicks = entryPicks.filter(p =>
+        p.is_correct === true && completedGameIds.includes(p.game_id!)
+      ).length
+      const totalPicks = completedGames.length
 
-      // Calculate tiebreaker positions
+      // Calculate tiebreaker positions (only for completed games)
       const sortedPicks = entryPicks
+        .filter(pick => completedGameIds.includes(pick.game_id!))
         .map(pick => {
-          const pg = dayPickemGames.find(g => g.id === pick.pickem_game_id)
-          const game = pg ? games.find(g => g.id === pg.game_id) : null
+          const game = completedGames.find(g => g.id === pick.game_id)
           return { ...pick, scheduled_at: game?.scheduled_at || '' }
         })
         .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
@@ -271,253 +328,347 @@ export function PickemClient({
     })
   }
 
-  const renderGame = (pickemGame: PickemGame) => {
-    const game = games.find(g => g.id === pickemGame.game_id)
-    if (!game || !game.team1 || !game.team2) return null
+  // Determine if pick was correct against spread
+  // Spread is always assigned to the LOWER SEED:
+  // - Negative spread = lower seed is favorite (must win by more than |spread|)
+  // - Positive spread = lower seed is underdog (can lose by less than spread)
+  const isPickCorrect = (game: Game, pickedTeamId: string): boolean | null => {
+    if (!game.winner_id || game.spread === null) return null
+    if (game.team1_score === null || game.team2_score === null) return null
+    if (!game.team1 || !game.team2) return null
 
-    const d1Team1 = findD1Team(game.team1.name)
-    const d1Team2 = findD1Team(game.team2.name)
-    const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
-    const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
+    const margin = game.team1_score - game.team2_score
+    const team1IsLowerSeed = game.team1.seed < game.team2.seed
 
-    const isFavorite1 = pickemGame.favorite_team_id === game.team1.id
-    const spread1 = isFavorite1 ? `-${pickemGame.spread}` : `+${pickemGame.spread}`
-    const spread2 = isFavorite1 ? `+${pickemGame.spread}` : `-${pickemGame.spread}`
+    // Adjusted margin from lower seed's perspective, then add spread
+    // If team1 is lower seed: team1 covers if margin + spread > 0
+    // If team2 is lower seed: team1 covers if margin - spread > 0
+    const adjustedMargin = team1IsLowerSeed
+      ? margin + game.spread
+      : margin - game.spread
 
-    const pickedTeamId = getPickedTeamId(pickemGame.id)
+    const team1Covered = adjustedMargin > 0
+    const pickedTeam1 = pickedTeamId === game.team1.id
+
+    return pickedTeam1 ? team1Covered : !team1Covered
+  }
+
+  const renderGame = (game: Game) => {
+    if (!game.team1 || !game.team2) return null
+
+    // Determine which team is lower seed
+    const lowerSeedTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
+    const higherSeedTeam = game.team1.seed < game.team2.seed ? game.team2 : game.team1
+
+    // Spread is assigned to lower seed:
+    // - Positive spread = lower seed is underdog, higher seed is favorite
+    // - Negative spread = lower seed is favorite
+    const lowerSeedIsFavorite = game.spread ? game.spread < 0 : true
+
+    // Order teams so favorite is first
+    const favoriteTeam = lowerSeedIsFavorite ? lowerSeedTeam : higherSeedTeam
+    const underdogTeam = lowerSeedIsFavorite ? higherSeedTeam : lowerSeedTeam
+
+    const d1Favorite = findD1Team(favoriteTeam.name)
+    const d1Underdog = findD1Team(underdogTeam.name)
+    const logoFavorite = d1Favorite ? getTeamLogoUrl(d1Favorite) : null
+    const logoUnderdog = d1Underdog ? getTeamLogoUrl(d1Underdog) : null
+
+    const pickedTeamId = getPickedTeamId(game.id)
     const isComplete = game.winner_id !== null
+    const hasSpread = game.spread !== null
 
-    // Determine if pick was correct (against spread)
-    const userPick = userPicks.find(p => p.pickem_game_id === pickemGame.id)
-    const isCorrect = userPick?.is_correct
+    // Get correctness from saved pick or calculate
+    const savedPick = userDayPicks.find(p => p.game_id === game.id)
+    const pickCorrectness = savedPick?.is_correct ?? (isComplete && pickedTeamId ? isPickCorrect(game, pickedTeamId) : null)
 
-    const renderTeamButton = (team: Team, spread: string, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null) => {
+    const channelNum = getChannelNumber(game.channel || null)
+
+    const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
       const isPicked = pickedTeamId === team.id
-      const isWinnerAgainstSpread = pickemGame.winner_team_id === team.id
+      const isWinner = isComplete && game.winner_id === team.id
 
-      let bgColor = d1Team?.primaryColor ? d1Team.primaryColor + '20' : 'rgba(63, 63, 70, 0.2)'
-      let borderClass = ''
-
+      // Ring styling based on pick status and correctness
+      let ringClass = ''
       if (isPicked) {
-        bgColor = d1Team?.primaryColor ? d1Team.primaryColor + '60' : 'rgba(63, 63, 70, 0.6)'
-        borderClass = 'ring-2 ring-orange-500'
-      }
-
-      if (isComplete && isPicked) {
-        if (isCorrect === true) {
-          borderClass = 'ring-2 ring-green-500'
-        } else if (isCorrect === false) {
-          borderClass = 'ring-2 ring-red-500'
+        if (isComplete) {
+          ringClass = pickCorrectness === true ? 'ring-2 ring-green-500' : 'ring-2 ring-red-500'
+        } else {
+          ringClass = 'ring-2 ring-orange-500'
         }
       }
 
+      // Favorite gets minus, underdog gets plus
+      const spreadValue = hasSpread && game.spread ? Math.abs(game.spread) : null
+      const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
+
       return (
         <button
-          onClick={() => handlePick(pickemGame.id, team.id)}
-          disabled={currentDay.is_locked}
-          className={`flex-1 flex items-center gap-2 p-3 rounded-lg transition-all ${borderClass} ${
-            currentDay.is_locked ? 'cursor-default' : 'hover:opacity-80'
+          key={team.id}
+          onClick={() => handlePick(game.id, team.id)}
+          disabled={isLocked}
+          className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
+            isLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
-          style={{ backgroundColor: bgColor }}
+          style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
+          <span className="w-5 text-xs font-mono text-zinc-400">{team.seed}</span>
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+            className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
           >
             {logo ? (
-              <img src={logo} alt="" className="w-5 h-5 object-contain" />
+              <img src={logo} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
             ) : (
-              <span className="text-[10px] font-bold text-white">
-                {d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2)}
-              </span>
+              <span className="text-[10px] font-bold text-white">{d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2) || '?'}</span>
             )}
           </div>
-          <div className="flex-1 text-left">
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-zinc-400">#{team.seed}</span>
-              <span className="text-sm font-medium">{d1Team?.shortName || team.short_name}</span>
-            </div>
-            <span className={`text-xs ${isFavorite1 === (team.id === game.team1?.id) ? 'text-orange-400' : 'text-zinc-400'}`}>
-              {spread}
+          <span className="flex-1 truncate text-sm text-white text-left">
+            {d1Team?.shortName || team.short_name || team.name}
+            {spreadDisplay && (
+              <span className="text-xs text-zinc-400 ml-1">{spreadDisplay}</span>
+            )}
+          </span>
+          {/* Score column */}
+          {isComplete && (
+            <span className={`w-8 text-right text-sm text-zinc-300 ${isWinner ? 'font-bold' : 'font-normal'}`}>
+              {team.id === game.team1?.id ? game.team1_score : game.team2_score}
             </span>
-          </div>
-          {isPicked && (
-            <div className="flex-shrink-0">
-              {isComplete ? (
-                isCorrect === true ? (
-                  <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                  </svg>
-                ) : isCorrect === false ? (
-                  <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                ) : null
-              ) : (
-                <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-              )}
-            </div>
+          )}
+          {/* Circled checkmark for pending picks */}
+          {isPicked && !isComplete && (
+            <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
           )}
         </button>
       )
     }
 
     return (
-      <div key={pickemGame.id} className="bg-zinc-800/30 rounded-xl p-3">
-        <div className="text-xs text-zinc-500 mb-2">{formatTime(game.scheduled_at)}</div>
-        <div className="flex gap-2">
-          {renderTeamButton(game.team1, spread1, d1Team1, logo1)}
-          {renderTeamButton(game.team2, spread2, d1Team2, logo2)}
+      <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
+        {/* Header: Date/Time, Location, Channel */}
+        <div className="flex items-center gap-2 text-[10px] text-zinc-400">
+          {game.scheduled_at && (
+            <span className="px-1 py-0.5 bg-zinc-800 rounded">{formatGameTime(game.scheduled_at)}</span>
+          )}
+          {game.location && (
+            <span className="flex-1 truncate">{game.location}</span>
+          )}
+          {game.channel && (
+            <span className="px-1 py-0.5 bg-zinc-800 rounded">
+              {game.channel}{channelNum ? ` (${channelNum})` : ''}
+            </span>
+          )}
         </div>
+
+        {/* Favorite (top) */}
+        {renderTeamRow(favoriteTeam, d1Favorite, logoFavorite, true)}
+
+        {/* Underdog (bottom) */}
+        {renderTeamRow(underdogTeam, d1Underdog, logoUnderdog, false)}
       </div>
     )
   }
 
-  const renderStandings = (session: number, standings: ReturnType<typeof calculateSessionStandings>) => {
+  // Get rank with ties (same score = same rank)
+  const getRank = (standings: typeof calculateSessionStandings extends (g: Game[]) => infer R ? R : never, index: number) => {
+    const currentScore = standings[index].correct_picks
+    const firstWithScore = standings.findIndex(s => s.correct_picks === currentScore)
+    return firstWithScore + 1
+  }
+
+  const renderSessionLeaderboard = (sessionGames: Game[], sessionNum: number, expanded: boolean, onToggle: () => void) => {
+    const standings = calculateSessionStandings(sessionGames)
     if (standings.length === 0) return null
 
-    const sessionGames = session === 1 ? session1Games : session2Games
-    const totalGames = sessionGames.length
-
     return (
-      <div className="bg-zinc-800/30 rounded-xl p-4 mt-4">
-        <h4 className="text-sm font-medium text-zinc-400 mb-3">
-          Session {session} Standings
-        </h4>
-        <div className="space-y-2">
-          {standings.map((standing, index) => {
-            const payout = index === 0 ? payouts.session_1st :
-                          index === 1 ? payouts.session_2nd :
-                          index === 2 ? payouts.session_3rd : 0
+      <div>
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center justify-between py-2 hover:opacity-80 transition-opacity"
+        >
+          <span className="text-xs font-medium text-zinc-400">Leaderboard</span>
+          <svg
+            className={`w-4 h-4 text-zinc-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
 
-            return (
-              <div
-                key={standing.user_id}
-                className={`flex items-center justify-between text-sm p-2 rounded ${
-                  standing.is_current_user ? 'bg-orange-500/20' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-6 font-bold ${
-                    index === 0 ? 'text-yellow-400' :
-                    index === 1 ? 'text-zinc-300' :
-                    index === 2 ? 'text-orange-400' :
-                    'text-zinc-500'
-                  }`}>
-                    {index + 1}.
-                  </span>
-                  <span className={standing.is_current_user ? 'font-medium' : ''}>
-                    {standing.display_name}
-                  </span>
+        {expanded && (
+          <div className="bg-zinc-800/30 rounded-xl p-3 space-y-1">
+            {standings.map((standing, index) => {
+              const rank = getRank(standings, index)
+
+              // Calculate payout considering ties
+              // Find how many people are tied at this rank
+              const tiedCount = standings.filter(s => s.correct_picks === standing.correct_picks).length
+
+              // Sum up payouts for all positions this tie group occupies (positions rank through rank+tiedCount-1)
+              // Only positions 1-3 have payouts
+              const payoutAmounts = [sessionPayouts.first, sessionPayouts.second, sessionPayouts.third]
+              let totalPayoutForTie = 0
+              for (let pos = rank; pos < rank + tiedCount && pos <= 3; pos++) {
+                totalPayoutForTie += payoutAmounts[pos - 1]
+              }
+
+              // Split equally among tied users (round to whole dollars)
+              const payout = totalPayoutForTie > 0 ? Math.floor(totalPayoutForTie / tiedCount) : 0
+
+              return (
+                <div
+                  key={standing.user_id}
+                  className={`flex items-center justify-between text-sm py-1 px-2 rounded ${
+                    standing.is_current_user ? 'bg-orange-500/20' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-5 text-xs font-bold ${
+                      rank === 1 ? 'text-yellow-400' :
+                      rank === 2 ? 'text-zinc-300' :
+                      rank === 3 ? 'text-orange-400' :
+                      'text-zinc-500'
+                    }`}>
+                      {rank}
+                    </span>
+                    <span className={`text-sm ${standing.is_current_user ? 'font-medium' : ''}`}>
+                      {standing.display_name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-400">
+                      {standing.correct_picks}/{sessionGames.length}
+                    </span>
+                    {payout > 0 && (
+                      <span className="text-xs text-green-400 font-medium">${payout}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-zinc-400">
-                    {standing.correct_picks}/{totalGames}
-                  </span>
-                  {payout > 0 && (
-                    <span className="text-green-400 font-medium">${payout}</span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }
 
-  const session1Standings = calculateSessionStandings(1)
-  const session2Standings = calculateSessionStandings(2)
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
-      <div className="p-6 max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold text-orange-500 mb-2">Pick&apos;em</h1>
-
-        {/* Day Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {pickemDays.map((day, index) => (
-            <button
-              key={day.id}
-              onClick={() => setSelectedDayIndex(index)}
-              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                selectedDayIndex === index
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-              }`}
-            >
-              {formatDate(day.contest_date)}
-            </button>
-          ))}
+    <div className="p-4 pb-20 space-y-6">
+      {/* Simulated Time Banner */}
+      {simulatedTime && (
+        <div className="bg-purple-500/20 border border-purple-500/50 text-purple-300 rounded-lg px-4 py-2 text-xs">
+          <span className="font-bold">DEV MODE:</span> Simulated time is {getCurrentTime().toLocaleString()}
         </div>
+      )}
 
-        {/* Lock Status */}
-        {currentDay.is_locked && (
-          <div className="bg-red-500/20 text-red-400 rounded-lg px-4 py-2 mb-4 text-sm">
-            Picks are locked for {formatDate(currentDay.contest_date)}
-          </div>
-        )}
+      <h1 className="text-xl font-bold text-orange-500">Pick&apos;em</h1>
 
-        {/* Payouts */}
-        <div className="bg-zinc-800/50 rounded-xl p-4 mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 mb-2">Session Payouts</h3>
-          <div className="flex gap-4 text-sm">
-            <div>
-              <span className="text-yellow-400">1st:</span> ${payouts.session_1st}
-            </div>
-            <div>
-              <span className="text-zinc-300">2nd:</span> ${payouts.session_2nd}
-            </div>
-            <div>
-              <span className="text-orange-400">3rd:</span> ${payouts.session_3rd}
-            </div>
-          </div>
-        </div>
+      {/* Day Tabs */}
+      <div className="flex gap-2">
+        {pickemDays.map((day, index) => {
+          const entry = userEntries.find(e => e.pickem_day_id === day.id)
+          const hasPaid = entry?.has_paid ?? false
 
-        {/* Session 1 */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-orange-400 mb-3">
-            Session 1 - Early Games
-          </h3>
-          <div className="space-y-3">
-            {session1Games.map(pg => renderGame(pg))}
-          </div>
-          {currentDay.is_locked && renderStandings(1, session1Standings)}
-        </div>
-
-        {/* Session 2 */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-orange-400 mb-3">
-            Session 2 - Late Games
-          </h3>
-          <div className="space-y-3">
-            {session2Games.map(pg => renderGame(pg))}
-          </div>
-          {currentDay.is_locked && renderStandings(2, session2Standings)}
-        </div>
-
-        {/* Save Button */}
-        {!currentDay.is_locked && (
-          <div className="fixed bottom-16 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
-            <div className="max-w-lg mx-auto">
+          return (
+            <div key={day.id} className="flex flex-col items-center flex-1">
               <button
-                onClick={savePicks}
-                disabled={saving || !allGamesPicked}
-                className={`w-full py-3 rounded-xl font-semibold transition-colors ${
-                  allGamesPicked
-                    ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                    : 'bg-zinc-700 text-zinc-500'
+                onClick={() => setSelectedDayIndex(index)}
+                className={`w-full px-3 py-1.5 rounded-t text-sm font-medium transition-colors ${
+                  selectedDayIndex === index
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                 }`}
               >
-                {saving ? 'Saving...' : allGamesPicked ? (
-                  hasUnsavedChanges ? 'Save Picks' : 'Picks Saved'
-                ) : (
-                  `Pick all games (${dayPickemGames.filter(pg => getPickedTeamId(pg.id)).length}/${dayPickemGames.length})`
-                )}
+                {formatDayName(day.contest_date)}
               </button>
+              <div className={`w-full text-[10px] font-bold text-center py-0.5 rounded-b ${
+                hasPaid
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-red-500/20 text-red-400'
+              }`}>
+                {hasPaid ? 'PAID' : 'PAY BRO'}
+              </div>
             </div>
+          )
+        })}
+      </div>
+
+      {/* Lock Status */}
+      {isLocked && (
+        <div className="bg-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">
+          Picks are locked for {formatDayName(currentDay.contest_date)}
+        </div>
+      )}
+
+      {/* Payouts */}
+      {(sessionPayouts.first > 0 || sessionPayouts.second > 0 || sessionPayouts.third > 0) && (
+        <div className="bg-zinc-800/50 rounded-xl px-4 py-2 flex items-center justify-between">
+          <span className="text-sm font-semibold text-orange-400">Session Payouts</span>
+          <div className="flex items-center gap-4 text-sm">
+            {sessionPayouts.first > 0 && (
+              <span><span className="text-zinc-400">1st</span> ${sessionPayouts.first}</span>
+            )}
+            {sessionPayouts.second > 0 && (
+              <span><span className="text-zinc-400">2nd</span> ${sessionPayouts.second}</span>
+            )}
+            {sessionPayouts.third > 0 && (
+              <span><span className="text-zinc-400">3rd</span> ${sessionPayouts.third}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Session 1 */}
+      <div className="space-y-2">
+        <button
+          onClick={toggleSession1Games}
+          className="w-full flex items-center justify-between"
+        >
+          <h3 className="text-sm font-semibold text-orange-400">Session 1 - Early Games</h3>
+          <svg
+            className={`w-4 h-4 text-zinc-400 transition-transform ${session1GamesExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
+        {renderSessionLeaderboard(session1Games, 1, session1LeaderboardExpanded, toggleSession1Leaderboard)}
+        {session1GamesExpanded && (
+          <div className="space-y-2">
+            {session1Games.map(game => renderGame(game))}
+          </div>
+        )}
+      </div>
+
+      {/* Session 2 */}
+      <div className="space-y-2">
+        <button
+          onClick={toggleSession2Games}
+          className="w-full flex items-center justify-between"
+        >
+          <h3 className="text-sm font-semibold text-orange-400">Session 2 - Late Games</h3>
+          <svg
+            className={`w-4 h-4 text-zinc-400 transition-transform ${session2GamesExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
+        {renderSessionLeaderboard(session2Games, 2, session2LeaderboardExpanded, toggleSession2Leaderboard)}
+        {session2GamesExpanded && (
+          <div className="space-y-2">
+            {session2Games.map(game => renderGame(game))}
           </div>
         )}
       </div>

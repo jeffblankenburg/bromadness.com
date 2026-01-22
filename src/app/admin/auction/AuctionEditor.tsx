@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
@@ -81,8 +81,43 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
   const [selectedUser, setSelectedUser] = useState('')
   const [bidAmount, setBidAmount] = useState('')
   const [saving, setSaving] = useState(false)
-  const [ownersExpanded, setOwnersExpanded] = useState(true)
-  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set(regions.map(r => r.id)))
+
+  // Load collapsed states from localStorage
+  const [ownersExpanded, setOwnersExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem('auction-owners-expanded')
+    return saved !== null ? saved === 'true' : true
+  })
+  const [alphabeticalExpanded, setAlphabeticalExpanded] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = localStorage.getItem('auction-alphabetical-expanded')
+    return saved !== null ? saved === 'true' : false
+  })
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set(regions.map(r => r.id))
+    const saved = localStorage.getItem('auction-expanded-regions')
+    if (saved) {
+      try {
+        return new Set(JSON.parse(saved))
+      } catch {
+        return new Set(regions.map(r => r.id))
+      }
+    }
+    return new Set(regions.map(r => r.id))
+  })
+
+  // Save collapsed states to localStorage
+  useEffect(() => {
+    localStorage.setItem('auction-owners-expanded', String(ownersExpanded))
+  }, [ownersExpanded])
+
+  useEffect(() => {
+    localStorage.setItem('auction-alphabetical-expanded', String(alphabeticalExpanded))
+  }, [alphabeticalExpanded])
+
+  useEffect(() => {
+    localStorage.setItem('auction-expanded-regions', JSON.stringify([...expandedRegions]))
+  }, [expandedRegions])
   const router = useRouter()
   const supabase = createClient()
 
@@ -216,6 +251,13 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
     teams: teams.filter(t => t.region_id === region.id).sort((a, b) => a.seed - b.seed),
   }))
 
+  // All teams sorted alphabetically
+  const alphabeticalTeams = [...teams].sort((a, b) => {
+    const nameA = getD1TeamData(a.name)?.shortName || a.short_name || a.name
+    const nameB = getD1TeamData(b.name)?.shortName || b.short_name || b.name
+    return nameA.localeCompare(nameB)
+  })
+
   return (
     <div className="space-y-6">
       {/* User Summary */}
@@ -291,6 +333,94 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                 Total pot: ${auctionEntries.filter(e => e.has_paid).length * settings.entryFee}
               </span>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Alphabetical List */}
+      <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAlphabeticalExpanded(!alphabeticalExpanded)}
+          className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
+        >
+          <h3 className="text-sm font-semibold text-orange-400">All Teams (A-Z)</h3>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-zinc-400">
+              {auctionTeams.length}/{teams.length} assigned
+            </span>
+            <svg
+              className={`w-4 h-4 text-zinc-400 transition-transform ${alphabeticalExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        {alphabeticalExpanded && (
+          <div className="px-4 pb-4 space-y-2">
+            {alphabeticalTeams.map(team => {
+              const owner = getTeamOwner(team.id)
+              const d1Team = getD1TeamData(team.name)
+              const logo = d1Team ? getTeamLogoUrl(d1Team) : null
+              const opponent = getOpponent(team.id)
+              const d1Opponent = opponent ? getD1TeamData(opponent.name) : null
+
+              return (
+                <div
+                  key={team.id}
+                  className="flex items-center gap-2 p-2 rounded-lg"
+                  style={{ backgroundColor: d1Team ? d1Team.primaryColor + '30' : '#3f3f4620' }}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedTeam(team)
+                      if (owner && owner.user) {
+                        setSelectedUser(owner.user.id)
+                        setBidAmount(owner.bidAmount.toString())
+                      } else {
+                        setSelectedUser('')
+                        setBidAmount('')
+                      }
+                    }}
+                    className="flex-1 flex items-center gap-2 text-left hover:opacity-80 cursor-pointer"
+                  >
+                    <span className="w-5 text-xs font-mono text-zinc-400">{team.seed}</span>
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
+                    >
+                      {logo ? (
+                        <img src={logo} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                      ) : (
+                        <span className="text-[10px] font-bold text-white">
+                          {d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2) || '?'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 text-sm truncate text-white">
+                      {d1Team?.shortName || team.short_name || team.name}
+                      {opponent && (
+                        <span className="text-xs text-zinc-500 ml-1">
+                          vs {d1Opponent?.shortName || opponent.short_name || opponent.name}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {owner ? (
+                    <span className="text-xs bg-zinc-900/50 px-2 py-1 rounded">
+                      {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-500 px-2">Unassigned</span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

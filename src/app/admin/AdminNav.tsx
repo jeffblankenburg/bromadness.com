@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/admin/pickem', label: "Pick'em" },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/expenses', label: 'Expenses' },
+  { href: '/admin/dev', label: 'Dev' },
 ]
 
 export function AdminNav() {

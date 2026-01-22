@@ -128,42 +128,34 @@ export function GameResults({ tournament, teams, games }: Props) {
   // Update pick'em when game result is entered
   const updatePickemResults = async (game: Game, team1Score: number, team2Score: number) => {
     try {
-      // Find the pickem_game for this game
-      const { data: pickemGame } = await supabase
-        .from('pickem_games')
-        .select('id, spread, favorite_team_id')
-        .eq('game_id', game.id)
-        .single()
+      // Check if this game has a spread set (pick'em game)
+      if (game.spread === null) return // No spread, not a pick'em game
 
-      if (!pickemGame) return // No pick'em for this game
+      // Get team seeds to determine which team has the spread
+      const team1 = teams.find(t => t.id === game.team1_id)
+      const team2 = teams.find(t => t.id === game.team2_id)
+      if (!team1 || !team2) return
 
       // Calculate who covered the spread
-      // The team that "wins" against the spread
+      // Spread is always assigned to the LOWER SEED:
+      // - Negative spread = lower seed is favorite (must win by more than |spread|)
+      // - Positive spread = lower seed is underdog (can lose by less than spread)
       const margin = team1Score - team2Score // positive = team1 won outright
-      const team1IsFavorite = game.favorite_team_id === game.team1_id
-      const spread = pickemGame.spread
+      const team1IsLowerSeed = team1.seed < team2.seed
 
-      // Adjusted margin from team1's perspective
-      // If team1 is favorite, subtract spread from their margin
-      // If team2 is favorite (team1 is underdog), add spread to team1's margin
-      const adjustedMargin = team1IsFavorite
-        ? margin - spread  // favorite must win by more than spread
-        : margin + spread  // underdog gets spread points added
+      // Adjusted margin: add spread if team1 is lower seed, subtract if team2 is lower seed
+      const adjustedMargin = team1IsLowerSeed
+        ? margin + game.spread
+        : margin - game.spread
 
       // Winner against the spread
       const spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
 
-      // Update the pickem_game with the spread winner
-      await supabase
-        .from('pickem_games')
-        .update({ winner_team_id: spreadWinnerId })
-        .eq('id', pickemGame.id)
-
-      // Get all picks for this pickem_game
+      // Get all picks for this game (picks reference game_id directly)
       const { data: picks } = await supabase
         .from('pickem_picks')
         .select('id, picked_team_id, entry_id')
-        .eq('pickem_game_id', pickemGame.id)
+        .eq('game_id', game.id)
 
       if (!picks || picks.length === 0) return
 
@@ -217,11 +209,50 @@ export function GameResults({ tournament, teams, games }: Props) {
           .eq('id', game.next_game_id)
       }
 
+      // Clear pick'em correctness for this game
+      await clearPickemResults(game)
+
       router.refresh()
     } catch (err) {
       console.error('Failed to clear result:', err)
     } finally {
       setSaving(null)
+    }
+  }
+
+  // Clear pick'em correctness when result is cleared
+  const clearPickemResults = async (game: Game) => {
+    try {
+      // Get all picks for this game
+      const { data: picks } = await supabase
+        .from('pickem_picks')
+        .select('id, entry_id')
+        .eq('game_id', game.id)
+
+      if (!picks || picks.length === 0) return
+
+      // Reset is_correct to null for all picks
+      await supabase
+        .from('pickem_picks')
+        .update({ is_correct: null })
+        .eq('game_id', game.id)
+
+      // Recalculate correct_picks count for each affected entry
+      const entryIds = [...new Set(picks.map(p => p.entry_id))]
+      for (const entryId of entryIds) {
+        const { count } = await supabase
+          .from('pickem_picks')
+          .select('*', { count: 'exact', head: true })
+          .eq('entry_id', entryId)
+          .eq('is_correct', true)
+
+        await supabase
+          .from('pickem_entries')
+          .update({ correct_picks: count || 0 })
+          .eq('id', entryId)
+      }
+    } catch (err) {
+      console.error('Failed to clear pick\'em results:', err)
     }
   }
 

@@ -138,14 +138,21 @@ export default async function AuctionPage() {
     .filter(entry => entry.teams.length > 0)
     .sort((a, b) => b.points - a.points)
 
+  // Calculate ranks with ties
+  const getRank = (index: number, points: number) => {
+    // Find the first person with this point total
+    const firstWithPoints = leaderboard.findIndex(e => e.points === points)
+    return firstWithPoints + 1
+  }
+
   return (
-    <div className="p-4 pb-20 space-y-6">
-      <h1 className="text-xl font-bold text-center">Auction Standings</h1>
+    <div className="p-4 pb-20 space-y-4">
+      <h1 className="text-xl font-bold text-orange-500">Auction</h1>
 
       {/* Payouts Info */}
       <div className="bg-zinc-800/50 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-orange-400 mb-3">Payouts</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-zinc-400">Champion</span>
             <span>${payouts.championship_winner}</span>
@@ -176,7 +183,7 @@ export default async function AuctionPage() {
       {/* Leaderboard */}
       <div className="space-y-3">
         {leaderboard.map((entry, idx) => {
-          const rank = idx + 1
+          const rank = getRank(idx, entry.points)
           const isTop4 = rank <= 4
 
           return (
@@ -188,10 +195,11 @@ export default async function AuctionPage() {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <span className={`text-lg font-bold ${
+                  <span className={`text-lg font-bold w-6 ${
                     rank === 1 ? 'text-yellow-400' :
                     rank === 2 ? 'text-zinc-300' :
                     rank === 3 ? 'text-orange-400' :
+                    rank === 4 ? 'text-zinc-400' :
                     'text-zinc-500'
                   }`}>
                     {rank}

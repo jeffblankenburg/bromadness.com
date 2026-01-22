@@ -22,6 +22,10 @@ const graduate = Graduate({
 export const metadata: Metadata = {
   title: "Bro Madness",
   description: "March Madness bracket pool, daily pick'em, and casino",
+  icons: {
+    icon: "/logo.png",
+    apple: "/icons/icon-192x192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -48,9 +52,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${graduate.variable} antialiased bg-black`}
       >
