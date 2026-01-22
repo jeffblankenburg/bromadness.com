@@ -195,18 +195,18 @@ export default async function AuctionPage() {
                 title={t.team?.name}
               >
                 <div
-                  className="w-12 h-12 rounded flex items-center justify-center"
+                  className="w-14 h-14 rounded flex items-center justify-center"
                   style={{ backgroundColor: teamColor }}
                 >
                   {logoUrl ? (
                     <img
                       src={logoUrl}
                       alt={t.team?.name || ''}
-                      className="w-8 h-8 object-contain"
+                      className="w-9 h-9 object-contain"
                       style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
                     />
                   ) : (
-                    <span className="text-white text-sm font-bold">
+                    <span className="text-white text-base font-bold">
                       {t.team?.short_name?.charAt(0) || '?'}
                     </span>
                   )}
