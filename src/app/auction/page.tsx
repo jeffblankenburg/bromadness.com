@@ -275,15 +275,12 @@ export default async function AuctionPage() {
                   }`}>
                     {rank}
                   </span>
-                  <div>
-                    <span className="font-medium">
-                      {entry.user.display_name || entry.user.phone}
-                    </span>
-                    <div className="text-xs text-zinc-500">
-                      ${entry.totalSpent}/${salaryCap} spent
-                      {entry.remaining > 0 && ` · $${entry.remaining} left`}
-                    </div>
-                  </div>
+                  <span className="font-medium">
+                    {entry.user.display_name || entry.user.phone}
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    ${entry.totalSpent}/${salaryCap} spent
+                  </span>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-orange-400">{entry.points} pts</div>
