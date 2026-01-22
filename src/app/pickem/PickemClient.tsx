@@ -567,23 +567,23 @@ export function PickemClient({
                 onClick={toggleEarlyGames}
                 className="w-full flex items-center justify-between py-2"
               >
-                <h3 className="text-sm font-semibold text-orange-400">
-                  Early Games
+                <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
+                <div className="flex items-center gap-2">
                   {session1Stats.total > 0 && (
-                    <span className="text-zinc-400 font-normal ml-2">
+                    <span className="text-zinc-400 text-sm">
                       {session1Stats.correct}/{session1Stats.total} correct
                     </span>
                   )}
-                </h3>
-                <svg
-                  className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                </svg>
+                  <svg
+                    className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                  </svg>
+                </div>
               </button>
               {earlyGamesExpanded && (
                 <div className="space-y-2">
@@ -598,23 +598,23 @@ export function PickemClient({
                 onClick={toggleLateGames}
                 className="w-full flex items-center justify-between py-2"
               >
-                <h3 className="text-sm font-semibold text-orange-400">
-                  Late Games
+                <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
+                <div className="flex items-center gap-2">
                   {session2Stats.total > 0 && (
-                    <span className="text-zinc-400 font-normal ml-2">
+                    <span className="text-zinc-400 text-sm">
                       {session2Stats.correct}/{session2Stats.total} correct
                     </span>
                   )}
-                </h3>
-                <svg
-                  className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                </svg>
+                  <svg
+                    className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                  </svg>
+                </div>
               </button>
               {lateGamesExpanded && (
                 <div className="space-y-2">
