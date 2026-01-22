@@ -304,7 +304,7 @@ export const D1_TEAMS: D1Team[] = [
   { name: "Fairfield Stags", shortName: "Fairfield", abbreviation: "FAIR", primaryColor: "#CC0000", secondaryColor: "#FFFFFF" },
   { name: "Manhattan Jaspers", shortName: "Manhattan", abbreviation: "MAN", primaryColor: "#006633", secondaryColor: "#FFFFFF" },
   { name: "Marist Red Foxes", shortName: "Marist", abbreviation: "MRST", primaryColor: "#C8102E", secondaryColor: "#FFFFFF" },
-  { name: "Mount St. Mary's Mountaineers", shortName: "Mt St Mary's", abbreviation: "MSM", primaryColor: "#003087", secondaryColor: "#FFFFFF" },
+  { name: "Mount St. Mary's Mountaineers", shortName: "Mt St Mary's", abbreviation: "MSM", primaryColor: "#003087", secondaryColor: "#FFFFFF", espnId: 116 },
   { name: "Niagara Purple Eagles", shortName: "Niagara", abbreviation: "NIAG", primaryColor: "#582C83", secondaryColor: "#FFFFFF" },
   { name: "Quinnipiac Bobcats", shortName: "Quinnipiac", abbreviation: "QUIN", primaryColor: "#002B5C", secondaryColor: "#C69214" },
   { name: "Rider Broncs", shortName: "Rider", abbreviation: "RID", primaryColor: "#9F1C32", secondaryColor: "#898D8D" },
