@@ -401,7 +401,9 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                       style={{ backgroundColor: d1Team ? d1Team.primaryColor + '30' : '#3f3f4620' }}
                     >
                       <button
-                        onClick={() => {
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setSelectedTeam(team)
                           if (owner && owner.user) {
                             setSelectedUser(owner.user.id)
@@ -411,7 +413,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                             setBidAmount('')
                           }
                         }}
-                        className="flex-1 flex items-center gap-2 text-left hover:opacity-80"
+                        className="flex-1 flex items-center gap-2 text-left hover:opacity-80 cursor-pointer"
                       >
                         <span className="w-5 text-xs font-mono text-zinc-400">{team.seed}</span>
                         <div
@@ -436,9 +438,13 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                             {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
                           </span>
                           <button
-                            onClick={() => handleRemove(owner.auctionId)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemove(owner.auctionId)
+                            }}
                             disabled={saving}
-                            className="text-red-400 hover:text-red-300 text-sm font-bold w-6 h-6 flex items-center justify-center"
+                            className="text-red-400 hover:text-red-300 text-sm font-bold w-6 h-6 flex items-center justify-center cursor-pointer"
                           >
                             ×
                           </button>
