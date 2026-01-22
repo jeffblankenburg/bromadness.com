@@ -179,16 +179,9 @@ export default async function Home() {
               {/* User's Auction Teams */}
               <Link href="/auction" className="block w-full bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-orange-400">
-                      Your Auction Teams
-                    </h3>
-                    {userPlace > 0 && (
-                      <span className="text-xs text-zinc-500">
-                        ({userPlace === 1 ? '1st' : userPlace === 2 ? '2nd' : userPlace === 3 ? '3rd' : `${userPlace}th`} place)
-                      </span>
-                    )}
-                  </div>
+                  <h3 className="text-sm font-semibold text-orange-400">
+                    Your Auction Teams
+                  </h3>
                   <div className="flex items-center gap-2">
                     {userPayout > 0 && (
                       <div className="flex items-center gap-1">
