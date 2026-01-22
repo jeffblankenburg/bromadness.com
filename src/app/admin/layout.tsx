@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { AdminNav } from './AdminNav'
 
 export default async function AdminLayout({
   children,
@@ -35,26 +36,7 @@ export default async function AdminLayout({
               ← Back to app
             </Link>
           </div>
-          <nav className="flex gap-4 mt-3 text-sm overflow-x-auto">
-            <Link href="/admin/tournament" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Tournament
-            </Link>
-            <Link href="/admin/results" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Results
-            </Link>
-            <Link href="/admin/menu" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Menu
-            </Link>
-            <Link href="/admin/auction" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Auction
-            </Link>
-            <Link href="/admin/users" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Users
-            </Link>
-            <Link href="/admin/expenses" className="text-zinc-400 hover:text-white whitespace-nowrap">
-              Expenses
-            </Link>
-          </nav>
+          <AdminNav />
         </div>
       </header>
       <div className="p-4">

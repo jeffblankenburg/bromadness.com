@@ -76,8 +76,10 @@ export default async function TournamentPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Tournament Setup</h2>
-      <p className="text-sm text-zinc-400">{teams.length}/64 teams</p>
+      <div className="flex items-center gap-3">
+        <h2 className="text-xl font-bold">Tournament Setup</h2>
+        <span className="text-sm text-zinc-400">{teams.length}/64 teams</span>
+      </div>
 
       <BracketEditor
         tournament={tournament}

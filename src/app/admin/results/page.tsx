@@ -45,7 +45,6 @@ export default async function ResultsPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold">Game Results</h2>
-      <p className="text-sm text-zinc-400">{tournament.name}</p>
 
       <GameResults
         tournament={tournament}

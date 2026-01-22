@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 
 interface User {
   id: string
@@ -64,13 +65,31 @@ interface Props {
   settings: Settings
 }
 
+const getD1TeamData = (teamName: string) => {
+  return D1_TEAMS.find(t => t.name.toLowerCase() === teamName.toLowerCase())
+}
+
 export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeams, auctionEntries, settings }: Props) {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [selectedUser, setSelectedUser] = useState('')
   const [bidAmount, setBidAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [ownersExpanded, setOwnersExpanded] = useState(true)
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set(regions.map(r => r.id)))
   const router = useRouter()
   const supabase = createClient()
+
+  const toggleRegion = (regionId: string) => {
+    setExpandedRegions(prev => {
+      const next = new Set(prev)
+      if (next.has(regionId)) {
+        next.delete(regionId)
+      } else {
+        next.add(regionId)
+      }
+      return next
+    })
+  }
 
   const getTeamOwner = (teamId: string) => {
     const auction = auctionTeams.find(a => a.team_id === teamId)
@@ -185,55 +204,80 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
   return (
     <div className="space-y-6">
       {/* User Summary */}
-      <div className="bg-zinc-800/50 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-orange-400 mb-3">Owners</h3>
-        <div className="space-y-2">
-          {users.map(user => {
-            const userTeams = getUserTeams(user.id)
-            const totalSpent = getUserTotalSpent(user.id)
-            const remaining = getUserRemainingBudget(user.id)
-            const paid = isUserPaid(user.id)
-            const isOverBudget = remaining < 0
-            const isLowBudget = remaining >= 0 && remaining < 20
+      <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setOwnersExpanded(!ownersExpanded)}
+          className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
+        >
+          <h3 className="text-sm font-semibold text-orange-400">Owners</h3>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-zinc-400">
+              {auctionEntries.filter(e => e.has_paid).length}/{users.length} paid
+            </span>
+            <svg
+              className={`w-4 h-4 text-zinc-400 transition-transform ${ownersExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        {ownersExpanded && (
+          <div className="px-4 pb-4">
+            <div className="space-y-2">
+              {users.map(user => {
+                const userTeams = getUserTeams(user.id)
+                const totalSpent = getUserTotalSpent(user.id)
+                const remaining = getUserRemainingBudget(user.id)
+                const paid = isUserPaid(user.id)
+                const isOverBudget = remaining < 0
+                const isLowBudget = remaining >= 0 && remaining < 20
 
-            return (
-              <div key={user.id} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => togglePayment(user.id)}
-                    disabled={saving}
-                    className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
-                      paid
-                        ? 'bg-green-500/20 border-green-500 text-green-400'
-                        : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
-                    }`}
-                  >
-                    {paid && '✓'}
-                  </button>
-                  <span>{user.display_name || user.phone}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-zinc-500 text-xs">
-                    {userTeams.length} teams
-                  </span>
-                  <span className={`font-mono text-xs ${
-                    isOverBudget
-                      ? 'text-red-400'
-                      : isLowBudget
-                        ? 'text-yellow-400'
-                        : 'text-zinc-400'
-                  }`}>
-                    ${totalSpent}/${settings.salaryCap}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <div className="mt-3 pt-3 border-t border-zinc-700 flex justify-between text-xs text-zinc-500">
-          <span>{auctionEntries.filter(e => e.has_paid).length}/{users.length} paid</span>
-          <span>Entry fee: ${settings.entryFee}</span>
-        </div>
+                return (
+                  <div key={user.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => togglePayment(user.id)}
+                        disabled={saving}
+                        className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                          paid
+                            ? 'bg-green-500/20 border-green-500 text-green-400'
+                            : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
+                        }`}
+                      >
+                        {paid && '✓'}
+                      </button>
+                      <span>{user.display_name || user.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-zinc-500 text-xs">
+                        {userTeams.length} teams
+                      </span>
+                      <span className={`font-mono text-xs ${
+                        isOverBudget
+                          ? 'text-red-400'
+                          : isLowBudget
+                            ? 'text-yellow-400'
+                            : 'text-zinc-400'
+                      }`}>
+                        ${totalSpent}/${settings.salaryCap}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t border-zinc-700 flex justify-between text-xs">
+              <span className="text-zinc-500">{auctionEntries.filter(e => e.has_paid).length}/{users.length} paid</span>
+              <span className="text-green-400 font-medium">
+                Total pot: ${auctionEntries.filter(e => e.has_paid).length * settings.entryFee}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Assignment Modal */}
@@ -317,55 +361,99 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
       })()}
 
       {/* Teams by Region */}
-      {teamsByRegion.map(({ region, teams: regionTeams }) => (
-        <div key={region.id} className="bg-zinc-800/50 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-orange-400 mb-3">{region.name}</h3>
-          <div className="space-y-1">
-            {regionTeams.map(team => {
-              const owner = getTeamOwner(team.id)
-              return (
-                <div
-                  key={team.id}
-                  className="flex items-center gap-2 py-1"
+      {teamsByRegion.map(({ region, teams: regionTeams }) => {
+        const isExpanded = expandedRegions.has(region.id)
+        const assignedCount = regionTeams.filter(t => getTeamOwner(t.id)).length
+
+        return (
+          <div key={region.id} className="bg-zinc-800/50 rounded-xl overflow-hidden">
+            <button
+              onClick={() => toggleRegion(region.id)}
+              className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
+            >
+              <h3 className="text-sm font-semibold text-orange-400">{region.name}</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-zinc-400">
+                  {assignedCount}/{regionTeams.length} assigned
+                </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
                 >
-                  <button
-                    onClick={() => {
-                      setSelectedTeam(team)
-                      if (owner && owner.user) {
-                        setSelectedUser(owner.user.id)
-                        setBidAmount(owner.bidAmount.toString())
-                      } else {
-                        setSelectedUser('')
-                        setBidAmount('')
-                      }
-                    }}
-                    className="flex-1 flex items-center gap-2 text-left hover:text-orange-400"
-                  >
-                    <span className="w-6 text-xs text-zinc-500">{team.seed}</span>
-                    <span className="flex-1 text-sm truncate">{team.short_name || team.name}</span>
-                  </button>
-                  {owner ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-zinc-700 px-2 py-0.5 rounded">
-                        {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
-                      </span>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            {isExpanded && (
+              <div className="px-4 pb-4 space-y-2">
+                {regionTeams.map(team => {
+                  const owner = getTeamOwner(team.id)
+                  const d1Team = getD1TeamData(team.name)
+                  const logo = d1Team ? getTeamLogoUrl(d1Team) : null
+
+                  return (
+                    <div
+                      key={team.id}
+                      className="flex items-center gap-2 p-2 rounded-lg"
+                      style={{ backgroundColor: d1Team ? d1Team.primaryColor + '30' : '#3f3f4620' }}
+                    >
                       <button
-                        onClick={() => handleRemove(owner.auctionId)}
-                        disabled={saving}
-                        className="text-red-400 hover:text-red-300 text-xs"
+                        onClick={() => {
+                          setSelectedTeam(team)
+                          if (owner && owner.user) {
+                            setSelectedUser(owner.user.id)
+                            setBidAmount(owner.bidAmount.toString())
+                          } else {
+                            setSelectedUser('')
+                            setBidAmount('')
+                          }
+                        }}
+                        className="flex-1 flex items-center gap-2 text-left hover:opacity-80"
                       >
-                        ×
+                        <span className="w-5 text-xs font-mono text-zinc-400">{team.seed}</span>
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
+                        >
+                          {logo ? (
+                            <img src={logo} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                          ) : (
+                            <span className="text-[10px] font-bold text-white">
+                              {d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2) || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="flex-1 text-sm truncate text-white">
+                          {d1Team?.shortName || team.short_name || team.name}
+                        </span>
                       </button>
+                      {owner ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-zinc-900/50 px-2 py-1 rounded">
+                            {owner.user?.display_name || owner.user?.phone || 'Unknown'} · ${owner.bidAmount}
+                          </span>
+                          <button
+                            onClick={() => handleRemove(owner.auctionId)}
+                            disabled={saving}
+                            className="text-red-400 hover:text-red-300 text-sm font-bold w-6 h-6 flex items-center justify-center"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-zinc-500 px-2">Unassigned</span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-xs text-zinc-600">Unassigned</span>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
