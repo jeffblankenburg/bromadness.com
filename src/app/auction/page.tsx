@@ -179,7 +179,7 @@ export default async function AuctionPage() {
 
   return (
     <div className="p-4 pb-20 space-y-4">
-      <h1 className="text-xl font-bold text-orange-500">Auction</h1>
+      <h1 className="text-xl font-bold text-orange-500">NCAA Auction</h1>
 
       {/* My Teams Row */}
       {currentUserTeams.length > 0 && (

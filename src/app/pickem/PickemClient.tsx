@@ -480,7 +480,7 @@ export function PickemClient({
           })} ET
         </div>
       )}
-
+        <h1 className="text-xl font-bold text-orange-500">NCAA Pick'em</h1>
       {/* Day Tabs */}
       <div className="flex gap-2">
         {pickemDays.map((day, index) => {
@@ -545,57 +545,80 @@ export function PickemClient({
       )}
 
       {/* My Picks Tab */}
-      {activeTab === 'picks' && (
-        <div className="space-y-4">
-          {/* Early Games */}
-          <div>
-            <button
-              onClick={toggleEarlyGames}
-              className="w-full flex items-center justify-between py-2"
-            >
-              <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
-              <svg
-                className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-              </svg>
-            </button>
-            {earlyGamesExpanded && (
-              <div className="space-y-2">
-                {session1Games.map(game => renderGame(game))}
-              </div>
-            )}
-          </div>
+      {activeTab === 'picks' && (() => {
+        const session1GameIds = session1Games.map(g => g.id)
+        const session2GameIds = session2Games.map(g => g.id)
+        const session1Correct = userDayPicks.filter(p => p.game_id && session1GameIds.includes(p.game_id) && p.is_correct === true).length
+        const session2Correct = userDayPicks.filter(p => p.game_id && session2GameIds.includes(p.game_id) && p.is_correct === true).length
+        const session1HasResults = session1Games.some(g => g.winner_id !== null)
+        const session2HasResults = session2Games.some(g => g.winner_id !== null)
 
-          {/* Late Games */}
-          <div>
-            <button
-              onClick={toggleLateGames}
-              className="w-full flex items-center justify-between py-2"
-            >
-              <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
-              <svg
-                className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
+        return (
+          <div className="space-y-4">
+            {/* Early Games */}
+            <div>
+              <button
+                onClick={toggleEarlyGames}
+                className="w-full flex items-center justify-between py-2"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-              </svg>
-            </button>
-            {lateGamesExpanded && (
-              <div className="space-y-2">
-                {session2Games.map(game => renderGame(game))}
-              </div>
-            )}
+                <h3 className="text-sm font-semibold text-orange-400">
+                  Early Games
+                  {session1HasResults && (
+                    <span className="text-zinc-400 font-normal ml-2">
+                      {session1Correct} Correct
+                    </span>
+                  )}
+                </h3>
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </button>
+              {earlyGamesExpanded && (
+                <div className="space-y-2">
+                  {session1Games.map(game => renderGame(game))}
+                </div>
+              )}
+            </div>
+
+            {/* Late Games */}
+            <div>
+              <button
+                onClick={toggleLateGames}
+                className="w-full flex items-center justify-between py-2"
+              >
+                <h3 className="text-sm font-semibold text-orange-400">
+                  Late Games
+                  {session2HasResults && (
+                    <span className="text-zinc-400 font-normal ml-2">
+                      {session2Correct} Correct
+                    </span>
+                  )}
+                </h3>
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </button>
+              {lateGamesExpanded && (
+                <div className="space-y-2">
+                  {session2Games.map(game => renderGame(game))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Leaderboard Tab */}
       {activeTab === 'leaderboard' && (
