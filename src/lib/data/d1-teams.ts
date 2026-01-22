@@ -201,16 +201,16 @@ export const D1_TEAMS: D1Team[] = [
 
   // MEAC/SWAC (HBCU programs)
   { name: "Alabama State Hornets", shortName: "Alabama St", abbreviation: "ALST", primaryColor: "#000000", secondaryColor: "#C99700", espnId: 2011 },
-  { name: "Howard Bison", shortName: "Howard", abbreviation: "HOW", primaryColor: "#003A63", secondaryColor: "#E51937" },
-  { name: "Norfolk State Spartans", shortName: "Norfolk St", abbreviation: "NORF", primaryColor: "#007A53", secondaryColor: "#F0AB00" },
-  { name: "North Carolina A&T Aggies", shortName: "NC A&T", abbreviation: "NCAT", primaryColor: "#004684", secondaryColor: "#FFC82E" },
-  { name: "North Carolina Central Eagles", shortName: "NC Central", abbreviation: "NCCU", primaryColor: "#862633", secondaryColor: "#898D8D" },
-  { name: "Texas Southern Tigers", shortName: "Texas Southern", abbreviation: "TXSO", primaryColor: "#6F263D", secondaryColor: "#C6AA76" },
-  { name: "Grambling State Tigers", shortName: "Grambling", abbreviation: "GRAM", primaryColor: "#000000", secondaryColor: "#ECB731" },
-  { name: "Southern Jaguars", shortName: "Southern", abbreviation: "SOU", primaryColor: "#0033A0", secondaryColor: "#FFC72C" },
-  { name: "Alcorn State Braves", shortName: "Alcorn State", abbreviation: "ALCN", primaryColor: "#4B306A", secondaryColor: "#F1AB00" },
-  { name: "Jackson State Tigers", shortName: "Jackson State", abbreviation: "JKST", primaryColor: "#002147", secondaryColor: "#FFFFFF" },
-  { name: "Prairie View A&M Panthers", shortName: "Prairie View", abbreviation: "PVAM", primaryColor: "#4F2D7F", secondaryColor: "#FFCC00" },
+  { name: "Howard Bison", shortName: "Howard", abbreviation: "HOW", primaryColor: "#003A63", secondaryColor: "#E51937", espnId: 47 },
+  { name: "Norfolk State Spartans", shortName: "Norfolk St", abbreviation: "NORF", primaryColor: "#007A53", secondaryColor: "#F0AB00", espnId: 2450 },
+  { name: "North Carolina A&T Aggies", shortName: "NC A&T", abbreviation: "NCAT", primaryColor: "#004684", secondaryColor: "#FFC82E", espnId: 2448 },
+  { name: "North Carolina Central Eagles", shortName: "NC Central", abbreviation: "NCCU", primaryColor: "#862633", secondaryColor: "#898D8D", espnId: 2428 },
+  { name: "Texas Southern Tigers", shortName: "Texas Southern", abbreviation: "TXSO", primaryColor: "#6F263D", secondaryColor: "#C6AA76", espnId: 2640 },
+  { name: "Grambling State Tigers", shortName: "Grambling", abbreviation: "GRAM", primaryColor: "#000000", secondaryColor: "#ECB731", espnId: 2755 },
+  { name: "Southern Jaguars", shortName: "Southern", abbreviation: "SOU", primaryColor: "#0033A0", secondaryColor: "#FFC72C", espnId: 2582 },
+  { name: "Alcorn State Braves", shortName: "Alcorn State", abbreviation: "ALCN", primaryColor: "#4B306A", secondaryColor: "#F1AB00", espnId: 2016 },
+  { name: "Jackson State Tigers", shortName: "Jackson State", abbreviation: "JKST", primaryColor: "#002147", secondaryColor: "#FFFFFF", espnId: 2296 },
+  { name: "Prairie View A&M Panthers", shortName: "Prairie View", abbreviation: "PVAM", primaryColor: "#4F2D7F", secondaryColor: "#FFCC00", espnId: 2504 },
 
   // America East
   { name: "Albany Great Danes", shortName: "Albany", abbreviation: "ALB", primaryColor: "#461660", secondaryColor: "#EEB211" },
