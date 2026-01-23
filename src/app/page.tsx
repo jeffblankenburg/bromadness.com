@@ -5,6 +5,7 @@ import { DevTools } from '@/components/DevTools'
 import { MenuDisplay } from '@/components/MenuDisplay'
 import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 import { CurrentGames } from '@/components/CurrentGames'
+import { ChatBubble } from '@/components/ChatBubble'
 import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
@@ -487,6 +488,9 @@ export default async function Home() {
               )}
             </div>
       </div>
+
+      {/* Chat bubble - floating button */}
+      <ChatBubble />
     </div>
   )
 }

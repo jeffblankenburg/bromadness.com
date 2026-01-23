@@ -238,7 +238,7 @@ export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickem
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
       >
-        <h3 className="text-sm font-semibold text-orange-400">Users</h3>
+        <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Users</h3>
         <div className="flex items-center gap-3">
           <span className="text-xs text-zinc-400">
             {totalPaid} paid · ${totalCollected}

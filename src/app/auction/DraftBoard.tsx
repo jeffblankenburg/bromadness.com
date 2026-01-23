@@ -151,7 +151,7 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
             style={{
               left: peeking.x,
               top: peeking.y - 8,
-              transform: 'translate(-50%, -100%)'
+              transform: 'translate(-8px, -100%)'
             }}
           >
             <div
@@ -163,7 +163,8 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
               <span>{peeking.userName}</span>
               <span className="ml-2 font-semibold">${peeking.teamEntry.bid_amount}</span>
             </div>
-            <div className="flex justify-center">
+            {/* Arrow at bottom-left */}
+            <div className="flex justify-start pl-[10px]">
               <div
                 className="w-3 h-3 rotate-45 -mt-[7px]"
                 style={{ backgroundColor: bgColor, borderRight: `4px solid ${borderColor}`, borderBottom: `4px solid ${borderColor}` }}

@@ -33,7 +33,7 @@ export function CollapsibleSection({ title, subtitle, storageKey, defaultExpande
         className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-orange-400">{title}</h3>
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{title}</h3>
           {subtitle && <span className="text-xs text-zinc-500">{subtitle}</span>}
         </div>
         <svg

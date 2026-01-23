@@ -74,7 +74,7 @@ export default async function SchedulePage() {
         <div className="p-6 max-w-md mx-auto">
           <div className="flex items-center justify-between mb-6">
             <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
-            <h1 className="text-lg font-bold text-orange-500">Schedule</h1>
+            <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Schedule</h1>
             <div className="w-10"></div>
           </div>
           <p className="text-zinc-400 text-center">No tournament found.</p>
@@ -118,7 +118,7 @@ export default async function SchedulePage() {
         <div className="p-4 max-w-md mx-auto">
           <div className="flex items-center justify-between mb-4">
             <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
-            <h1 className="text-lg font-bold text-orange-500">Schedule</h1>
+            <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Schedule</h1>
             <div className="w-10"></div>
           </div>
 

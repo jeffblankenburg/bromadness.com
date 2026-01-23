@@ -34,7 +34,7 @@ export default async function PickemPage() {
   if (!tournament) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-orange-500 mb-4">Pick&apos;em</h1>
+        <h1 className="text-2xl font-bold text-orange-500 uppercase tracking-wide mb-4" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em</h1>
         <p className="text-zinc-400">No tournament found.</p>
       </div>
     )
@@ -74,7 +74,7 @@ export default async function PickemPage() {
   if (games.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-orange-500 mb-4">Pick&apos;em</h1>
+        <h1 className="text-2xl font-bold text-orange-500 uppercase tracking-wide mb-4" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em</h1>
         <p className="text-zinc-400">Pick&apos;em coming soon!</p>
       </div>
     )

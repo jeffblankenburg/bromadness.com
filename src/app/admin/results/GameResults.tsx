@@ -114,6 +114,15 @@ export function GameResults({ tournament, teams, games }: Props) {
           .eq('id', game.next_game_id)
       }
 
+      // Mark the losing team as eliminated
+      const loserId = game.team1_id === winnerId ? game.team2_id : game.team1_id
+      if (loserId) {
+        await supabase
+          .from('teams')
+          .update({ is_eliminated: true })
+          .eq('id', loserId)
+      }
+
       // Update pick'em results
       await updatePickemResults(game, team1Score, team2Score)
 
@@ -190,6 +199,9 @@ export function GameResults({ tournament, teams, games }: Props) {
   const handleClearResult = async (game: Game) => {
     setSaving(game.id)
     try {
+      // Find the losing team before clearing (to un-eliminate them)
+      const loserId = game.team1_id === game.winner_id ? game.team2_id : game.team1_id
+
       // Clear this game's result
       await supabase
         .from('games')
@@ -207,6 +219,14 @@ export function GameResults({ tournament, teams, games }: Props) {
           .from('games')
           .update({ [updateField]: null })
           .eq('id', game.next_game_id)
+      }
+
+      // Un-eliminate the previously losing team
+      if (loserId) {
+        await supabase
+          .from('teams')
+          .update({ is_eliminated: false })
+          .eq('id', loserId)
       }
 
       // Clear pick'em correctness for this game

@@ -523,7 +523,7 @@ export function PickemClient({
 
   return (
     <div className="p-4 pb-20 space-y-4">
-      <h1 className="text-xl font-bold text-orange-500">NCAA Pick'em</h1>
+      <h1 className="text-xl font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>NCAA Pick'em</h1>
       {/* Day Tabs */}
       <div className="flex gap-2">
         {enabledDays.map((dayName) => {
@@ -642,7 +642,7 @@ export function PickemClient({
               onClick={toggleEarlyGames}
               className="w-full flex items-center justify-between py-2"
             >
-              <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
+              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Early Games</h3>
               <div className="flex items-center gap-2">
                 {session1Stats.total > 0 && (
                   <span className="text-zinc-400 text-sm">
@@ -674,7 +674,7 @@ export function PickemClient({
               onClick={toggleLateGames}
               className="w-full flex items-center justify-between py-2"
             >
-              <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
+              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Late Games</h3>
               <div className="flex items-center gap-2">
                 {session2Stats.total > 0 && (
                   <span className="text-zinc-400 text-sm">
@@ -741,13 +741,13 @@ export function PickemClient({
 
           {/* Session 1 Leaderboard */}
           <div>
-            <h3 className="text-sm font-semibold text-orange-400 mb-3">Session 1 - Early Games</h3>
+            <h3 className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 1 - Early Games</h3>
             {renderLeaderboard(session1Games, 'Session 1')}
           </div>
 
           {/* Session 2 Leaderboard */}
           <div>
-            <h3 className="text-sm font-semibold text-orange-400 mb-3">Session 2 - Late Games</h3>
+            <h3 className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 2 - Late Games</h3>
             {renderLeaderboard(session2Games, 'Session 2')}
           </div>
         </div>

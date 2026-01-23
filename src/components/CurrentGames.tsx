@@ -197,7 +197,7 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
         className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-orange-400">Current Pick&apos;em Games</h3>
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Current Pick&apos;em Games</h3>
           {pickemPayout > 0 && (
             <div className="flex items-center gap-1">
               <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">

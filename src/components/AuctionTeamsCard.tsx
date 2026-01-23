@@ -53,7 +53,7 @@ export function AuctionTeamsCard({ teams, totalPoints, payout }: Props) {
         className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-orange-400">
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
             NCAA Auction
           </h3>
           {payout > 0 && (
@@ -112,7 +112,7 @@ export function AuctionTeamsCard({ teams, totalPoints, payout }: Props) {
               })}
               <div className="flex items-center justify-between text-sm px-2 pt-2 mt-2 border-t border-zinc-700">
                 <span className="font-semibold text-zinc-300">Total Points</span>
-                <span className="text-xs font-bold text-orange-400">{totalPoints}</span>
+                <span className="text-xs font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{totalPoints}</span>
               </div>
             </div>
           ) : (

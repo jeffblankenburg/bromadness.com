@@ -67,7 +67,7 @@ export function MenuDisplay({ items, currentDay, hideAlwaysAvailable = false }: 
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
           </svg>
         </button>
-        <h3 className="text-sm font-semibold text-orange-400 text-center">
+        <h3 className="text-sm font-semibold text-orange-400 text-center uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
           {selectedDay}&apos;s Menu
         </h3>
         <button

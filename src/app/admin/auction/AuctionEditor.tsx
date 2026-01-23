@@ -394,7 +394,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
           onClick={() => setOwnersExpanded(!ownersExpanded)}
           className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
         >
-          <h3 className="text-sm font-semibold text-orange-400">Owners</h3>
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Owners</h3>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">
               {participatingUsers.length} participating · {auctionEntries.filter(e => e.has_paid && e.is_participating).length} paid
@@ -521,7 +521,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
           onClick={() => setAlphabeticalExpanded(!alphabeticalExpanded)}
           className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
         >
-          <h3 className="text-sm font-semibold text-orange-400">All Teams (A-Z)</h3>
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>All Teams (A-Z)</h3>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">
               {auctionTeams.length}/{teams.length} assigned
@@ -707,7 +707,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
               onClick={() => toggleRegion(region.id)}
               className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
             >
-              <h3 className="text-sm font-semibold text-orange-400">{region.name}</h3>
+              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{region.name}</h3>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-zinc-400">
                   {assignedCount}/{regionTeams.length} assigned

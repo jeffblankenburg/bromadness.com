@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 import { AuctionClient } from './AuctionClient'
 import { AuctionTeamList } from './AuctionTeamList'
+import { AuctionLeaderboard } from './AuctionLeaderboard'
 import { CollapsibleSection } from './CollapsibleSection'
 import { DraftBoard } from './DraftBoard'
 import { getActiveUserId } from '@/lib/simulation'
@@ -206,6 +207,107 @@ export default async function AuctionPage() {
       .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
   }
 
+  // Calculate potential points if all alive teams won their remaining games
+  // When two of user's teams could meet, higher seed (underdog) wins for max points
+  const calculatePotentialPoints = (userId: string) => {
+    const userTeams = getUserTeamsWithStatus(userId)
+    const aliveTeams = userTeams.filter(t => !t.isEliminated)
+
+    if (aliveTeams.length === 0) {
+      return userTeams.reduce((sum, t) => sum + t.points, 0)
+    }
+
+    // Group alive teams by region
+    const teamsByRegion = new Map<string, typeof aliveTeams>()
+    for (const team of aliveTeams) {
+      const regionId = team.team?.region_id || 'unknown'
+      if (!teamsByRegion.has(regionId)) {
+        teamsByRegion.set(regionId, [])
+      }
+      teamsByRegion.get(regionId)!.push(team)
+    }
+
+    // Current points from all teams (including eliminated)
+    let totalPotential = userTeams.reduce((sum, t) => sum + t.points, 0)
+
+    // Track which team from each region goes to Final Four
+    const regionWinners: { team: typeof aliveTeams[0]; regionPosition: number }[] = []
+
+    // Calculate potential from regional play (rounds through Elite 8 = round 4)
+    for (const [regionId, regionTeams] of teamsByRegion) {
+      // Sort by seed DESCENDING (higher number = underdog = more points per win)
+      regionTeams.sort((a, b) => (b.team?.seed || 0) - (a.team?.seed || 0))
+
+      const region = (regions || []).find(r => r.id === regionId)
+      const regionPosition = region?.position || 0
+
+      // Highest seed (underdog) in this region makes it to Elite 8 (round 4)
+      const bestTeam = regionTeams[0]
+      const bestSeed = bestTeam.team?.seed || 0
+      const bestWins = bestTeam.wins
+      // Remaining regional games (up to round 4 = Elite 8 winner)
+      const remainingRegional = Math.max(0, 4 - bestWins)
+      totalPotential += bestSeed * remainingRegional
+      regionWinners.push({ team: bestTeam, regionPosition })
+
+      // Other teams in region get eliminated when they meet the highest seed
+      // Approximate: they get ~1 more win on average before meeting
+      for (let i = 1; i < regionTeams.length; i++) {
+        const team = regionTeams[i]
+        const seed = team.team?.seed || 0
+        const wins = team.wins
+        // Give credit for 1 more win before meeting the higher seed
+        if (wins < 4) {
+          totalPotential += seed
+        }
+      }
+    }
+
+    // Final Four and Championship (rounds 5-6)
+    // Regions typically paired: position 1 vs 2, position 3 vs 4 for FF
+    // Then winners meet in Championship
+    if (regionWinners.length > 0) {
+      // Group by FF matchup (positions 1&2 vs 3&4)
+      const ffMatchup1 = regionWinners.filter(r => r.regionPosition <= 2)
+      const ffMatchup2 = regionWinners.filter(r => r.regionPosition > 2)
+
+      const ffWinners: typeof regionWinners = []
+
+      // From each FF matchup, higher seed advances (more points)
+      if (ffMatchup1.length > 0) {
+        ffMatchup1.sort((a, b) => (b.team.team?.seed || 0) - (a.team.team?.seed || 0))
+        const winner = ffMatchup1[0]
+        const seed = winner.team.team?.seed || 0
+        if (winner.team.wins < 5) {
+          totalPotential += seed // FF win
+        }
+        ffWinners.push(winner)
+      }
+
+      if (ffMatchup2.length > 0) {
+        ffMatchup2.sort((a, b) => (b.team.team?.seed || 0) - (a.team.team?.seed || 0))
+        const winner = ffMatchup2[0]
+        const seed = winner.team.team?.seed || 0
+        if (winner.team.wins < 5) {
+          totalPotential += seed // FF win
+        }
+        ffWinners.push(winner)
+      }
+
+      // Championship: higher seed of FF winners (more points)
+      if (ffWinners.length > 0) {
+        ffWinners.sort((a, b) => (b.team.team?.seed || 0) - (a.team.team?.seed || 0))
+        const champion = ffWinners[0]
+        const seed = champion.team.team?.seed || 0
+        if (champion.team.wins < 6) {
+          totalPotential += seed // Championship win
+        }
+      }
+    }
+
+    return totalPotential
+  }
+
   // Find championship game (round 6) teams
   const championshipGame = (games || []).find(g => g.round === 6)
   const championshipWinnerId = championshipGame?.winner_id
@@ -226,9 +328,12 @@ export default async function AuctionPage() {
       const totalSpent = getUserTotalSpent(user.id)
       const auctionEntry = (auctionEntries || []).find(e => e.user_id === user.id)
       const hasPaid = auctionEntry?.has_paid ?? false
+      const points = calculateUserPoints(user.id)
+      const potential = calculatePotentialPoints(user.id)
       return {
         user,
-        points: calculateUserPoints(user.id),
+        points,
+        potential,
         teams: getUserTeamsWithStatus(user.id),
         totalSpent,
         remaining: salaryCap - totalSpent,
@@ -347,7 +452,7 @@ export default async function AuctionPage() {
   return (
     <AuctionClient auctionComplete={auctionComplete}>
     <div className="p-4 pb-20 space-y-4">
-      <h1 className="text-xl font-bold text-orange-500">NCAA Auction</h1>
+      <h1 className="text-xl font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>NCAA Auction</h1>
 
       {/* My Teams Row - show during auction too */}
       {currentUserTeams.length > 0 && (
@@ -359,24 +464,34 @@ export default async function AuctionPage() {
             return (
               <div
                 key={t.id}
-                className={`flex flex-col items-center ${t.isEliminated ? 'opacity-40' : ''}`}
+                className="flex flex-col items-center"
                 title={t.team?.name}
               >
                 <div
-                  className="w-14 h-14 rounded flex items-center justify-center"
-                  style={{ backgroundColor: teamColor }}
+                  className={`relative w-14 h-14 rounded flex items-center justify-center ${
+                    t.isEliminated ? 'ring-2 ring-red-500 ring-inset' : ''
+                  }`}
+                  style={{ backgroundColor: t.isEliminated ? '#71717a' : teamColor }}
                 >
                   {logoUrl ? (
                     <img
                       src={logoUrl}
                       alt={t.team?.name || ''}
-                      className="w-9 h-9 object-contain"
+                      className={`w-9 h-9 object-contain ${t.isEliminated ? 'grayscale' : ''}`}
                       style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
                     />
                   ) : (
-                    <span className="text-white text-base font-bold">
+                    <span className={`text-base font-bold ${t.isEliminated ? 'text-zinc-400' : 'text-white'}`}>
                       {t.team?.short_name?.charAt(0) || '?'}
                     </span>
+                  )}
+                  {/* Red X for eliminated */}
+                  {t.isEliminated && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <svg className="w-10 h-10 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </div>
                   )}
                 </div>
                 <span className="text-[10px] text-zinc-400 font-medium mt-1">
@@ -418,7 +533,7 @@ export default async function AuctionPage() {
       {/* Payouts Info - show after auction complete */}
       {auctionComplete && <div className="bg-zinc-800/50 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-orange-400">Payouts</h3>
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Payouts</h3>
           <span className="text-xs text-zinc-500">{participantCount} players · ${pot} pot</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -450,76 +565,9 @@ export default async function AuctionPage() {
       </div>}
 
       {/* Leaderboard - show after auction complete */}
-      {auctionComplete && <div className="space-y-3">
-        {leaderboard.map((entry, idx) => {
-          const rank = getRank(idx, entry.points)
-          const isTop4 = rank <= 4
-
-          return (
-            <div
-              key={entry.user.id}
-              className={`relative overflow-hidden bg-zinc-800/50 rounded-xl p-4 ${
-                isTop4 ? 'ring-1 ring-orange-500/30' : ''
-              }`}
-            >
-              {/* Diagonal ribbon for unpaid */}
-              {!entry.hasPaid && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="rotate-[15deg] bg-red-600/90 text-white text-xs font-bold py-1 w-[200%] text-center shadow-lg">
-                    NEEDS TO PAY BRO ${entryFee}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <span className={`text-lg font-bold w-6 ${
-                    rank === 1 ? 'text-yellow-400' :
-                    rank === 2 ? 'text-zinc-300' :
-                    rank === 3 ? 'text-orange-400' :
-                    rank === 4 ? 'text-zinc-400' :
-                    'text-zinc-500'
-                  }`}>
-                    {rank}
-                  </span>
-                  <span className="font-medium">
-                    {entry.user.display_name || entry.user.phone}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    ${entry.totalSpent}/${salaryCap} spent
-                  </span>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-orange-400">{entry.points} pts</div>
-                  {entry.hasChampion && (
-                    <div className="text-xs text-yellow-400">Champion!</div>
-                  )}
-                  {entry.hasRunnerup && (
-                    <div className="text-xs text-zinc-400">Runner-up</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-1">
-                {entry.teams.map(t => (
-                  <span
-                    key={t.id}
-                    className={`text-xs px-2 py-0.5 rounded ${
-                      t.isEliminated
-                        ? 'bg-zinc-700/50 text-zinc-500 line-through'
-                        : t.wins > 0
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-zinc-700 text-zinc-300'
-                    }`}
-                  >
-                    #{t.team?.seed} {t.team?.short_name || t.team?.name}
-                    {t.wins > 0 && ` (+${t.points})`}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>}
+      {auctionComplete && (
+        <AuctionLeaderboard leaderboard={leaderboard} entryFee={entryFee} />
+      )}
 
     </div>
     </AuctionClient>

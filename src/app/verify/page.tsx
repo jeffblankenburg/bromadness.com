@@ -163,7 +163,7 @@ export default function VerifyPage() {
             )}
 
             {loading && (
-              <p className="text-orange-400 text-sm text-center">Verifying...</p>
+              <p className="text-orange-400 text-sm text-center uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Verifying...</p>
             )}
           </div>
 

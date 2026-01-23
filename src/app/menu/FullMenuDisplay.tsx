@@ -62,7 +62,7 @@ export function FullMenuDisplay({ items }: Props) {
         ) : (
           Object.entries(groupedItems).map(([mealType, mealItems]) => (
             <div key={mealType} className="bg-zinc-800/50 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-orange-400 mb-2">{mealType}</h3>
+              <h3 className="text-sm font-semibold text-orange-400 mb-2 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{mealType}</h3>
               <div className="space-y-2">
                 {mealItems.map(item => (
                   <div key={item.id} className="flex items-center justify-between">
@@ -81,7 +81,7 @@ export function FullMenuDisplay({ items }: Props) {
       {/* Always Available */}
       {randomItems.length > 0 && (
         <div className="bg-zinc-800/50 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-orange-400 mb-2">Always Available</h3>
+          <h3 className="text-sm font-semibold text-orange-400 mb-2 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Always Available</h3>
           <div className="space-y-2">
             {randomItems.map(item => (
               <div key={item.id} className="flex items-center justify-between">

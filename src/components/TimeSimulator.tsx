@@ -157,7 +157,7 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
             return (
               <div key={date} className="space-y-1">
                 <div className="text-xs text-zinc-300">
-                  {dayName} - First game at <span className="text-orange-400 font-medium">{gameTimeStr} ET</span>
+                  {dayName} - First game at <span className="text-orange-400 font-medium uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{gameTimeStr} ET</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button

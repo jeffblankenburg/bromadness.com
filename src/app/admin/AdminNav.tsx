@@ -46,7 +46,7 @@ export function AdminNav() {
     <div className="relative" ref={menuRef}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold text-orange-500">{pageTitle}</h1>
+          <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{pageTitle}</h1>
           <div id="admin-header-actions" />
         </div>
         <button

@@ -401,7 +401,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
       {isRegionTab && currentRegion && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-orange-400">{currentRegion.name} Region</h3>
+            <h3 className="font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{currentRegion.name} Region</h3>
             <span className="text-sm text-zinc-400">{regionTeamCount}/16 teams</span>
           </div>
 
@@ -420,7 +420,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                   onClick={() => toggleRound(round)}
                   className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
                 >
-                  <span className="text-sm font-medium text-orange-400">{ROUND_NAMES[round]}</span>
+                  <span className="text-sm font-medium text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{ROUND_NAMES[round]}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-zinc-500">{readyGames.length} game{readyGames.length !== 1 ? 's' : ''}</span>
                     <svg
@@ -583,7 +583,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
               onClick={() => toggleRound(1)}
               className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
             >
-              <span className="text-sm font-medium text-orange-400">{ROUND_NAMES[1]}</span>
+              <span className="text-sm font-medium text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{ROUND_NAMES[1]}</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-500">8 games</span>
                 <svg
@@ -786,7 +786,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
       {/* Final Four Content */}
       {isFinalFourTab && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-orange-400">Final Four</h3>
+          <h3 className="font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Final Four</h3>
           {finalFourGames.length === 0 ? (
             <p className="text-zinc-500 text-sm">No Final Four games created yet.</p>
           ) : finalFourReadyGames.length === 0 ? (
@@ -939,7 +939,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
       {/* Championship Content */}
       {isChampionshipTab && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-orange-400">Championship</h3>
+          <h3 className="font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Championship</h3>
           {championshipGames.length === 0 ? (
             <p className="text-zinc-500 text-sm">No Championship game created yet.</p>
           ) : championshipReadyGames.length === 0 ? (

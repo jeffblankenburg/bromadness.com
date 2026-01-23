@@ -168,7 +168,7 @@ export function MenuEditor({ tournamentId, menuItems }: Props) {
           const items = groupedItems[mealType] || []
           return (
             <div key={mealType} className="bg-zinc-800/50 rounded-xl p-3">
-              <h3 className="text-sm font-semibold text-orange-400 mb-2">{mealType}</h3>
+              <h3 className="text-sm font-semibold text-orange-400 mb-2 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{mealType}</h3>
               {items.length === 0 ? (
                 <p className="text-zinc-500 text-sm">No items</p>
               ) : (
@@ -199,7 +199,7 @@ export function MenuEditor({ tournamentId, menuItems }: Props) {
 
       {/* Random Items Section */}
       <div className="bg-zinc-800/50 rounded-xl p-3">
-        <h3 className="text-sm font-semibold text-orange-400 mb-2">Always Available</h3>
+        <h3 className="text-sm font-semibold text-orange-400 mb-2 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Always Available</h3>
         {randomItems.length === 0 ? (
           <p className="text-zinc-500 text-sm">No items</p>
         ) : (

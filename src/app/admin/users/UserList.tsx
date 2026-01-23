@@ -204,7 +204,7 @@ export function UserList({ users }: Props) {
       ) : (
         <form onSubmit={handleSubmit} className="bg-zinc-800/50 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-orange-400">New User</h3>
+            <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>New User</h3>
             <button
               type="button"
               onClick={() => {
@@ -271,7 +271,7 @@ export function UserList({ users }: Props) {
 
       {/* User List */}
       <div className="bg-zinc-800/50 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-orange-400 mb-3">
+        <h3 className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
           {users.length} Users
         </h3>
         <div className="space-y-2">
@@ -366,7 +366,7 @@ export function UserList({ users }: Props) {
             className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-orange-400">Edit User</h3>
+              <h3 className="text-lg font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Edit User</h3>
               <button
                 type="button"
                 onClick={cancelEditing}

@@ -79,7 +79,7 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
           {/* Modal Content */}
           <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-orange-400">Pick&apos;em Settings</h3>
+              <h3 className="text-lg font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em Settings</h3>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-zinc-400 hover:text-white"
