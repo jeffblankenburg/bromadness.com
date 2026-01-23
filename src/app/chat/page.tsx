@@ -177,6 +177,13 @@ export default function ChatPage() {
     }
   }
 
+  // Scroll to bottom helper - used by image onLoad
+  const scrollToBottom = () => {
+    if (shouldAutoScroll.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   useEffect(() => {
     if (messages.length > 0) {
       if (isInitialLoad.current) {
@@ -387,6 +394,7 @@ export default function ChatPage() {
                     height={150}
                     className="rounded-lg max-w-[200px]"
                     unoptimized
+                    onLoad={scrollToBottom}
                   />
                 </div>
               ) : emojiOnly ? (
