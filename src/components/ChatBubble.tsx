@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export function ChatBubble() {
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // Fetch unread count on mount and poll every 30 seconds
   useEffect(() => {
+    const supabase = createClient()
+
+    // Fetch initial unread count
     const fetchUnreadCount = async () => {
       try {
         const res = await fetch('/api/messages/unread-count')
@@ -21,8 +24,23 @@ export function ChatBubble() {
     }
 
     fetchUnreadCount()
-    const interval = setInterval(fetchUnreadCount, 30000)
-    return () => clearInterval(interval)
+
+    // Subscribe to new messages in realtime
+    const channel = supabase
+      .channel('chat-unread')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        () => {
+          // New message arrived, increment unread count
+          setUnreadCount(prev => prev + 1)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   return (

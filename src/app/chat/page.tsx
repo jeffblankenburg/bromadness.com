@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 interface Message {
   id: string
@@ -41,8 +42,10 @@ export default function ChatPage() {
     fetch('/api/messages/read', { method: 'POST' }).catch(console.error)
   }, [])
 
-  // Fetch messages on mount and poll
+  // Fetch messages on mount and subscribe to realtime updates
   useEffect(() => {
+    const supabase = createClient()
+
     const fetchMessages = async () => {
       try {
         const res = await fetch('/api/messages?limit=50')
@@ -62,8 +65,52 @@ export default function ChatPage() {
     }
 
     fetchMessages()
-    const interval = setInterval(fetchMessages, 5000)
-    return () => clearInterval(interval)
+
+    // Subscribe to new messages in realtime
+    const channel = supabase
+      .channel('chat-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        async (payload) => {
+          // Fetch the full message with user data
+          const { data: newMessage } = await supabase
+            .from('chat_messages')
+            .select(`
+              id,
+              content,
+              gif_url,
+              created_at,
+              user:users!chat_messages_user_id_fkey(id, display_name)
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (newMessage) {
+            // Transform user array to single object (Supabase returns array for joins)
+            const formattedMessage: Message = {
+              id: newMessage.id,
+              content: newMessage.content,
+              gif_url: newMessage.gif_url,
+              created_at: newMessage.created_at,
+              user: Array.isArray(newMessage.user) ? newMessage.user[0] : newMessage.user
+            }
+
+            setMessages(prev => {
+              // Avoid duplicates (in case we sent this message ourselves)
+              if (prev.some(m => m.id === formattedMessage.id)) {
+                return prev
+              }
+              return [...prev, formattedMessage]
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   // Load older messages when scrolling to top
