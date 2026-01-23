@@ -113,11 +113,12 @@ export default async function PickemPage() {
 
   // Get user's picks
   const gameIds = games.map(g => g.id)
-  const { data: userPicks } = gameIds.length > 0
+  const userEntryIds = (userEntries || []).map(e => e.id)
+  const { data: userPicks } = userEntryIds.length > 0
     ? await supabase
         .from('pickem_picks')
         .select('id, entry_id, game_id, picked_team_id, is_correct')
-        .in('game_id', gameIds)
+        .in('entry_id', userEntryIds)
     : { data: [] }
 
   // Get all users for standings
