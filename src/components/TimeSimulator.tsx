@@ -10,27 +10,46 @@ interface Props {
   firstGameTimes: { date: string; time: string }[]
 }
 
-// Format time in Eastern timezone for March Madness
-const formatEastern = (date: Date) => {
-  return date.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }) + ' ET'
+// Format time for display (all times are stored as Eastern)
+const formatEastern = (timeStr: string) => {
+  const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  if (!match) return timeStr
+
+  const [, year, month, day, hours, mins] = match
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const dayName = days[date.getDay()]
+  const monthName = months[parseInt(month) - 1]
+
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+
+  return `${dayName}, ${monthName} ${parseInt(day)}, ${hour12}:${mins} ${ampm} ET`
 }
 
-const formatTimeOnly = (date: Date) => {
-  return date.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
+const formatTimeOnly = (timeStr: string) => {
+  const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  if (!match) return timeStr
+
+  const [, , , , hours, mins] = match
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+
+  return `${hour12}:${mins} ${ampm}`
 }
+
+const getDayName = (timeStr: string) => {
+  const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return ''
+  const [, year, month, day] = match
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  return days[date.getDay()]
+}
+
 
 export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTimes }: Props) {
   const [saving, setSaving] = useState(false)
@@ -61,14 +80,42 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
       alert('Please enter both date and time')
       return
     }
-    const isoTime = `${customDate}T${customTime}:00`
-    setSimulatedTime(isoTime)
+    // Store time as-is (Eastern time, no timezone conversion)
+    setSimulatedTime(`${customDate}T${customTime}:00`)
   }
 
   const handleQuickSet = (minutesOffset: number, gameTime: string) => {
-    const baseTime = new Date(gameTime)
-    baseTime.setMinutes(baseTime.getMinutes() + minutesOffset)
-    setSimulatedTime(baseTime.toISOString())
+    // Extract time components from the string
+    const match = gameTime.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+    if (!match) return
+
+    const [, year, month, day, hours, mins] = match.map(Number)
+
+    // Calculate new time with offset
+    let totalMins = hours * 60 + mins + minutesOffset
+    let newDay = day
+    let newMonth = month
+    let newYear = year
+
+    // Handle day overflow/underflow
+    while (totalMins >= 24 * 60) {
+      totalMins -= 24 * 60
+      newDay++
+    }
+    while (totalMins < 0) {
+      totalMins += 24 * 60
+      newDay--
+    }
+
+    // Simple day bounds check (doesn't handle month boundaries perfectly but good enough for quick set)
+    if (newDay < 1) newDay = 1
+    if (newDay > 31) newDay = 31
+
+    const newHours = Math.floor(totalMins / 60)
+    const newMins = totalMins % 60
+
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    setSimulatedTime(`${newYear}-${pad(newMonth)}-${pad(newDay)}T${pad(newHours)}:${pad(newMins)}:00`)
   }
 
   return (
@@ -90,12 +137,12 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
         <div className="text-sm">
           <span className="text-zinc-400">Simulated time: </span>
           <span className="text-purple-300 font-mono">
-            {formatEastern(new Date(currentSimulatedTime))}
+            {formatEastern(currentSimulatedTime)}
           </span>
         </div>
       ) : (
         <div className="text-sm text-zinc-400">
-          Using real time ({formatEastern(new Date())}). Set a simulated time to test pick locking.
+          Using real time. Set a simulated time to test pick locking.
         </div>
       )}
 
@@ -104,9 +151,8 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
         <div className="space-y-3">
           <p className="text-xs text-zinc-500">Quick set relative to first game of the day:</p>
           {firstGameTimes.map(({ date, time }) => {
-            const gameDate = new Date(time)
-            const dayName = gameDate.toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
-            const gameTimeStr = formatTimeOnly(gameDate)
+            const dayName = getDayName(time)
+            const gameTimeStr = formatTimeOnly(time)
 
             return (
               <div key={date} className="space-y-1">

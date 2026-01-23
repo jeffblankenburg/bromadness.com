@@ -7,11 +7,11 @@ import { useState, useEffect, useRef } from 'react'
 const NAV_ITEMS = [
   { href: '/admin/tournament', label: 'Tournament Setup' },
   { href: '/admin/results', label: 'Game Results' },
-  { href: '/admin/menu', label: 'Food Menu' },
   { href: '/admin/auction', label: 'Auction' },
   { href: '/admin/pickem', label: "Pick'em" },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/trip-cost', label: 'Trip Cost' },
+  { href: '/admin/menu', label: 'Food Menu' },
   { href: '/admin/dev', label: 'Dev' },
 ]
 
@@ -45,7 +45,10 @@ export function AdminNav() {
   return (
     <div className="relative" ref={menuRef}>
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-orange-500">{pageTitle}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-orange-500">{pageTitle}</h1>
+          <div id="admin-header-actions" />
+        </div>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 -mr-2 text-zinc-400 hover:text-white transition-colors"

@@ -5,6 +5,7 @@ import { DevTools } from '@/components/DevTools'
 import { MenuDisplay } from '@/components/MenuDisplay'
 import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 import { CurrentGames } from '@/components/CurrentGames'
+import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
 const SHOW_DEV_TOOLS = false
@@ -37,13 +38,16 @@ export default async function Home() {
     redirect('/login')
   }
 
-  // Get user profile
+  // Get active user ID (may be simulated)
+  const activeUserId = await getActiveUserId(user.id)
+
+  // Get user profile (for simulated user if simulating)
   let profile = null
   if (user) {
     const { data } = await supabase
       .from('users')
       .select('display_name, is_admin, casino_credits')
-      .eq('id', user.id)
+      .eq('id', activeUserId)
       .single()
     profile = data
   }
@@ -51,7 +55,7 @@ export default async function Home() {
   // Get active tournament and menu items
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, start_date, auction_payouts, pickem_payouts')
+    .select('id, start_date, auction_payouts, pickem_payouts, dev_simulated_time')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -91,8 +95,11 @@ export default async function Home() {
   let userPickemTeamIds: string[] = []
   let userPickemPayout = 0
   let tripBalance = 0
+  let simulatedTime: string | null = null
 
   if (tournament) {
+    simulatedTime = tournament.dev_simulated_time as string | null
+
     const { data } = await supabase
       .from('menu_items')
       .select('id, day, meal_type, item_name, provider')
@@ -101,9 +108,32 @@ export default async function Home() {
     menuItems = data || []
 
     // Get current games (started in last 150 mins or starting in next 15 mins)
-    const now = new Date()
-    const pastCutoff = new Date(now.getTime() - 150 * 60 * 1000).toISOString()
-    const futureCutoff = new Date(now.getTime() + 15 * 60 * 1000).toISOString()
+    // All times are stored as Eastern without timezone
+    // Format helper for timestamp without timezone
+    const formatTimestamp = (date: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    }
+
+    // Parse simulated time or get current Eastern time
+    let nowDate: Date
+    if (simulatedTime) {
+      // Parse the simulated time string directly (it's stored as Eastern)
+      const match = simulatedTime.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):?(\d{2})?/)
+      if (match) {
+        const [, year, month, day, hours, mins, secs] = match
+        nowDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(mins), parseInt(secs || '0'))
+      } else {
+        nowDate = new Date()
+      }
+    } else {
+      // Get current time in Eastern timezone
+      const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
+      nowDate = new Date(eastern)
+    }
+
+    const pastCutoff = formatTimestamp(new Date(nowDate.getTime() - 150 * 60 * 1000))
+    const futureCutoff = formatTimestamp(new Date(nowDate.getTime() + 15 * 60 * 1000))
 
     const { data: gamesData } = await supabase
       .from('games')
@@ -113,6 +143,7 @@ export default async function Home() {
         team2:teams!games_team2_id_fkey(id, name, short_name, seed)
       `)
       .eq('tournament_id', tournament.id)
+      .is('winner_id', null)
       .gte('scheduled_at', pastCutoff)
       .lte('scheduled_at', futureCutoff)
       .order('scheduled_at')
@@ -121,6 +152,7 @@ export default async function Home() {
 
     // Fallback: if no current games, show next 2 upcoming games
     if (gamesToShow.length === 0) {
+      const nowTimestamp = formatTimestamp(nowDate)
       const { data: upcomingGames } = await supabase
         .from('games')
         .select(`
@@ -129,9 +161,10 @@ export default async function Home() {
           team2:teams!games_team2_id_fkey(id, name, short_name, seed)
         `)
         .eq('tournament_id', tournament.id)
+        .is('winner_id', null)
         .not('team1_id', 'is', null)
         .not('team2_id', 'is', null)
-        .gte('scheduled_at', now.toISOString())
+        .gte('scheduled_at', nowTimestamp)
         .order('scheduled_at')
         .limit(2)
 
@@ -174,8 +207,8 @@ export default async function Home() {
 
     // Find current user's place and calculate payout
     if (user) {
-      userTotalPoints = userPoints[user.id] || 0
-      const userIndex = sortedUsers.findIndex(([id]) => id === user.id)
+      userTotalPoints = userPoints[activeUserId] || 0
+      const userIndex = sortedUsers.findIndex(([id]) => id === activeUserId)
       userPlace = userIndex >= 0 ? userIndex + 1 : 0
 
       // Calculate payout considering ties
@@ -214,7 +247,7 @@ export default async function Home() {
       }
 
       // Get user's teams
-      const userTeams = (allAuctionData || []).filter(a => a.user_id === user.id)
+      const userTeams = (allAuctionData || []).filter(a => a.user_id === activeUserId)
       userAuctionTeams = userTeams.map(a => {
         const teamData = a.team as unknown as { id: string; name: string; short_name: string | null; seed: number } | null
         const wins = teamData ? (games || []).filter(g => g.winner_id === teamData.id).length : 0
@@ -243,7 +276,7 @@ export default async function Home() {
         userPickemTeamIds = (pickemPicks || [])
           .filter(p => {
             const entry = p.entry as unknown as { user_id: string } | null
-            return entry?.user_id === user.id
+            return entry?.user_id === activeUserId
           })
           .map(p => p.picked_team_id)
           .filter((id): id is string => id !== null)
@@ -345,7 +378,7 @@ export default async function Home() {
                 const sortedPickemUsers = Object.entries(userCorrectPicks)
                   .sort(([, a], [, b]) => b - a)
 
-                const userScore = userCorrectPicks[user.id] || 0
+                const userScore = userCorrectPicks[activeUserId] || 0
                 if (userScore === 0) continue
 
                 // Find user's rank (with ties)
@@ -384,7 +417,7 @@ export default async function Home() {
         .from('trip_costs')
         .select('id, amount_owed')
         .eq('tournament_id', tournament.id)
-        .eq('user_id', user.id)
+        .eq('user_id', activeUserId)
         .single()
 
       if (tripCost) {
@@ -433,6 +466,7 @@ export default async function Home() {
                   userAuctionTeamIds={userAuctionTeamIds}
                   userPickemTeamIds={userPickemTeamIds}
                   pickemPayout={userPickemPayout}
+                  simulatedTime={simulatedTime}
                 />
               )}
 

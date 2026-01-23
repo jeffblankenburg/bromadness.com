@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TimeSimulator } from '@/components/TimeSimulator'
+import { UserSimulator } from '@/components/UserSimulator'
+import { getSimulatedUserId } from '@/lib/simulation'
 
 export default async function AdminDevPage() {
   const supabase = await createClient()
@@ -63,6 +65,24 @@ export default async function AdminDevPage() {
     .filter(g => g.time)
     .sort((a, b) => a.date.localeCompare(b.date))
 
+  // Fetch all users for user simulation
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, display_name, phone')
+    .order('display_name')
+
+  // Get current simulated user
+  const simulatedUserId = await getSimulatedUserId()
+  let currentSimulatedUser = null
+  if (simulatedUserId) {
+    const { data: simUser } = await supabase
+      .from('users')
+      .select('id, display_name, phone')
+      .eq('id', simulatedUserId)
+      .single()
+    currentSimulatedUser = simUser
+  }
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-zinc-400">
@@ -73,6 +93,11 @@ export default async function AdminDevPage() {
         tournamentId={tournament.id}
         currentSimulatedTime={tournament.dev_simulated_time as string | null}
         firstGameTimes={firstGameTimes}
+      />
+
+      <UserSimulator
+        users={users || []}
+        currentSimulatedUser={currentSimulatedUser}
       />
     </div>
   )

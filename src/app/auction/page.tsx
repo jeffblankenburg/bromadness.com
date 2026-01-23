@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 import { AuctionClient } from './AuctionClient'
+import { AuctionTeamList } from './AuctionTeamList'
+import { CollapsibleSection } from './CollapsibleSection'
+import { DraftBoard } from './DraftBoard'
+import { getActiveUserId } from '@/lib/simulation'
 
 function findD1Team(teamName: string) {
   return D1_TEAMS.find(t =>
@@ -93,6 +97,9 @@ export default async function AuctionPage() {
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Get active user ID (may be simulated)
+  const activeUserId = user ? await getActiveUserId(user.id) : null
+
   // Get active tournament with settings
   const { data: tournament } = await supabase
     .from('tournaments')
@@ -125,17 +132,31 @@ export default async function AuctionPage() {
     .select('id, name, short_name, seed, region_id, is_eliminated')
     .eq('tournament_id', tournament.id)
 
+  // Get regions for team list
+  const { data: regions } = await supabase
+    .from('regions')
+    .select('id, name, position')
+    .eq('tournament_id', tournament.id)
+    .order('position')
+
   // Get auction assignments
   const { data: auctionTeams } = await supabase
     .from('auction_teams')
     .select('id, user_id, team_id, bid_amount')
     .eq('tournament_id', tournament.id)
 
-  // Get auction entries (payment status)
+  // Get auction entries (payment and participation status)
   const { data: auctionEntries } = await supabase
     .from('auction_entries')
-    .select('id, user_id, has_paid')
+    .select('id, user_id, has_paid, is_participating')
     .eq('tournament_id', tournament.id)
+
+  // Filter to only participating users
+  const participatingUserIds = new Set(
+    (auctionEntries || [])
+      .filter(e => e.is_participating)
+      .map(e => e.user_id)
+  )
 
   // Get completed games to determine winners
   const { data: games } = await supabase
@@ -198,8 +219,9 @@ export default async function AuctionPage() {
       .reduce((sum, t) => sum + t.bid_amount, 0)
   }
 
-  // Build leaderboard
+  // Build leaderboard (only participating users)
   const leaderboard = (users || [])
+    .filter(user => participatingUserIds.has(user.id))
     .map(user => {
       const totalSpent = getUserTotalSpent(user.id)
       const auctionEntry = (auctionEntries || []).find(e => e.user_id === user.id)
@@ -232,10 +254,10 @@ export default async function AuctionPage() {
   const pot = participantCount * entryFee
   const payouts = calculateAuctionPayouts(pot)
 
-  // Get current user's teams
-  const currentUserTeams = user
+  // Get current user's teams (uses activeUserId for simulation support)
+  const currentUserTeams = activeUserId
     ? (auctionTeams || [])
-        .filter(a => a.user_id === user.id)
+        .filter(a => a.user_id === activeUserId)
         .map(a => {
           const team = (teams || []).find(t => t.id === a.team_id)
           const d1Team = team ? findD1Team(team.name) : null
@@ -264,6 +286,7 @@ export default async function AuctionPage() {
   // Build draft board data (teams per user in bid order)
   const getDraftBoardData = () => {
     return (users || [])
+      .filter(u => participatingUserIds.has(u.id))
       .map(u => {
         const userTeams = (auctionTeams || [])
           .filter(a => a.user_id === u.id)
@@ -367,84 +390,29 @@ export default async function AuctionPage() {
 
       {/* Draft Board - show during auction */}
       {!auctionComplete && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-zinc-800">
-                <th className="text-left px-2 py-2 text-zinc-400 font-medium">Player</th>
-                {Array.from({ length: teamsPerPlayer }).map((_, i) => (
-                  <th key={i} className="text-center px-2 py-2 text-zinc-400 font-medium w-24">
-                    Bid {i + 1}
-                  </th>
-                ))}
-                <th className="text-center px-2 py-2 text-zinc-400 font-medium w-16">+</th>
-                <th className="text-right px-2 py-2 text-zinc-400 font-medium">Left</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draftBoard.map((entry, idx) => {
-                const isCurrentThrower = idx === currentThrowerIndex && !isPlayerDone(idx)
-                return (
-                <tr
-                  key={entry.user.id}
-                  className={idx % 2 === 0 ? 'bg-zinc-900/40' : 'bg-zinc-700/40'}
-                >
-                  <td className={`relative px-2 py-1.5 ${isCurrentThrower ? 'font-bold text-orange-400' : 'font-medium text-zinc-200'}`}>
-                    {/* Subtle background text for unpaid users */}
-                    {!entry.hasPaid && (
-                      <span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 text-center text-red-500/15 text-sm font-black whitespace-nowrap tracking-widest pointer-events-none" style={{ width: '400%' }}>
-                        PAY BRO ${entryFee}
-                      </span>
-                    )}
-                    <span className="relative">{entry.user.display_name || entry.user.phone}</span>
-                  </td>
-                  {/* Paid teams in main columns */}
-                  {Array.from({ length: teamsPerPlayer }).map((_, i) => {
-                    const teamEntry = entry.paidTeams[i]
-                    const d1Team = teamEntry?.team ? findD1Team(teamEntry.team.name) : null
-                    return (
-                      <td key={i} className="text-center px-1 py-1">
-                        {teamEntry ? (
-                          <div className="flex flex-col items-center text-xs leading-tight">
-                            <span className="text-zinc-400">${teamEntry.bid_amount}</span>
-                            <span className="text-zinc-200 font-medium">
-                              {teamEntry.team?.seed} {d1Team?.abbreviation || teamEntry.team?.short_name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-700">—</span>
-                        )}
-                      </td>
-                    )
-                  })}
-                  {/* Bonus teams column */}
-                  <td className="text-center px-1 py-1">
-                    {entry.bonusTeams.length > 0 ? (
-                      <div className="flex flex-col items-center text-xs leading-tight">
-                        {entry.bonusTeams.map(bt => {
-                          const d1Team = bt.team ? findD1Team(bt.team.name) : null
-                          return (
-                            <span key={bt.id} className="text-zinc-500 text-[10px]">
-                              {bt.team?.seed} {d1Team?.abbreviation || bt.team?.short_name}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-zinc-800">—</span>
-                    )}
-                  </td>
-                  <td className="text-right px-2 py-1.5 text-white text-base font-bold">
-                    ${salaryCap - entry.totalSpent}
-                  </td>
-                </tr>
-              )})}
-            </tbody>
-          </table>
-          <p className="text-xs text-zinc-500 mt-2 text-center">
-            {totalPaidTeams} of {numPlayers * teamsPerPlayer} picks made
-          </p>
-        </div>
+        <CollapsibleSection
+          title="Draft Board"
+          subtitle={`${totalPaidTeams} of ${numPlayers * teamsPerPlayer} picks`}
+          storageKey="auction-draft-board-expanded"
+        >
+          <DraftBoard
+            draftBoard={draftBoard}
+            teamsPerPlayer={teamsPerPlayer}
+            salaryCap={salaryCap}
+            entryFee={entryFee}
+            currentThrowerIndex={currentThrowerIndex}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* All Teams List - show during auction */}
+      {!auctionComplete && regions && regions.length > 0 && (
+        <AuctionTeamList
+          regions={regions}
+          teams={teams || []}
+          auctionTeams={auctionTeams || []}
+          users={users || []}
+        />
       )}
 
       {/* Payouts Info - show after auction complete */}

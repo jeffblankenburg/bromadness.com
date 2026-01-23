@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Graduate } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { DevTimeBanner } from "@/components/DevTimeBanner";
+import { SimulatedUserBanner } from "@/components/SimulatedUserBanner";
+import { createClient } from "@/lib/supabase/server";
+import { getSimulatedUserId } from "@/lib/simulation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,17 +49,51 @@ export const viewport: Viewport = {
   themeColor: "#f97316",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Fetch simulated time for dev banner
+  const supabase = await createClient()
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('dev_simulated_time')
+    .order('year', { ascending: false })
+    .limit(1)
+    .single()
+
+  const simulatedTime = tournament?.dev_simulated_time as string | null
+
+  // Check for user simulation
+  const simulatedUserId = await getSimulatedUserId()
+  let simulatedUserName: string | null = null
+
+  if (simulatedUserId) {
+    const { data: simulatedUser } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', simulatedUserId)
+      .single()
+    simulatedUserName = simulatedUser?.display_name || null
+  }
+
+  // Calculate banner count for layout spacing
+  const bannerCount = (simulatedTime ? 1 : 0) + (simulatedUserName ? 1 : 0)
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${graduate.variable} antialiased bg-black`}
       >
-        <main className="min-h-screen pt-safe pb-14">
+        {simulatedTime && <DevTimeBanner simulatedTime={simulatedTime} />}
+        {simulatedUserName && (
+          <SimulatedUserBanner
+            userName={simulatedUserName}
+            hasDevBanner={!!simulatedTime}
+          />
+        )}
+        <main className={`min-h-screen pt-safe pb-14 ${bannerCount === 1 ? 'mt-8' : bannerCount === 2 ? 'mt-16' : ''}`}>
           {children}
         </main>
         <BottomNav />

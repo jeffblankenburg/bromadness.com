@@ -30,6 +30,7 @@ interface Props {
   userAuctionTeamIds: string[]
   userPickemTeamIds: string[]
   pickemPayout?: number
+  simulatedTime?: string | null
 }
 
 function findD1Team(teamName: string) {
@@ -59,8 +60,26 @@ const getChannelNumber = (channelName: string | null) => {
   return channel ? channel.number : null
 }
 
-export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pickemPayout = 0 }: Props) {
+// Parse a timestamp string (stored as Eastern) into a Date object
+const parseTimestamp = (timeStr: string): Date => {
+  const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):?(\d{2})?/)
+  if (!match) return new Date(0)
+  const [, year, month, day, hours, mins, secs] = match
+  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(mins), parseInt(secs || '0'))
+}
+
+export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pickemPayout = 0, simulatedTime }: Props) {
   const [expanded, setExpanded] = useState(true)
+
+  // Get current time as a Date object (in Eastern time context)
+  const getCurrentTime = (): Date => {
+    if (simulatedTime) {
+      return parseTimestamp(simulatedTime)
+    }
+    // Get current Eastern time
+    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
+    return new Date(eastern)
+  }
 
   // Load saved state from localStorage after mount
   useEffect(() => {
@@ -85,8 +104,7 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
     const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
     const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
 
-    const isComplete = game.winner_id !== null
-    const isStarted = game.scheduled_at && new Date(game.scheduled_at) <= new Date()
+    const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
     const channelNum = getChannelNumber(game.channel)
 
     // Determine which team is the favorite
@@ -95,7 +113,7 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
       ? (game.spread < 0 ? game.team1.seed < game.team2.seed : game.team1.seed > game.team2.seed)
       : game.team1.seed < game.team2.seed
 
-    const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, score: number | null, isWinner: boolean, isFavorite: boolean) => {
+    const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
       const hasSpread = game.spread !== null && game.spread !== 0
       const spreadValue = hasSpread ? Math.abs(game.spread!) : null
       const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
@@ -140,11 +158,6 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
               </svg>
             </span>
           )}
-          {(isStarted || isComplete) && (
-            <span className={`w-8 text-center text-sm text-zinc-300 ${isWinner ? 'font-bold' : 'font-normal'}`}>
-              {score ?? '-'}
-            </span>
-          )}
         </div>
       )
     }
@@ -154,12 +167,12 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
         {/* Header: Time, Location, Channel */}
         <div className="flex items-center gap-2 text-[10px] text-zinc-400">
           {game.scheduled_at && (
-            <span className={`px-1 py-0.5 rounded ${isStarted && !isComplete ? 'bg-red-500/20 text-red-400 font-bold' : 'bg-zinc-800'}`}>
-              {isStarted && !isComplete ? 'LIVE' : formatGameTime(game.scheduled_at)}
+            <span className={`px-1 py-0.5 rounded ${isStarted ? 'bg-red-500/20 text-red-400 font-bold' : 'bg-zinc-800'}`}>
+              {isStarted ? 'LIVE' : formatGameTime(game.scheduled_at)}
             </span>
           )}
           {game.location && (
-            <span className="flex-1 truncate">{game.location}</span>
+            <span className="flex-1 text-center truncate">{game.location}</span>
           )}
           {game.channel && (
             <span className="px-1 py-0.5 bg-zinc-800 rounded">
@@ -169,10 +182,10 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, pic
         </div>
 
         {/* Team 1 */}
-        {renderTeamRow(game.team1, d1Team1, logo1, game.team1_score, game.winner_id === game.team1.id, team1IsFavorite)}
+        {renderTeamRow(game.team1, d1Team1, logo1, team1IsFavorite)}
 
         {/* Team 2 */}
-        {renderTeamRow(game.team2, d1Team2, logo2, game.team2_score, game.winner_id === game.team2.id, !team1IsFavorite)}
+        {renderTeamRow(game.team2, d1Team2, logo2, !team1IsFavorite)}
       </div>
     )
   }

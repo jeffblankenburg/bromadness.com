@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PickemClient } from './PickemClient'
+import { getActiveUserId } from '@/lib/simulation'
 
 interface PickemPayouts {
   entry_fee: number
@@ -18,6 +19,9 @@ export default async function PickemPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Get active user ID (may be simulated)
+  const activeUserId = await getActiveUserId(user.id)
 
   // Get active tournament
   const { data: tournament } = await supabase
@@ -112,13 +116,13 @@ export default async function PickemPage() {
     .eq('tournament_id', tournament.id)
     .order('contest_date')
 
-  // Get user's entries
+  // Get user's entries (uses activeUserId for simulation support)
   const dayIds = (pickemDays || []).map(d => d.id)
   const { data: userEntries } = dayIds.length > 0
     ? await supabase
         .from('pickem_entries')
         .select('id, user_id, pickem_day_id, has_paid')
-        .eq('user_id', user.id)
+        .eq('user_id', activeUserId)
         .in('pickem_day_id', dayIds)
     : { data: [] }
 
@@ -159,7 +163,7 @@ export default async function PickemPage() {
 
   return (
     <PickemClient
-      userId={user.id}
+      userId={activeUserId}
       pickemDays={pickemDays || []}
       games={games}
       users={users || []}

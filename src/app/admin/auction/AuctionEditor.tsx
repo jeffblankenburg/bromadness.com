@@ -37,6 +37,7 @@ interface AuctionEntry {
   user_id: string
   has_paid: boolean
   paid_at: string | null
+  is_participating: boolean
 }
 
 interface Game {
@@ -66,11 +67,12 @@ const getD1TeamData = (teamName: string) => {
   return D1_TEAMS.find(t => t.name.toLowerCase() === teamName.toLowerCase())
 }
 
-export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeams, auctionEntries, games, settings }: Props) {
+export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeams, auctionEntries: initialAuctionEntries, games, settings }: Props) {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [selectedUser, setSelectedUser] = useState('')
   const [bidAmount, setBidAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [auctionEntries, setAuctionEntries] = useState<AuctionEntry[]>(initialAuctionEntries)
 
   // Load collapsed states from localStorage
   const [ownersExpanded, setOwnersExpanded] = useState(() => {
@@ -154,33 +156,126 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
     return entry?.has_paid ?? false
   }
 
+  const isUserParticipating = (userId: string) => {
+    const entry = auctionEntries.find(e => e.user_id === userId)
+    return entry?.is_participating ?? false
+  }
+
+  const participatingUsers = users.filter(user => isUserParticipating(user.id))
+
   const areAllPaid = () => {
-    return users.every(user => isUserPaid(user.id))
+    return participatingUsers.every(user => isUserPaid(user.id))
+  }
+
+  const areAllParticipating = () => {
+    return users.every(user => isUserParticipating(user.id))
   }
 
   const toggleAllPayments = async () => {
     const allPaid = areAllPaid()
     const newPaidStatus = !allPaid
+    const newPaidAt = newPaidStatus ? new Date().toISOString() : null
+    const prevEntries = [...auctionEntries]
 
-    setSaving(true)
+    // Optimistically update UI
+    setAuctionEntries(prev => {
+      const updated = [...prev]
+      participatingUsers.forEach(user => {
+        const idx = updated.findIndex(e => e.user_id === user.id)
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], has_paid: newPaidStatus, paid_at: newPaidAt }
+        } else {
+          updated.push({ id: `temp-${user.id}`, user_id: user.id, has_paid: newPaidStatus, paid_at: newPaidAt, is_participating: true })
+        }
+      })
+      return updated
+    })
+
     try {
-      // Use upsert to handle both insert and update in one operation
-      const entries = users.map(user => ({
+      const entries = participatingUsers.map(user => ({
         tournament_id: tournamentId,
         user_id: user.id,
         has_paid: newPaidStatus,
-        paid_at: newPaidStatus ? new Date().toISOString() : null,
+        paid_at: newPaidAt,
+        is_participating: true,
       }))
 
       await supabase
         .from('auction_entries')
         .upsert(entries, { onConflict: 'tournament_id,user_id' })
-
-      router.refresh()
     } catch (err) {
       console.error('Failed to toggle all payments:', err)
-    } finally {
-      setSaving(false)
+      setAuctionEntries(prevEntries)
+    }
+  }
+
+  const toggleAllParticipating = async () => {
+    const allParticipating = areAllParticipating()
+    const newStatus = !allParticipating
+    const prevEntries = [...auctionEntries]
+
+    // Optimistically update UI
+    setAuctionEntries(prev => {
+      const updated = [...prev]
+      users.forEach(user => {
+        const idx = updated.findIndex(e => e.user_id === user.id)
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], is_participating: newStatus }
+        } else {
+          updated.push({ id: `temp-${user.id}`, user_id: user.id, has_paid: false, paid_at: null, is_participating: newStatus })
+        }
+      })
+      return updated
+    })
+
+    try {
+      const entries = users.map(user => ({
+        tournament_id: tournamentId,
+        user_id: user.id,
+        is_participating: newStatus,
+      }))
+
+      await supabase
+        .from('auction_entries')
+        .upsert(entries, { onConflict: 'tournament_id,user_id' })
+    } catch (err) {
+      console.error('Failed to toggle all participating:', err)
+      setAuctionEntries(prevEntries)
+    }
+  }
+
+  const toggleParticipation = async (userId: string) => {
+    const entry = auctionEntries.find(e => e.user_id === userId)
+    const newStatus = !(entry?.is_participating ?? false)
+
+    // Optimistically update UI
+    setAuctionEntries(prev => {
+      const existing = prev.find(e => e.user_id === userId)
+      if (existing) {
+        return prev.map(e => e.user_id === userId ? { ...e, is_participating: newStatus } : e)
+      } else {
+        return [...prev, { id: `temp-${userId}`, user_id: userId, has_paid: false, paid_at: null, is_participating: newStatus }]
+      }
+    })
+
+    try {
+      await supabase
+        .from('auction_entries')
+        .upsert({
+          tournament_id: tournamentId,
+          user_id: userId,
+          is_participating: newStatus,
+        }, { onConflict: 'tournament_id,user_id' })
+    } catch (err) {
+      console.error('Failed to toggle participation:', err)
+      // Revert on error
+      setAuctionEntries(prev => {
+        const existing = prev.find(e => e.user_id === userId)
+        if (existing) {
+          return prev.map(e => e.user_id === userId ? { ...e, is_participating: !newStatus } : e)
+        }
+        return prev.filter(e => e.user_id !== userId)
+      })
     }
   }
 
@@ -193,30 +288,43 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
   }
 
   const togglePayment = async (userId: string) => {
-    setSaving(true)
+    const entry = auctionEntries.find(e => e.user_id === userId)
+    const newPaidStatus = !(entry?.has_paid ?? false)
+    const newPaidAt = newPaidStatus ? new Date().toISOString() : null
+
+    // Optimistically update UI
+    setAuctionEntries(prev => {
+      const existing = prev.find(e => e.user_id === userId)
+      if (existing) {
+        return prev.map(e => e.user_id === userId ? { ...e, has_paid: newPaidStatus, paid_at: newPaidAt } : e)
+      } else {
+        return [...prev, { id: `temp-${userId}`, user_id: userId, has_paid: newPaidStatus, paid_at: newPaidAt, is_participating: true }]
+      }
+    })
+
     try {
-      const entry = auctionEntries.find(e => e.user_id === userId)
       if (entry) {
         await supabase
           .from('auction_entries')
           .update({
-            has_paid: !entry.has_paid,
-            paid_at: !entry.has_paid ? new Date().toISOString() : null
+            has_paid: newPaidStatus,
+            paid_at: newPaidAt
           })
           .eq('id', entry.id)
       } else {
         await supabase.from('auction_entries').insert({
           tournament_id: tournamentId,
           user_id: userId,
-          has_paid: true,
-          paid_at: new Date().toISOString(),
+          has_paid: newPaidStatus,
+          paid_at: newPaidAt,
         })
       }
-      router.refresh()
     } catch (err) {
       console.error('Failed to toggle payment:', err)
-    } finally {
-      setSaving(false)
+      // Revert on error
+      setAuctionEntries(prev => {
+        return prev.map(e => e.user_id === userId ? { ...e, has_paid: !newPaidStatus, paid_at: entry?.paid_at ?? null } : e)
+      })
     }
   }
 
@@ -289,7 +397,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
           <h3 className="text-sm font-semibold text-orange-400">Owners</h3>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">
-              {auctionEntries.filter(e => e.has_paid).length}/{users.length} paid
+              {participatingUsers.length} participating · {auctionEntries.filter(e => e.has_paid && e.is_participating).length} paid
             </span>
             <svg
               className={`w-4 h-4 text-zinc-400 transition-transform ${ownersExpanded ? 'rotate-180' : ''}`}
@@ -305,70 +413,102 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
         {ownersExpanded && (
           <div className="px-4 pb-4">
             <div className="space-y-2">
-              {/* Check all row */}
-              <div className="flex items-center justify-between text-sm pb-2 mb-1 border-b border-zinc-700/50">
-                <div className="flex items-center gap-2">
+              {/* Header row */}
+              <div className="flex items-center text-xs text-zinc-500 pb-2 mb-1 border-b border-zinc-700/50">
+                <span className="w-24">Name</span>
+                <div className="flex items-center gap-1 w-12">
+                  <button
+                    onClick={() => toggleAllParticipating()}
+                    disabled={saving}
+                    className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                      areAllParticipating()
+                        ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                        : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
+                    }`}
+                    title={areAllParticipating() ? 'All participating' : 'Click to add all'}
+                  >
+                    {areAllParticipating() ? '✓' : ''}
+                  </button>
+                  <span>In</span>
+                </div>
+                <div className="flex items-center gap-1 w-14">
                   <button
                     onClick={() => toggleAllPayments()}
-                    disabled={saving}
-                    className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
-                      areAllPaid()
+                    disabled={saving || participatingUsers.length === 0}
+                    className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                      areAllPaid() && participatingUsers.length > 0
                         ? 'bg-green-500/20 border-green-500 text-green-400'
                         : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
                     }`}
-                    title={areAllPaid() ? 'All paid - click to mark all unpaid' : 'Click to mark all paid'}
+                    title={areAllPaid() ? 'All paid' : 'Click to mark all paid'}
                   >
-                    {areAllPaid() ? '✓' : ''}
+                    {areAllPaid() && participatingUsers.length > 0 ? '✓' : ''}
                   </button>
-                  <span className="text-zinc-500 text-xs">Check all</span>
+                  <span>Paid</span>
                 </div>
+                <span className="w-12 text-right">Teams</span>
+                <span className="w-10 text-right ml-auto">Left</span>
               </div>
-              {users.map(user => {
+              {users.map((user, index) => {
                 const userTeams = getUserTeams(user.id)
                 const totalSpent = getUserTotalSpent(user.id)
                 const remaining = getUserRemainingBudget(user.id)
                 const paid = isUserPaid(user.id)
+                const participating = isUserParticipating(user.id)
                 const isOverBudget = remaining < 0
                 const isLowBudget = remaining >= 0 && remaining < 20
 
                 return (
-                  <div key={user.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
+                  <div key={user.id} className={`flex items-center text-sm ${index % 2 === 0 ? 'bg-zinc-700/50' : 'bg-zinc-900/50'} ${!participating ? 'opacity-50' : ''}`}>
+                    <span className="w-24 truncate">{(user.display_name || user.phone).slice(0, 10)}</span>
+                    <div className="w-12 flex justify-start">
+                      <button
+                        onClick={() => toggleParticipation(user.id)}
+                        disabled={saving}
+                        className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                          participating
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                            : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
+                        }`}
+                      >
+                        {participating && '✓'}
+                      </button>
+                    </div>
+                    <div className="w-14 flex justify-start">
                       <button
                         onClick={() => togglePayment(user.id)}
-                        disabled={saving}
+                        disabled={saving || !participating}
                         className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
                           paid
                             ? 'bg-green-500/20 border-green-500 text-green-400'
                             : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
-                        }`}
+                        } ${!participating ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {paid && '✓'}
                       </button>
-                      <span>{user.display_name || user.phone}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-zinc-500 text-xs">
-                        {userTeams.length} teams
-                      </span>
-                      <span className={`font-mono text-xs ${
-                        isOverBudget
-                          ? 'text-red-400'
-                          : isLowBudget
-                            ? 'text-yellow-400'
-                            : 'text-zinc-400'
-                      }`}>
-                        ${totalSpent}/${settings.salaryCap}
-                      </span>
-                    </div>
+                    <span className="w-12 text-right text-zinc-500 text-xs">
+                      {userTeams.length}
+                    </span>
+                    <span className={`w-10 text-right font-mono text-xs ml-auto ${
+                      isOverBudget
+                        ? 'text-red-400'
+                        : isLowBudget
+                          ? 'text-yellow-400'
+                          : 'text-zinc-400'
+                    }`}>
+                      ${remaining}
+                    </span>
                   </div>
                 )
               })}
             </div>
             <div className="mt-3 pt-3 border-t border-zinc-700 flex justify-between text-xs">
-              <span className="text-zinc-500">{auctionEntries.filter(e => e.has_paid).length}/{users.length} paid</span>
+              <span className="text-zinc-500">
+                {auctionEntries.filter(e => e.has_paid && e.is_participating).length}/{participatingUsers.length} paid
+              </span>
               <span className="text-green-400 font-medium">
-                Total pot: ${auctionEntries.filter(e => e.has_paid).length * settings.entryFee}
+                Total pot: ${auctionEntries.filter(e => e.has_paid && e.is_participating).length * settings.entryFee}
               </span>
             </div>
           </div>
@@ -498,7 +638,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                   className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg"
                 >
                   <option value="">Select owner...</option>
-                  {users.map(user => {
+                  {participatingUsers.map(user => {
                     const remaining = getUserRemainingBudget(user.id)
                     return (
                       <option key={user.id} value={user.id}>

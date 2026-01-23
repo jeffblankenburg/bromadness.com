@@ -51,6 +51,94 @@ export async function PATCH(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const admin = await checkIsAdmin()
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { userId, displayName, fullName, phone } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+
+    const adminClient = createAdminClient()
+
+    // Build update object with only provided fields
+    const updates: Record<string, string> = {}
+    if (displayName !== undefined) updates.display_name = displayName
+    if (fullName !== undefined) updates.full_name = fullName
+    if (phone !== undefined) updates.phone = phone
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    // If phone is being updated, also update in auth.users
+    if (phone) {
+      const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
+        phone,
+      })
+      if (authError) {
+        console.error('Auth update error:', authError)
+        return NextResponse.json({ error: 'Failed to update phone number' }, { status: 500 })
+      }
+    }
+
+    const { error } = await adminClient
+      .from('users')
+      .update(updates)
+      .eq('id', userId)
+
+    if (error) {
+      console.error('Update error:', error)
+      return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error updating user:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const admin = await checkIsAdmin()
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { userId } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+
+    // Prevent deleting yourself
+    if (userId === admin.id) {
+      return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
+    }
+
+    const adminClient = createAdminClient()
+
+    // Delete from auth.users (this will cascade to public.users due to foreign key)
+    const { error } = await adminClient.auth.admin.deleteUser(userId)
+
+    if (error) {
+      console.error('Delete error:', error)
+      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const admin = await checkIsAdmin()
@@ -59,7 +147,7 @@ export async function POST(request: Request) {
     }
 
     // Get request body
-    const { phone, displayName } = await request.json()
+    const { phone, displayName, fullName } = await request.json()
 
     if (!phone || !displayName) {
       return NextResponse.json({ error: 'Phone and name are required' }, { status: 400 })
@@ -94,6 +182,7 @@ export async function POST(request: Request) {
         id: authUser.user.id,
         phone,
         display_name: displayName,
+        full_name: fullName || null,
       })
 
     if (profileError) {

@@ -213,9 +213,12 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
   }
 
   const handleScheduleChange = async (gameId: string, datetime: string) => {
+    // Store time as-is (Eastern time, no timezone conversion needed)
+    const scheduledAt = datetime ? `${datetime}:00` : null
+
     const { error } = await supabase
       .from('games')
-      .update({ scheduled_at: datetime || null })
+      .update({ scheduled_at: scheduledAt })
       .eq('id', gameId)
 
     if (error) {

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,6 +19,7 @@ interface Props {
 
 export function AuctionSettings({ tournamentId, settings }: Props) {
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [entryFee, setEntryFee] = useState(settings.entryFee)
   const [salaryCap, setSalaryCap] = useState(settings.salaryCap)
   const [bidIncrement, setBidIncrement] = useState(settings.bidIncrement)
@@ -25,6 +27,10 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -61,8 +67,8 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
         </svg>
       </button>
 
-      {/* Modal */}
-      {isOpen && (
+      {/* Modal - rendered via portal to avoid header stacking context issues */}
+      {isOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
@@ -170,7 +176,8 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

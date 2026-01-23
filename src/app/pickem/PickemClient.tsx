@@ -85,12 +85,13 @@ function formatShortDayName(dateStr: string): string {
 
 const formatGameTime = (dateStr: string | null) => {
   if (!dateStr) return null
-  return new Date(dateStr).toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return null
+  const [, , , , hours, mins] = match
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'p' : 'a'
+  return `${hour12}:${mins}${ampm}`
 }
 
 const getChannelNumber = (channelName: string | null) => {
@@ -112,7 +113,24 @@ export function PickemClient({
   simulatedTime,
   enabledDays,
 }: Props) {
-  const getCurrentTime = () => simulatedTime ? new Date(simulatedTime) : new Date()
+  // Parse a timestamp string (stored as Eastern) into a Date object
+  const parseTimestamp = (timeStr: string): Date => {
+    const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):?(\d{2})?/)
+    if (!match) return new Date(0)
+    const [, year, month, day, hours, mins, secs] = match
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(mins), parseInt(secs || '0'))
+  }
+
+  // Get current time as a Date object (in Eastern time context)
+  const getCurrentTime = (): Date => {
+    if (simulatedTime) {
+      return parseTimestamp(simulatedTime)
+    }
+    // Get current Eastern time
+    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
+    return new Date(eastern)
+  }
+
   const [selectedDayName, setSelectedDayName] = useState(enabledDays[0] || 'Thursday')
   const [activeTab, setActiveTab] = useState<'picks' | 'leaderboard'>('picks')
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
@@ -212,7 +230,7 @@ export function PickemClient({
 
   // Check if day is locked
   const firstGameTime = dayGames[0]?.scheduled_at
-  const isLocked = firstGameTime ? new Date(firstGameTime) <= getCurrentTime() : false
+  const isLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
 
   // Get user's entry and picks
   const userEntry = currentDay ? userEntries.find(e => e.pickem_day_id === currentDay.id) : undefined
@@ -231,27 +249,23 @@ export function PickemClient({
     setSaving(true)
 
     try {
-      let entryId = userEntry?.id
-      if (!entryId) {
-        const { data: newEntry, error: entryError } = await supabase
-          .from('pickem_entries')
-          .insert({ user_id: userId, pickem_day_id: currentDay.id })
-          .select()
-          .single()
-        if (entryError) throw entryError
-        entryId = newEntry.id
+      // Use API route to handle picks (supports simulation mode)
+      const res = await fetch('/api/pickem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          pickemDayId: currentDay.id,
+          gameId,
+          teamId,
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save pick')
       }
 
-      const { error: pickError } = await supabase
-        .from('pickem_picks')
-        .upsert({
-          entry_id: entryId,
-          game_id: gameId,
-          picked_team_id: teamId,
-          is_correct: null,
-        }, { onConflict: 'entry_id,game_id' })
-
-      if (pickError) throw pickError
       router.refresh()
     } catch (error) {
       console.error('Failed to save pick:', error)
@@ -304,7 +318,7 @@ export function PickemClient({
           const game = completedGames.find(g => g.id === pick.game_id)
           return { ...pick, scheduled_at: game?.scheduled_at || '' }
         })
-        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+        .sort((a, b) => parseTimestamp(a.scheduled_at).getTime() - parseTimestamp(b.scheduled_at).getTime())
 
       let firstLoss: number | null = null
       let secondLoss: number | null = null
@@ -417,11 +431,23 @@ export function PickemClient({
       )
     }
 
+    const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
+
     return (
       <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
         <div className="flex items-center gap-2 text-[10px] text-zinc-400">
           {game.scheduled_at && (
-            <span className="px-1 py-0.5 bg-zinc-800 rounded">{formatGameTime(game.scheduled_at)}</span>
+            <span className={`px-1 py-0.5 rounded flex items-center gap-1 ${isStarted && !isComplete ? 'bg-red-500/20 text-red-400 font-bold' : 'bg-zinc-800'}`}>
+              {isStarted && !isComplete ? 'LIVE' : formatGameTime(game.scheduled_at)}
+              {isLocked && (
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              )}
+            </span>
+          )}
+          {game.location && (
+            <span className="flex-1 text-center truncate">{game.location}</span>
           )}
           {game.channel && (
             <span className="px-1 py-0.5 bg-zinc-800 rounded">
@@ -497,21 +523,7 @@ export function PickemClient({
 
   return (
     <div className="p-4 pb-20 space-y-4">
-      {/* Simulated Time Banner */}
-      {simulatedTime && (
-        <div className="bg-purple-500/20 border border-purple-500/50 text-purple-300 rounded-lg px-4 py-2 text-xs">
-          <span className="font-bold">DEV MODE:</span> Simulated time is {getCurrentTime().toLocaleString('en-US', {
-            timeZone: 'America/New_York',
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          })} ET
-        </div>
-      )}
-        <h1 className="text-xl font-bold text-orange-500">NCAA Pick'em</h1>
+      <h1 className="text-xl font-bold text-orange-500">NCAA Pick'em</h1>
       {/* Day Tabs */}
       <div className="flex gap-2">
         {enabledDays.map((dayName) => {
@@ -520,21 +532,41 @@ export function PickemClient({
           const hasPaid = entry?.has_paid ?? false
           const hasGames = pickemDay !== undefined
 
+          // Check if this day is locked (first game has started)
+          const dayGamesForTab = pickemDay
+            ? games.filter(g => g.scheduled_at?.split('T')[0] === pickemDay.contest_date)
+            : []
+          const firstGameOfDay = dayGamesForTab.length > 0
+            ? dayGamesForTab.reduce((earliest, g) =>
+                !earliest || (g.scheduled_at && g.scheduled_at < earliest.scheduled_at!) ? g : earliest
+              , dayGamesForTab[0])
+            : null
+          const isDayLocked = firstGameOfDay?.scheduled_at
+            ? parseTimestamp(firstGameOfDay.scheduled_at) <= getCurrentTime()
+            : false
+
           return (
             <button
               key={dayName}
               onClick={() => setSelectedDayName(dayName)}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 selectedDayName === dayName
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-orange-500 text-orange-950'
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
               }`}
             >
-              <div>{dayName.slice(0, 3)}</div>
+              <div className="flex items-center justify-center gap-1">
+                {dayName.slice(0, 3)}
+                {isDayLocked && (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                )}
+              </div>
               <div className={`text-[10px] ${
                 selectedDayName === dayName
-                  ? (hasGames ? (hasPaid ? 'text-green-300' : 'text-red-300') : 'text-zinc-300')
-                  : (hasGames ? (hasPaid ? 'text-green-500' : 'text-red-500') : 'text-zinc-500')
+                  ? (hasGames ? (hasPaid ? 'text-green-700' : 'text-red-600 font-bold') : 'text-orange-800')
+                  : (hasGames ? (hasPaid ? 'text-green-500' : 'text-red-500 font-bold') : 'text-zinc-500')
               }`}>
                 {hasGames ? (hasPaid ? 'PAID' : `PAY BRO $${entryFee}`) : 'SOON'}
               </div>
@@ -599,69 +631,88 @@ export function PickemClient({
         const session1Stats = getSessionStats(session1Games)
         const session2Stats = getSessionStats(session2Games)
 
+        // Check if any late game has started
+        const lateGamesStarted = session2Games.some(g =>
+          g.scheduled_at && parseTimestamp(g.scheduled_at) <= getCurrentTime()
+        )
+
+        const renderEarlyGames = () => (
+          <div>
+            <button
+              onClick={toggleEarlyGames}
+              className="w-full flex items-center justify-between py-2"
+            >
+              <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
+              <div className="flex items-center gap-2">
+                {session1Stats.total > 0 && (
+                  <span className="text-zinc-400 text-sm">
+                    {session1Stats.correct}/{session1Stats.total} correct
+                  </span>
+                )}
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            {earlyGamesExpanded && (
+              <div className="space-y-2">
+                {session1Games.map(game => renderGame(game))}
+              </div>
+            )}
+          </div>
+        )
+
+        const renderLateGames = () => (
+          <div>
+            <button
+              onClick={toggleLateGames}
+              className="w-full flex items-center justify-between py-2"
+            >
+              <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
+              <div className="flex items-center gap-2">
+                {session2Stats.total > 0 && (
+                  <span className="text-zinc-400 text-sm">
+                    {session2Stats.correct}/{session2Stats.total} correct
+                  </span>
+                )}
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            {lateGamesExpanded && (
+              <div className="space-y-2">
+                {session2Games.map(game => renderGame(game))}
+              </div>
+            )}
+          </div>
+        )
+
         return (
           <div className="space-y-4">
-            {/* Early Games */}
-            <div>
-              <button
-                onClick={toggleEarlyGames}
-                className="w-full flex items-center justify-between py-2"
-              >
-                <h3 className="text-sm font-semibold text-orange-400">Early Games</h3>
-                <div className="flex items-center gap-2">
-                  {session1Stats.total > 0 && (
-                    <span className="text-zinc-400 text-sm">
-                      {session1Stats.correct}/{session1Stats.total} correct
-                    </span>
-                  )}
-                  <svg
-                    className={`w-4 h-4 text-zinc-400 transition-transform ${earlyGamesExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-              {earlyGamesExpanded && (
-                <div className="space-y-2">
-                  {session1Games.map(game => renderGame(game))}
-                </div>
-              )}
-            </div>
-
-            {/* Late Games */}
-            <div>
-              <button
-                onClick={toggleLateGames}
-                className="w-full flex items-center justify-between py-2"
-              >
-                <h3 className="text-sm font-semibold text-orange-400">Late Games</h3>
-                <div className="flex items-center gap-2">
-                  {session2Stats.total > 0 && (
-                    <span className="text-zinc-400 text-sm">
-                      {session2Stats.correct}/{session2Stats.total} correct
-                    </span>
-                  )}
-                  <svg
-                    className={`w-4 h-4 text-zinc-400 transition-transform ${lateGamesExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-              {lateGamesExpanded && (
-                <div className="space-y-2">
-                  {session2Games.map(game => renderGame(game))}
-                </div>
-              )}
-            </div>
+            {lateGamesStarted ? (
+              <>
+                {renderLateGames()}
+                {renderEarlyGames()}
+              </>
+            ) : (
+              <>
+                {renderEarlyGames()}
+                {renderLateGames()}
+              </>
+            )}
           </div>
         )
       })()}

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AuctionEditor } from './AuctionEditor'
 import { AuctionSettings } from './AuctionSettings'
 import { AuctionFinishButton } from './AuctionFinishButton'
+import { HeaderAction } from '../HeaderAction'
 
 export default async function AuctionPage() {
   const supabase = await createClient()
@@ -41,18 +42,18 @@ export default async function AuctionPage() {
     .select('id, user_id, team_id, bid_amount')
     .eq('tournament_id', tournament.id)
 
+  // Get auction entries (payment and participation status)
+  const { data: auctionEntries } = await supabase
+    .from('auction_entries')
+    .select('id, user_id, has_paid, paid_at, is_participating')
+    .eq('tournament_id', tournament.id)
+
   // Get regions for grouping
   const { data: regions } = await supabase
     .from('regions')
     .select('id, name, position')
     .eq('tournament_id', tournament.id)
     .order('position')
-
-  // Get auction entries (payment status)
-  const { data: auctionEntries } = await supabase
-    .from('auction_entries')
-    .select('id, user_id, has_paid, paid_at')
-    .eq('tournament_id', tournament.id)
 
   // Get round 1 games to show opponents
   const { data: games } = await supabase
@@ -70,9 +71,9 @@ export default async function AuctionPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <HeaderAction>
         <AuctionSettings tournamentId={tournament.id} settings={settings} />
-      </div>
+      </HeaderAction>
 
       <AuctionEditor
         tournamentId={tournament.id}
