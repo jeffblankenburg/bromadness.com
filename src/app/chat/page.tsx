@@ -259,10 +259,26 @@ export default function ChatPage() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
 
+  // Check if message is only emojis (for larger display)
+  const isEmojiOnly = (text: string | null) => {
+    if (!text || text.trim().length === 0) return false
+    // Match emoji including skin tones, ZWJ sequences, etc.
+    const emojiPattern = /^[\s\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\uFE0F\u200D]+$/u
+    return emojiPattern.test(text)
+  }
+
   return (
-    <div className="h-[calc(100vh-2.75rem)] bg-black flex flex-col overflow-hidden">
-      {/* Header - fixed at top */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 pt-safe border-b border-zinc-800 bg-black">
+    <div
+      className="fixed bg-black flex flex-col"
+      style={{
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))'
+      }}
+    >
+      {/* Header - never scrolls */}
+      <div className="flex-none flex items-center justify-between px-4 py-3 pt-safe border-b border-zinc-800 bg-black">
         <div className="w-8" />
         <h1 className="text-xl font-bold text-orange-500" style={{ fontFamily: 'var(--font-display)' }}>
           Bro Chat
@@ -274,13 +290,18 @@ export default function ChatPage() {
         </Link>
       </div>
 
-      {/* Messages */}
+      {/* Messages - ONLY this area scrolls */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 overflow-auto scrollbar-hide"
+        style={{
+          minHeight: 0,
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain'
+        }}
       >
+        <div className="p-4 space-y-3">
         {loadingOlder && (
           <div className="text-center text-zinc-500 py-2">Loading older messages...</div>
         )}
@@ -294,6 +315,7 @@ export default function ChatPage() {
         ) : (
           messages.map(msg => {
             const isOwnMessage = activeUserId && msg.user?.id === activeUserId
+            const emojiOnly = isEmojiOnly(msg.content)
             return (
             <div key={msg.id} className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
               <div className={`flex items-baseline gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
@@ -305,12 +327,12 @@ export default function ChatPage() {
                 </span>
                 <span className="text-xs text-zinc-500">{formatTime(msg.created_at)}</span>
               </div>
-              <div className={`px-4 py-2 max-w-[85%] ${
-                isOwnMessage
-                  ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
-                  : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
-              }`}>
-                {msg.gif_url ? (
+              {msg.gif_url ? (
+                <div className={`px-4 py-2 max-w-[85%] ${
+                  isOwnMessage
+                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                }`}>
                   <Image
                     src={msg.gif_url}
                     alt="GIF"
@@ -319,19 +341,34 @@ export default function ChatPage() {
                     className="rounded-lg max-w-[200px]"
                     unoptimized
                   />
-                ) : (
+                </div>
+              ) : emojiOnly ? (
+                <div className={`px-4 py-2 ${
+                  isOwnMessage
+                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                }`}>
+                  <span style={{ fontSize: '4rem', lineHeight: 1 }}>{msg.content}</span>
+                </div>
+              ) : (
+                <div className={`px-4 py-2 max-w-[85%] ${
+                  isOwnMessage
+                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                }`}>
                   <p className="text-sm text-white break-words">{msg.content}</p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}))
         }
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* GIF Picker */}
+      {/* GIF Picker - never scrolls */}
       {showGifPicker && (
-        <div className="shrink-0 border-t border-zinc-800 bg-zinc-900 p-3">
+        <div className="flex-none border-t border-zinc-800 bg-zinc-900 p-3">
           <div className="flex items-center gap-2 mb-3">
             <input
               type="text"
@@ -378,8 +415,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Input - fixed at bottom */}
-      <div className="shrink-0 border-t border-zinc-800 p-3 bg-zinc-900">
+      {/* Input - never scrolls */}
+      <div className="flex-none border-t border-zinc-800 p-3 bg-zinc-900">
         <div className="flex gap-2">
           <button
             onClick={() => setShowGifPicker(!showGifPicker)}

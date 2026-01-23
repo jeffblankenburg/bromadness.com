@@ -54,6 +54,11 @@ body {
   bottom: calc(2.75rem + env(safe-area-inset-bottom) + 1rem);
 }
 
+/* Bottom position above nav with safe area */
+.bottom-nav-area {
+  bottom: calc(2.75rem + env(safe-area-inset-bottom));
+}
+
 /* Rotating border animation */
 @keyframes rotate-border {
   from {
