@@ -8,6 +8,7 @@ interface Settings {
   entryFee: number
   salaryCap: number
   bidIncrement: number
+  teamsPerPlayer: number
 }
 
 interface Props {
@@ -20,6 +21,7 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
   const [entryFee, setEntryFee] = useState(settings.entryFee)
   const [salaryCap, setSalaryCap] = useState(settings.salaryCap)
   const [bidIncrement, setBidIncrement] = useState(settings.bidIncrement)
+  const [teamsPerPlayer, setTeamsPerPlayer] = useState(settings.teamsPerPlayer)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -33,6 +35,7 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
           entry_fee: entryFee,
           salary_cap: salaryCap,
           bid_increment: bidIncrement,
+          teams_per_player: teamsPerPlayer,
         })
         .eq('id', tournamentId)
       setIsOpen(false)
@@ -113,12 +116,27 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
                 <div className="flex items-center">
                   <span className="text-zinc-500 mr-2">$</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={bidIncrement}
                     onChange={(e) => setBidIncrement(parseInt(e.target.value) || 0)}
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Teams Per Player</label>
+                <select
+                  value={teamsPerPlayer}
+                  onChange={(e) => setTeamsPerPlayer(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm"
+                >
+                  <option value={2}>2 teams</option>
+                  <option value={3}>3 teams</option>
+                  <option value={4}>4 teams</option>
+                </select>
+                <p className="text-xs text-zinc-500 mt-1">$0 bonus teams don&apos;t count against this limit</p>
               </div>
 
               <div className="text-xs text-zinc-500">

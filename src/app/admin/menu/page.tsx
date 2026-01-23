@@ -15,7 +15,6 @@ export default async function MenuPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Menu</h2>
         <p className="text-zinc-400">No tournament found. Create one first.</p>
       </div>
     )
@@ -30,8 +29,6 @@ export default async function MenuPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Menu</h2>
-
       <MenuEditor
         tournamentId={tournament.id}
         menuItems={menuItems || []}

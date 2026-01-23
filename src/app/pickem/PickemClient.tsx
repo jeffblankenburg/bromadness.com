@@ -63,6 +63,7 @@ interface Props {
   allPicks: PickemPick[]
   entryFee: number
   simulatedTime: string | null
+  enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
 }
 
 function findD1Team(teamName: string) {
@@ -109,9 +110,10 @@ export function PickemClient({
   allPicks,
   entryFee,
   simulatedTime,
+  enabledDays,
 }: Props) {
   const getCurrentTime = () => simulatedTime ? new Date(simulatedTime) : new Date()
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0)
+  const [selectedDayName, setSelectedDayName] = useState(enabledDays[0] || 'Thursday')
   const [activeTab, setActiveTab] = useState<'picks' | 'leaderboard'>('picks')
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -149,20 +151,18 @@ export function PickemClient({
     localStorage.setItem('pickem-late-expanded', String(newValue))
   }
 
-  const currentDay = pickemDays[selectedDayIndex]
-  if (!currentDay) {
-    return (
-      <div className="p-4 space-y-4">
-        <h1 className="text-xl font-bold text-orange-500">Pick&apos;em</h1>
-        <p className="text-zinc-400">No games scheduled yet.</p>
-      </div>
-    )
-  }
+  // Find the pickem_day that matches the selected day name
+  const currentDay = pickemDays.find(d => formatDayName(d.contest_date) === selectedDayName)
 
-  // Get games for current day
-  const dayGames = games
-    .filter(g => g.scheduled_at?.split('T')[0] === currentDay.contest_date)
-    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+  // Get games for current day (if it exists)
+  const dayGames = currentDay
+    ? games
+        .filter(g => g.scheduled_at?.split('T')[0] === currentDay.contest_date)
+        .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
+    : []
+
+  // Check if this day has no games yet
+  const dayHasNoGames = !currentDay || dayGames.length === 0
 
   // Split into sessions
   const midpoint = Math.ceil(dayGames.length / 2)
@@ -170,9 +170,9 @@ export function PickemClient({
   const session2Games = dayGames.slice(midpoint)
 
   // Calculate session payouts with $5 rounding
-  const paidEntriesForDay = allEntries.filter(
-    e => e.pickem_day_id === currentDay.id && e.has_paid === true
-  ).length
+  const paidEntriesForDay = currentDay
+    ? allEntries.filter(e => e.pickem_day_id === currentDay.id && e.has_paid === true).length
+    : 0
   const dayPot = paidEntriesForDay * entryFee
   const sessionPot = Math.round((dayPot / 2) / 5) * 5 // Round session pot to $5
 
@@ -215,7 +215,7 @@ export function PickemClient({
   const isLocked = firstGameTime ? new Date(firstGameTime) <= getCurrentTime() : false
 
   // Get user's entry and picks
-  const userEntry = userEntries.find(e => e.pickem_day_id === currentDay.id)
+  const userEntry = currentDay ? userEntries.find(e => e.pickem_day_id === currentDay.id) : undefined
   const dayGameIds = dayGames.map(g => g.id)
   const userDayPicks = userPicks.filter(p => p.game_id && dayGameIds.includes(p.game_id))
 
@@ -226,7 +226,7 @@ export function PickemClient({
   }
 
   const handlePick = async (gameId: string, teamId: string) => {
-    if (isLocked || saving) return
+    if (isLocked || saving || !currentDay) return
     setLocalPicks(prev => ({ ...prev, [gameId]: teamId }))
     setSaving(true)
 
@@ -284,7 +284,9 @@ export function PickemClient({
     const completedGames = sessionGames.filter(g => g.winner_id !== null)
     const completedGameIds = completedGames.map(g => g.id)
     const sessionGameIds = sessionGames.map(g => g.id)
-    const dayEntries = allEntries.filter(e => e.pickem_day_id === currentDay.id && e.has_paid === true)
+    const dayEntries = currentDay
+      ? allEntries.filter(e => e.pickem_day_id === currentDay.id && e.has_paid === true)
+      : []
 
     return dayEntries.map(entry => {
       const user = users.find(u => u.id === entry.user_id)
@@ -512,27 +514,29 @@ export function PickemClient({
         <h1 className="text-xl font-bold text-orange-500">NCAA Pick'em</h1>
       {/* Day Tabs */}
       <div className="flex gap-2">
-        {pickemDays.map((day, index) => {
-          const entry = userEntries.find(e => e.pickem_day_id === day.id)
+        {enabledDays.map((dayName) => {
+          const pickemDay = pickemDays.find(d => formatDayName(d.contest_date) === dayName)
+          const entry = pickemDay ? userEntries.find(e => e.pickem_day_id === pickemDay.id) : null
           const hasPaid = entry?.has_paid ?? false
+          const hasGames = pickemDay !== undefined
 
           return (
             <button
-              key={day.id}
-              onClick={() => setSelectedDayIndex(index)}
+              key={dayName}
+              onClick={() => setSelectedDayName(dayName)}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedDayIndex === index
+                selectedDayName === dayName
                   ? 'bg-orange-500 text-white'
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
               }`}
             >
-              <div>{formatShortDayName(day.contest_date)}</div>
+              <div>{dayName.slice(0, 3)}</div>
               <div className={`text-[10px] ${
-                selectedDayIndex === index
-                  ? (hasPaid ? 'text-green-300' : 'text-red-300')
-                  : (hasPaid ? 'text-green-500' : 'text-red-500')
+                selectedDayName === dayName
+                  ? (hasGames ? (hasPaid ? 'text-green-300' : 'text-red-300') : 'text-zinc-300')
+                  : (hasGames ? (hasPaid ? 'text-green-500' : 'text-red-500') : 'text-zinc-500')
               }`}>
-                {hasPaid ? 'PAID' : 'PAY BRO'}
+                {hasGames ? (hasPaid ? 'PAID' : `PAY BRO $${entryFee}`) : 'SOON'}
               </div>
             </button>
           )
@@ -574,7 +578,14 @@ export function PickemClient({
       )}
 
       {/* My Picks Tab */}
-      {activeTab === 'picks' && (() => {
+      {activeTab === 'picks' && dayHasNoGames && (
+        <div className="text-center py-12">
+          <p className="text-zinc-400 text-lg">{selectedDayName} games coming soon!</p>
+          <p className="text-zinc-500 text-sm mt-2">Check back once the bracket is set.</p>
+        </div>
+      )}
+
+      {activeTab === 'picks' && !dayHasNoGames && (() => {
         const getSessionStats = (sessionGames: Game[]) => {
           const completedGames = sessionGames.filter(g => g.winner_id !== null)
           const correctCount = completedGames.filter(game => {
@@ -656,7 +667,14 @@ export function PickemClient({
       })()}
 
       {/* Leaderboard Tab */}
-      {activeTab === 'leaderboard' && (
+      {activeTab === 'leaderboard' && dayHasNoGames && (
+        <div className="text-center py-12">
+          <p className="text-zinc-400 text-lg">{selectedDayName} games coming soon!</p>
+          <p className="text-zinc-500 text-sm mt-2">Leaderboard will appear once games are scheduled.</p>
+        </div>
+      )}
+
+      {activeTab === 'leaderboard' && !dayHasNoGames && (
         <div className="space-y-6">
           {/* Payouts */}
           {(sessionPayouts.first > 0 || sessionPayouts.second > 0 || sessionPayouts.third > 0) && (

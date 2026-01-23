@@ -7,23 +7,37 @@ import { createClient } from '@/lib/supabase/client'
 interface Props {
   tournamentId: string
   entryFee: number
+  enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
 }
 
-export function PickemSettings({ tournamentId, entryFee: initialEntryFee }: Props) {
+const PICKEM_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday']
+
+export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enabledDays: initialEnabledDays }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [entryFee, setEntryFee] = useState(initialEntryFee)
+  const [enabledDays, setEnabledDays] = useState<string[]>(initialEnabledDays)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
+  const toggleDay = (day: string) => {
+    setEnabledDays(prev =>
+      prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    )
+  }
+
   const handleSave = async () => {
     setSaving(true)
+
     try {
       const { error } = await supabase
         .from('tournaments')
         .update({
           pickem_payouts: {
             entry_fee: entryFee,
+            enabled_days: enabledDays,
           },
         })
         .eq('id', tournamentId)
@@ -65,7 +79,7 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee }: Prop
           {/* Modal Content */}
           <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-orange-400">Pick'em Settings</h3>
+              <h3 className="text-lg font-semibold text-orange-400">Pick&apos;em Settings</h3>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-zinc-400 hover:text-white"
@@ -82,11 +96,29 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee }: Prop
                 <div className="flex items-center">
                   <span className="text-zinc-500 mr-2">$</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={entryFee}
                     onChange={(e) => setEntryFee(parseInt(e.target.value) || 0)}
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Enabled Days</label>
+                <div className="space-y-2">
+                  {PICKEM_DAYS.map(day => (
+                    <label key={day} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={enabledDays.includes(day)}
+                        onChange={() => toggleDay(day)}
+                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-zinc-300">{day}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 

@@ -41,6 +41,7 @@ interface Props {
   games: Game[]
   pickemPicks: PickemPick[]
   entryFee: number
+  enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
 }
 
 function formatDate(dateStr: string): string {
@@ -48,7 +49,12 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickemPicks, entryFee }: Props) {
+function getDayName(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00')
+  return date.toLocaleDateString('en-US', { weekday: 'long' })
+}
+
+export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickemPicks, entryFee, enabledDays }: Props) {
   const [saving, setSaving] = useState<string | null>(null)
   const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
   const [expanded, setExpanded] = useState(() => {
@@ -155,16 +161,73 @@ export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickem
     return entry?.has_paid ?? false
   }
 
+  // Check if all users are paid for a specific day
+  const areAllPaidForDay = (pickemDayId: string): boolean => {
+    return users.every(user => isUserPaid(user.id, pickemDayId))
+  }
+
+  // Toggle all users paid/unpaid for a specific day
+  const toggleAllForDay = async (pickemDayId: string) => {
+    const allPaid = areAllPaidForDay(pickemDayId)
+    const newPaidStatus = !allPaid
+
+    // Optimistic updates for all users
+    const updates: Record<string, boolean> = {}
+    users.forEach(user => {
+      const key = `${user.id}-${pickemDayId}`
+      updates[key] = newPaidStatus
+    })
+    setOptimisticPaid(prev => ({ ...prev, ...updates }))
+
+    try {
+      for (const user of users) {
+        const existingEntry = pickemEntries.find(
+          e => e.user_id === user.id && e.pickem_day_id === pickemDayId
+        )
+
+        if (existingEntry) {
+          await supabase
+            .from('pickem_entries')
+            .update({
+              has_paid: newPaidStatus,
+              paid_at: newPaidStatus ? new Date().toISOString() : null,
+            })
+            .eq('id', existingEntry.id)
+        } else if (newPaidStatus) {
+          // Only create entry if marking as paid
+          await supabase
+            .from('pickem_entries')
+            .insert({
+              user_id: user.id,
+              pickem_day_id: pickemDayId,
+              has_paid: true,
+              paid_at: new Date().toISOString(),
+            })
+        }
+      }
+
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to toggle all payments:', error)
+      // Revert optimistic updates
+      setOptimisticPaid(prev => {
+        const next = { ...prev }
+        Object.keys(updates).forEach(key => delete next[key])
+        return next
+      })
+    }
+  }
+
   // Calculate totals
   const totalPaid = pickemDays.reduce((sum, day) => {
     return sum + users.filter(user => isUserPaid(user.id, day.id)).length
   }, 0)
   const totalCollected = totalPaid * entryFee
 
-  if (pickemDays.length === 0) {
+  if (enabledDays.length === 0) {
     return (
       <div className="bg-zinc-800/50 rounded-xl p-4">
-        <p className="text-zinc-400 text-sm">No pick&apos;em days found. Schedule games in the Tournament tab first.</p>
+        <p className="text-zinc-400 text-sm">No pick&apos;em days enabled. Enable days in settings.</p>
       </div>
     )
   }
@@ -197,11 +260,31 @@ export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickem
           {/* Header row */}
           <div className="flex items-center gap-2 mb-2 text-xs text-zinc-500">
             <div className="flex-1">Name</div>
-            {pickemDays.map(day => (
-              <div key={day.id} className="w-20 text-center">
-                {formatDate(day.contest_date).split(',')[0]}
-              </div>
-            ))}
+            {enabledDays.map(dayName => {
+              const pickemDay = pickemDays.find(d => getDayName(d.contest_date) === dayName)
+              const allPaid = pickemDay ? areAllPaidForDay(pickemDay.id) : false
+              const hasGames = pickemDay !== undefined
+              return (
+                <div key={dayName} className="w-14 flex items-center justify-end gap-1">
+                  <span>{dayName.slice(0, 3)}</span>
+                  {hasGames ? (
+                    <button
+                      onClick={() => toggleAllForDay(pickemDay!.id)}
+                      className={`w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center text-xs ${
+                        allPaid
+                          ? 'bg-green-500/20 border-green-500 text-green-400'
+                          : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
+                      }`}
+                      title={allPaid ? 'All paid - click to mark all unpaid' : 'Click to mark all paid'}
+                    >
+                      {allPaid ? '✓' : ''}
+                    </button>
+                  ) : (
+                    <span className="w-5 h-5 flex-shrink-0 text-center text-zinc-700 text-xs leading-5">—</span>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* User rows */}
@@ -211,11 +294,23 @@ export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickem
                 <div className="flex-1 truncate">
                   {user.display_name || user.phone}
                 </div>
-                {pickemDays.map(day => {
-                  const isPaid = isUserPaid(user.id, day.id)
-                  const pickStatus = getUserPickStatus(user.id, day.id, day.contest_date)
+                {enabledDays.map(dayName => {
+                  const pickemDay = pickemDays.find(d => getDayName(d.contest_date) === dayName)
+
+                  if (!pickemDay) {
+                    // Day is enabled but no games scheduled yet
+                    return (
+                      <div key={dayName} className="w-14 flex items-center justify-end gap-1">
+                        <span className="text-zinc-700 text-xs">-</span>
+                        <span className="w-5 h-5 flex-shrink-0 rounded border border-zinc-700 flex items-center justify-center text-xs text-zinc-700">—</span>
+                      </div>
+                    )
+                  }
+
+                  const isPaid = isUserPaid(user.id, pickemDay.id)
+                  const pickStatus = getUserPickStatus(user.id, pickemDay.id, pickemDay.contest_date)
                   const hasPicks = pickStatus.made === pickStatus.total && pickStatus.total > 0
-                  const isSaving = saving === `${user.id}-${day.id}`
+                  const isSaving = saving === `${user.id}-${pickemDay.id}`
 
                   // Color logic: gray if not paid, red if paid but incomplete, green if complete
                   const pickColor = !isPaid
@@ -225,15 +320,15 @@ export function PaymentTracker({ pickemDays, users, pickemEntries, games, pickem
                       : 'text-red-400'
 
                   return (
-                    <div key={day.id} className="w-20 flex items-center justify-center gap-1">
+                    <div key={dayName} className="w-14 flex items-center justify-end gap-1">
                       <span className={`text-xs ${pickColor}`}>
-                        {pickStatus.total > 0 ? `${pickStatus.made}/${pickStatus.total}` : '-'}
+                        {pickStatus.made > 0 ? pickStatus.made : isPaid ? '0' : '-'}
                       </span>
 
                       <button
-                        onClick={() => togglePayment(user.id, day.id)}
+                        onClick={() => togglePayment(user.id, pickemDay.id)}
                         disabled={isSaving}
-                        className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                        className={`w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center text-xs ${
                           isPaid
                             ? 'bg-green-500/20 border-green-500 text-green-400'
                             : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'

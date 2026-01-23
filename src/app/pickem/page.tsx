@@ -2,12 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PickemClient } from './PickemClient'
 
-// Toggle to enable Saturday/Sunday pick'em (Round 2)
-// Set to true when ready to open weekend picks
-const ENABLE_WEEKEND_PICKEM = false
-
 interface PickemPayouts {
   entry_fee: number
+  enabled_days?: string[]  // Day names like "Thursday", "Friday", etc.
+}
+
+// Get day name from a date string
+function getDayName(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00')
+  return date.toLocaleDateString('en-US', { weekday: 'long' })
 }
 
 export default async function PickemPage() {
@@ -33,10 +36,12 @@ export default async function PickemPage() {
     )
   }
 
+  const payouts = (tournament.pickem_payouts as PickemPayouts) || { entry_fee: 10 }
+  const enabledDays = payouts.enabled_days || ['Thursday', 'Friday']
+
   // Get Round 1 & 2 games with team info and spreads
   // Round 1 = Thursday/Friday (Round of 64)
   // Round 2 = Saturday/Sunday (Round of 32)
-  const pickemRounds = ENABLE_WEEKEND_PICKEM ? [1, 2] : [1]
   const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
@@ -46,15 +51,21 @@ export default async function PickemPage() {
       team2:teams!games_team2_id_fkey(id, name, short_name, seed)
     `)
     .eq('tournament_id', tournament.id)
-    .in('round', pickemRounds)
+    .in('round', [1, 2])
     .order('scheduled_at')
 
-  // Transform games to extract team objects from arrays
-  const games = (gamesRaw || []).map(g => ({
-    ...g,
-    team1: Array.isArray(g.team1) ? g.team1[0] || null : g.team1,
-    team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
-  }))
+  // Transform games to extract team objects from arrays, filter by enabled days
+  const games = (gamesRaw || [])
+    .filter(g => {
+      if (!g.scheduled_at) return false
+      const dayName = getDayName(g.scheduled_at.split('T')[0])
+      return enabledDays.includes(dayName)
+    })
+    .map(g => ({
+      ...g,
+      team1: Array.isArray(g.team1) ? g.team1[0] || null : g.team1,
+      team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
+    }))
 
   if (games.length === 0) {
     return (
@@ -143,7 +154,6 @@ export default async function PickemPage() {
         .in('entry_id', entryIds)
     : { data: [] }
 
-  const payouts = (tournament.pickem_payouts as PickemPayouts) || { entry_fee: 10 }
   const entryFee = payouts.entry_fee || 10
   const simulatedTime = tournament.dev_simulated_time as string | null
 
@@ -159,6 +169,7 @@ export default async function PickemPage() {
       allPicks={allPicks || []}
       entryFee={entryFee}
       simulatedTime={simulatedTime}
+      enabledDays={enabledDays}
     />
   )
 }

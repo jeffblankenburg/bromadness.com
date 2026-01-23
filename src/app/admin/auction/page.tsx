@@ -9,7 +9,7 @@ export default async function AuctionPage() {
   // Get active tournament with auction settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, bid_increment, auction_payouts, auction_complete')
+    .select('id, name, year, entry_fee, salary_cap, bid_increment, teams_per_player, auction_payouts, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -17,7 +17,6 @@ export default async function AuctionPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Auction</h2>
         <p className="text-zinc-400">No tournament found. Create one first.</p>
       </div>
     )
@@ -66,12 +65,12 @@ export default async function AuctionPage() {
     entryFee: tournament.entry_fee ?? 20,
     salaryCap: tournament.salary_cap ?? 100,
     bidIncrement: tournament.bid_increment ?? 5,
+    teamsPerPlayer: tournament.teams_per_player ?? 3,
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Auction</h2>
+      <div className="flex items-center justify-end">
         <AuctionSettings tournamentId={tournament.id} settings={settings} />
       </div>
 

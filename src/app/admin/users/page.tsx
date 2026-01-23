@@ -11,7 +11,6 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Users</h2>
       <UserList users={users || []} />
     </div>
   )

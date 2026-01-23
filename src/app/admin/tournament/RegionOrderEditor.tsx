@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { ClearTournament } from './ClearTournament'
 
 interface Region {
   id: string
@@ -12,9 +13,10 @@ interface Region {
 
 interface Props {
   regions: Region[]
+  tournamentId: string
 }
 
-export function RegionOrderEditor({ regions: initialRegions }: Props) {
+export function RegionOrderEditor({ regions: initialRegions, tournamentId }: Props) {
   const [regions, setRegions] = useState<Region[]>(
     [...initialRegions].sort((a, b) => a.position - b.position)
   )
@@ -168,6 +170,12 @@ export function RegionOrderEditor({ regions: initialRegions }: Props) {
               {saving ? 'Saving...' : 'Save Order'}
             </button>
           )}
+
+          {/* Danger Zone */}
+          <div className="pt-4 mt-4 border-t border-zinc-700">
+            <p className="text-xs text-zinc-500 mb-2">Danger Zone</p>
+            <ClearTournament tournamentId={tournamentId} />
+          </div>
         </div>
       )}
     </div>

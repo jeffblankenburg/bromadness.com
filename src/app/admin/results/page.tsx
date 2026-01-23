@@ -22,7 +22,6 @@ export default async function ResultsPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Game Results</h2>
         <p className="text-zinc-400">No tournament found. Create one first.</p>
       </div>
     )
@@ -44,8 +43,6 @@ export default async function ResultsPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Game Results</h2>
-
       <GameResults
         tournament={tournament}
         teams={teams || []}

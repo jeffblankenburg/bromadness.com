@@ -154,6 +154,36 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
     return entry?.has_paid ?? false
   }
 
+  const areAllPaid = () => {
+    return users.every(user => isUserPaid(user.id))
+  }
+
+  const toggleAllPayments = async () => {
+    const allPaid = areAllPaid()
+    const newPaidStatus = !allPaid
+
+    setSaving(true)
+    try {
+      // Use upsert to handle both insert and update in one operation
+      const entries = users.map(user => ({
+        tournament_id: tournamentId,
+        user_id: user.id,
+        has_paid: newPaidStatus,
+        paid_at: newPaidStatus ? new Date().toISOString() : null,
+      }))
+
+      await supabase
+        .from('auction_entries')
+        .upsert(entries, { onConflict: 'tournament_id,user_id' })
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to toggle all payments:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getOpponent = (teamId: string) => {
     const game = games.find(g => g.team1_id === teamId || g.team2_id === teamId)
     if (!game) return null
@@ -275,6 +305,24 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
         {ownersExpanded && (
           <div className="px-4 pb-4">
             <div className="space-y-2">
+              {/* Check all row */}
+              <div className="flex items-center justify-between text-sm pb-2 mb-1 border-b border-zinc-700/50">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleAllPayments()}
+                    disabled={saving}
+                    className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                      areAllPaid()
+                        ? 'bg-green-500/20 border-green-500 text-green-400'
+                        : 'border-zinc-600 text-zinc-600 hover:border-zinc-400'
+                    }`}
+                    title={areAllPaid() ? 'All paid - click to mark all unpaid' : 'Click to mark all paid'}
+                  >
+                    {areAllPaid() ? '✓' : ''}
+                  </button>
+                  <span className="text-zinc-500 text-xs">Check all</span>
+                </div>
+              </div>
               {users.map(user => {
                 const userTeams = getUserTeams(user.id)
                 const totalSpent = getUserTotalSpent(user.id)

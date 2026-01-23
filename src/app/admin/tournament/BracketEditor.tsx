@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { InlineTeamSearch } from './InlineTeamSearch'
@@ -68,8 +68,36 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<{ regionId: string; seed: number } | null>(null)
   const [activeTab, setActiveTab] = useState<string>(regions[0]?.id || '')
   const [saving, setSaving] = useState(false)
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(() => {
+    if (typeof window === 'undefined') return new Set([1, 2, 3, 4])
+    const saved = localStorage.getItem('bracket-expanded-rounds')
+    if (saved) {
+      try {
+        return new Set(JSON.parse(saved))
+      } catch {
+        return new Set([1, 2, 3, 4])
+      }
+    }
+    return new Set([1, 2, 3, 4])
+  })
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    localStorage.setItem('bracket-expanded-rounds', JSON.stringify([...expandedRounds]))
+  }, [expandedRounds])
+
+  const toggleRound = (round: number) => {
+    setExpandedRounds(prev => {
+      const next = new Set(prev)
+      if (next.has(round)) {
+        next.delete(round)
+      } else {
+        next.add(round)
+      }
+      return next
+    })
+  }
 
   // Special tab IDs for final rounds
   const FINAL_FOUR_TAB = 'final-four'
@@ -374,9 +402,200 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
             <span className="text-sm text-zinc-400">{regionTeamCount}/16 teams</span>
           </div>
 
-          {/* Round 1 Matchups */}
-          <div className="text-xs text-zinc-500 font-medium mt-2">{ROUND_NAMES[1]}</div>
-          <div className="space-y-3">
+          {/* Later Rounds (4, 3, 2) - shown first, in reverse order */}
+          {[4, 3, 2].map(round => {
+            const roundGames = getGamesForRound(activeTab, round)
+            const readyGames = roundGames.filter(g => isGamePartiallyReady(g))
+
+            if (readyGames.length === 0) return null
+
+            const isExpanded = expandedRounds.has(round)
+
+            return (
+              <div key={round} className="bg-zinc-800/50 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleRound(round)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
+                >
+                  <span className="text-sm font-medium text-orange-400">{ROUND_NAMES[round]}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">{readyGames.length} game{readyGames.length !== 1 ? 's' : ''}</span>
+                    <svg
+                      className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="px-3 pb-3 space-y-3">
+                    {readyGames.map(game => {
+                      const team1 = getTeamById(game.team1_id)
+                      const team2 = getTeamById(game.team2_id)
+                      const d1Team1 = team1 ? getD1TeamData(team1.name) : null
+                      const d1Team2 = team2 ? getD1TeamData(team2.name) : null
+                      const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
+                      const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
+
+                      return (
+                        <div key={game.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
+                          {/* Header: DateTime, Location, Channel */}
+                          <div className="flex items-center gap-1">
+                            <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                              game.scheduled_at
+                                ? 'bg-zinc-800 border border-zinc-600'
+                                : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                            }`}>
+                              <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
+                                {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
+                              </span>
+                              <input
+                                type="datetime-local"
+                                value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                                onChange={(e) => handleScheduleChange(game.id, e.target.value)}
+                                className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              defaultValue={game.location || ''}
+                              onBlur={(e) => handleLocationChange(game.id, e.target.value)}
+                              placeholder="Location"
+                              className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
+                                game.location
+                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                              }`}
+                            />
+                            <select
+                              value={game.channel || ''}
+                              onChange={(e) => handleChannelChange(game.id, e.target.value)}
+                              className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
+                                game.channel
+                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
+                              }`}
+                            >
+                              <option value="">Ch</option>
+                              {CHANNELS.map(ch => (
+                                <option key={ch.name} value={ch.name}>{ch.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Team 1 */}
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
+                                team1 && d1Team1 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
+                              }`}
+                              style={team1 && d1Team1 ? { backgroundColor: d1Team1.primaryColor + '40' } : undefined}
+                            >
+                              {team1 && d1Team1 ? (
+                                <>
+                                  <span className="w-5 text-xs font-mono text-zinc-400">{team1.seed}</span>
+                                  <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: d1Team1.primaryColor }}
+                                  >
+                                    {logo1 ? (
+                                      <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
+                                    )}
+                                  </div>
+                                  <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
+                                </>
+                              ) : (
+                                <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
+                              )}
+                            </div>
+                            <div className="w-[72px] flex-shrink-0">
+                              {game.spread ? (
+                                <input
+                                  type="text"
+                                  defaultValue={game.spread}
+                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
+                                  className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
+                                />
+                              ) : team1 ? (
+                                <input
+                                  type="text"
+                                  defaultValue=""
+                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
+                                  placeholder="Sprd"
+                                  className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
+                                />
+                              ) : (
+                                <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Team 2 */}
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
+                                team2 && d1Team2 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
+                              }`}
+                              style={team2 && d1Team2 ? { backgroundColor: d1Team2.primaryColor + '40' } : undefined}
+                            >
+                              {team2 && d1Team2 ? (
+                                <>
+                                  <span className="w-5 text-xs font-mono text-zinc-400">{team2.seed}</span>
+                                  <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: d1Team2.primaryColor }}
+                                  >
+                                    {logo2 ? (
+                                      <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
+                                    )}
+                                  </div>
+                                  <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
+                                </>
+                              ) : (
+                                <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
+                              )}
+                            </div>
+                            <div className="w-[72px] flex-shrink-0" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* Round 1 Matchups - collapsible */}
+          <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+            <button
+              onClick={() => toggleRound(1)}
+              className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
+            >
+              <span className="text-sm font-medium text-orange-400">{ROUND_NAMES[1]}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500">8 games</span>
+                <svg
+                  className={`w-4 h-4 text-zinc-400 transition-transform ${expandedRounds.has(1) ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            {expandedRounds.has(1) && (
+              <div className="px-3 pb-3 space-y-3">
             {ROUND1_MATCHUPS.map(([seed1, seed2], idx) => {
               const gameNumber = idx + 1
               const game = getGameForMatchup(activeTab, gameNumber)
@@ -555,163 +774,9 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                 </div>
               )
             })}
-          </div>
-
-          {/* Later Rounds (2-4) within this region */}
-          {[2, 3, 4].map(round => {
-            const roundGames = getGamesForRound(activeTab, round)
-            const readyGames = roundGames.filter(g => isGamePartiallyReady(g))
-
-            if (readyGames.length === 0) return null
-
-            return (
-              <div key={round} className="mt-6">
-                <div className="text-xs text-zinc-500 font-medium mb-2">{ROUND_NAMES[round]}</div>
-                <div className="space-y-3">
-                  {readyGames.map(game => {
-                    const team1 = getTeamById(game.team1_id)
-                    const team2 = getTeamById(game.team2_id)
-                    const d1Team1 = team1 ? getD1TeamData(team1.name) : null
-                    const d1Team2 = team2 ? getD1TeamData(team2.name) : null
-                    const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
-                    const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
-
-                    return (
-                      <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
-                        {/* Header: DateTime, Location, Channel */}
-                        <div className="flex items-center gap-1">
-                          {/* DateTime - compact display + picker */}
-                          <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
-                            game.scheduled_at
-                              ? 'bg-zinc-800 border border-zinc-600'
-                              : 'bg-zinc-800/50 border border-dashed border-zinc-600'
-                          }`}>
-                            <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
-                              {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
-                            </span>
-                            <input
-                              type="datetime-local"
-                              value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
-                              onChange={(e) => handleScheduleChange(game.id, e.target.value)}
-                              className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
-                            />
-                          </div>
-                          {/* Location */}
-                          <input
-                            type="text"
-                            defaultValue={game.location || ''}
-                            onBlur={(e) => handleLocationChange(game.id, e.target.value)}
-                            placeholder="Location"
-                            className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
-                              game.location
-                                ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                                : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
-                            }`}
-                          />
-                          {/* Channel selector */}
-                          <select
-                            value={game.channel || ''}
-                            onChange={(e) => handleChannelChange(game.id, e.target.value)}
-                            className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
-                              game.channel
-                                ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                                : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
-                            }`}
-                          >
-                            <option value="">Ch</option>
-                            {CHANNELS.map(ch => (
-                              <option key={ch.name} value={ch.name}>{ch.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Team 1 */}
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
-                              team1 && d1Team1 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
-                            }`}
-                            style={team1 && d1Team1 ? { backgroundColor: d1Team1.primaryColor + '40' } : undefined}
-                          >
-                            {team1 && d1Team1 ? (
-                              <>
-                                <span className="w-5 text-xs font-mono text-zinc-400">{team1.seed}</span>
-                                <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                  style={{ backgroundColor: d1Team1.primaryColor }}
-                                >
-                                  {logo1 ? (
-                                    <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
-                                  )}
-                                </div>
-                                <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
-                              </>
-                            ) : (
-                              <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
-                            )}
-                          </div>
-                          {/* Spread input for team1 (favorite) */}
-                          <div className="w-[72px] flex-shrink-0">
-                            {game.spread ? (
-                              <input
-                                type="text"
-                                                                defaultValue={game.spread}
-                                onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
-                                className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
-                              />
-                            ) : team1 ? (
-                              <input
-                                type="text"
-                                                                defaultValue=""
-                                onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
-                                placeholder="Sprd"
-                                className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
-                              />
-                            ) : (
-                              <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Team 2 */}
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
-                              team2 && d1Team2 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
-                            }`}
-                            style={team2 && d1Team2 ? { backgroundColor: d1Team2.primaryColor + '40' } : undefined}
-                          >
-                            {team2 && d1Team2 ? (
-                              <>
-                                <span className="w-5 text-xs font-mono text-zinc-400">{team2.seed}</span>
-                                <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                  style={{ backgroundColor: d1Team2.primaryColor }}
-                                >
-                                  {logo2 ? (
-                                    <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
-                                  )}
-                                </div>
-                                <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
-                              </>
-                            ) : (
-                              <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
-                            )}
-                          </div>
-                          {/* Spacer to match team1 spread width */}
-                          <div className="w-[72px] flex-shrink-0" />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
               </div>
-            )
-          })}
+            )}
+          </div>
         </div>
       )}
 

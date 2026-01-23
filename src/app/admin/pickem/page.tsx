@@ -2,9 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PaymentTracker } from './PaymentTracker'
 import { PickemSettings } from './PickemSettings'
+import { DeleteAllPicks } from './DeleteAllPicks'
 
 interface PickemPayouts {
   entry_fee: number
+  enabled_days?: string[]  // Day names like "Thursday", "Friday", etc.
 }
 
 export default async function AdminPickemPage() {
@@ -33,7 +35,6 @@ export default async function AdminPickemPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Pick&apos;em</h2>
         <p className="text-zinc-400">No tournament found. Create a tournament first.</p>
       </div>
     )
@@ -66,6 +67,49 @@ export default async function AdminPickemPage() {
 
   const pickemDates = Object.keys(gamesByDate).sort()
 
+  // Get enabled days from settings
+  const payoutsData = (tournament.pickem_payouts as PickemPayouts) || { entry_fee: 10 }
+  const enabledDaysFromSettings = payoutsData.enabled_days || ['Thursday', 'Friday']
+
+  // Helper to get day name from date
+  const getDayNameFromDate = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T12:00:00')
+    return date.toLocaleDateString('en-US', { weekday: 'long' })
+  }
+
+  // Build a map of day name -> date from existing game dates
+  const dayNameToDate: Record<string, string> = {}
+  pickemDates.forEach(date => {
+    dayNameToDate[getDayNameFromDate(date)] = date
+  })
+
+  // For enabled days without games, derive dates from existing ones
+  // Thursday=0, Friday=1, Saturday=2, Sunday=3 offset from Thursday
+  const dayOffsets: Record<string, number> = { Thursday: 0, Friday: 1, Saturday: 2, Sunday: 3 }
+
+  // Find a reference date (preferably Thursday)
+  const referenceDay = ['Thursday', 'Friday', 'Saturday', 'Sunday'].find(d => dayNameToDate[d])
+  if (referenceDay) {
+    const refDate = new Date(dayNameToDate[referenceDay] + 'T12:00:00')
+    const refOffset = dayOffsets[referenceDay]
+
+    enabledDaysFromSettings.forEach(dayName => {
+      if (!dayNameToDate[dayName] && dayOffsets[dayName] !== undefined) {
+        const dayOffset = dayOffsets[dayName] - refOffset
+        const newDate = new Date(refDate)
+        newDate.setDate(newDate.getDate() + dayOffset)
+        const dateStr = newDate.toISOString().split('T')[0]
+        dayNameToDate[dayName] = dateStr
+      }
+    })
+  }
+
+  // All dates we need (from games + derived for enabled days)
+  const allNeededDates = [...new Set([
+    ...pickemDates,
+    ...enabledDaysFromSettings.map(d => dayNameToDate[d]).filter(Boolean)
+  ])].sort()
+
   // Get pickem entries (for payment tracking) - join through pickem_days
   const { data: pickemDays } = await supabase
     .from('pickem_days')
@@ -74,7 +118,7 @@ export default async function AdminPickemPage() {
 
   // Auto-create pickem_days for any dates that don't exist
   const existingDates = (pickemDays || []).map(d => d.contest_date)
-  const missingDates = pickemDates.filter(date => !existingDates.includes(date))
+  const missingDates = allNeededDates.filter(date => !existingDates.includes(date))
 
   if (missingDates.length > 0) {
     await supabase
@@ -116,13 +160,16 @@ export default async function AdminPickemPage() {
     entry_fee: 10,
   }
 
+  const enabledDays = payouts.enabled_days || ['Thursday', 'Friday'] // Default to Thu/Fri
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Pick&apos;em</h2>
+      <div className="flex items-center justify-end gap-2">
+        <DeleteAllPicks tournamentId={tournament.id} />
         <PickemSettings
           tournamentId={tournament.id}
           entryFee={payouts.entry_fee}
+          enabledDays={enabledDays}
         />
       </div>
 
@@ -133,6 +180,7 @@ export default async function AdminPickemPage() {
         games={games || []}
         pickemPicks={pickemPicks || []}
         entryFee={payouts.entry_fee}
+        enabledDays={enabledDays}
       />
     </div>
   )

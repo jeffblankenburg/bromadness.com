@@ -96,7 +96,7 @@ export default async function AuctionPage() {
   // Get active tournament with settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, auction_payouts, auction_order_seed, auction_complete')
+    .select('id, name, year, entry_fee, salary_cap, teams_per_player, auction_payouts, auction_order_seed, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -258,6 +258,9 @@ export default async function AuctionPage() {
   const assignedTeams = (auctionTeams || []).length
   const auctionComplete = (tournament.auction_complete ?? false) || (totalTeams > 0 && assignedTeams >= totalTeams)
 
+  // Teams per player from settings (only paid teams count)
+  const teamsPerPlayer = tournament.teams_per_player ?? 3
+
   // Build draft board data (teams per user in bid order)
   const getDraftBoardData = () => {
     return (users || [])
@@ -269,10 +272,17 @@ export default async function AuctionPage() {
             return { ...a, team }
           })
           .sort((a, b) => (a.team?.seed || 99) - (b.team?.seed || 99))
+
+        // Separate paid teams from bonus ($0) teams
+        const paidTeams = userTeams.filter(t => t.bid_amount > 0)
+        const bonusTeams = userTeams.filter(t => t.bid_amount === 0)
+
         const auctionEntry = (auctionEntries || []).find(e => e.user_id === u.id)
         return {
           user: u,
           teams: userTeams,
+          paidTeams,
+          bonusTeams,
           totalSpent: userTeams.reduce((sum, t) => sum + t.bid_amount, 0),
           hasPaid: auctionEntry?.has_paid ?? false,
         }
@@ -282,10 +292,34 @@ export default async function AuctionPage() {
   const draftBoardUnsorted = getDraftBoardData()
   const orderSeed = tournament.auction_order_seed || tournament.id
   const draftBoard = seededShuffle(draftBoardUnsorted, orderSeed)
-  const maxTeamsPerUser = Math.max(...draftBoard.map(d => d.teams.length), 3)
 
-  // Calculate whose turn it is to throw out a team
-  const currentThrowerIndex = draftBoard.length > 0 ? assignedTeams % draftBoard.length : 0
+  // Check if a player has purchased all their required teams (only paid teams count)
+  const isPlayerDone = (idx: number) => {
+    return draftBoard[idx].paidTeams.length >= teamsPerPlayer
+  }
+
+  // Count only paid teams for determining whose turn it is
+  const totalPaidTeams = draftBoard.reduce((sum, entry) => sum + entry.paidTeams.length, 0)
+  const numPlayers = draftBoard.length
+
+  // Calculate whose turn it is to throw out a team, skipping players who are done
+  const calculateCurrentThrower = () => {
+    if (numPlayers === 0) return 0
+
+    // Start from where we would be without skipping
+    let baseIndex = totalPaidTeams % numPlayers
+
+    // Skip players who have already purchased all their teams
+    let attempts = 0
+    while (isPlayerDone(baseIndex) && attempts < numPlayers) {
+      baseIndex = (baseIndex + 1) % numPlayers
+      attempts++
+    }
+
+    return baseIndex
+  }
+
+  const currentThrowerIndex = calculateCurrentThrower()
 
   return (
     <AuctionClient auctionComplete={auctionComplete}>
@@ -338,17 +372,18 @@ export default async function AuctionPage() {
             <thead>
               <tr className="bg-zinc-800">
                 <th className="text-left px-2 py-2 text-zinc-400 font-medium">Player</th>
-                {Array.from({ length: maxTeamsPerUser }).map((_, i) => (
+                {Array.from({ length: teamsPerPlayer }).map((_, i) => (
                   <th key={i} className="text-center px-2 py-2 text-zinc-400 font-medium w-24">
                     Bid {i + 1}
                   </th>
                 ))}
-                <th className="text-right px-2 py-2 text-zinc-400 font-medium">Spent</th>
+                <th className="text-center px-2 py-2 text-zinc-400 font-medium w-16">+</th>
+                <th className="text-right px-2 py-2 text-zinc-400 font-medium">Left</th>
               </tr>
             </thead>
             <tbody>
               {draftBoard.map((entry, idx) => {
-                const isCurrentThrower = idx === currentThrowerIndex
+                const isCurrentThrower = idx === currentThrowerIndex && !isPlayerDone(idx)
                 return (
                 <tr
                   key={entry.user.id}
@@ -363,8 +398,9 @@ export default async function AuctionPage() {
                     )}
                     <span className="relative">{entry.user.display_name || entry.user.phone}</span>
                   </td>
-                  {Array.from({ length: maxTeamsPerUser }).map((_, i) => {
-                    const teamEntry = entry.teams[i]
+                  {/* Paid teams in main columns */}
+                  {Array.from({ length: teamsPerPlayer }).map((_, i) => {
+                    const teamEntry = entry.paidTeams[i]
                     const d1Team = teamEntry?.team ? findD1Team(teamEntry.team.name) : null
                     return (
                       <td key={i} className="text-center px-1 py-1">
@@ -381,15 +417,32 @@ export default async function AuctionPage() {
                       </td>
                     )
                   })}
+                  {/* Bonus teams column */}
+                  <td className="text-center px-1 py-1">
+                    {entry.bonusTeams.length > 0 ? (
+                      <div className="flex flex-col items-center text-xs leading-tight">
+                        {entry.bonusTeams.map(bt => {
+                          const d1Team = bt.team ? findD1Team(bt.team.name) : null
+                          return (
+                            <span key={bt.id} className="text-zinc-500 text-[10px]">
+                              {bt.team?.seed} {d1Team?.abbreviation || bt.team?.short_name}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-zinc-800">—</span>
+                    )}
+                  </td>
                   <td className="text-right px-2 py-1.5 text-white text-base font-bold">
-                    ${entry.totalSpent}
+                    ${salaryCap - entry.totalSpent}
                   </td>
                 </tr>
               )})}
             </tbody>
           </table>
           <p className="text-xs text-zinc-500 mt-2 text-center">
-            {assignedTeams}/{totalTeams} teams assigned
+            {totalPaidTeams} of {numPlayers * teamsPerPlayer} picks made
           </p>
         </div>
       )}

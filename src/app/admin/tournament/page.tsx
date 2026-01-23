@@ -68,7 +68,6 @@ export default async function TournamentPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Tournament Setup</h2>
         <p className="text-zinc-400">No tournament found. Please set up the tournament in the database.</p>
       </div>
     )
@@ -76,11 +75,6 @@ export default async function TournamentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-xl font-bold">Tournament Setup</h2>
-        <span className="text-sm text-zinc-400">{teams.length}/64 teams</span>
-      </div>
-
       <BracketEditor
         tournament={tournament}
         regions={tournament.regions || []}
@@ -88,7 +82,10 @@ export default async function TournamentPage() {
         games={games}
       />
 
-      <RegionOrderEditor regions={tournament.regions || []} />
+      <RegionOrderEditor
+        regions={tournament.regions || []}
+        tournamentId={tournament.id}
+      />
     </div>
   )
 }

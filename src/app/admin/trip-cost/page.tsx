@@ -15,7 +15,6 @@ export default async function TripCostPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Trip Cost</h2>
         <p className="text-zinc-400">No tournament found. Create one first.</p>
       </div>
     )
@@ -54,7 +53,6 @@ export default async function TripCostPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Trip Cost</h2>
       <TripCostManager
         tournamentId={tournament.id}
         users={users || []}

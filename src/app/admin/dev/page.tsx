@@ -28,7 +28,6 @@ export default async function AdminDevPage() {
   if (!tournament) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold">Dev Tools</h2>
         <p className="text-zinc-400">No tournament found. Create a tournament first.</p>
       </div>
     )
@@ -66,7 +65,6 @@ export default async function AdminDevPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Dev Tools</h2>
       <p className="text-sm text-zinc-400">
         These tools are for testing and development purposes only.
       </p>
