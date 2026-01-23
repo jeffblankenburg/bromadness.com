@@ -49,6 +49,11 @@ body {
   display: none;
 }
 
+/* Position above bottom nav, accounting for safe area */
+.bottom-nav-offset {
+  bottom: calc(2.75rem + env(safe-area-inset-bottom) + 1rem);
+}
+
 /* Rotating border animation */
 @keyframes rotate-border {
   from {

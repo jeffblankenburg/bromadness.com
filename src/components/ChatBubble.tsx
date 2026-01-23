@@ -28,7 +28,7 @@ export function ChatBubble() {
   return (
     <Link
       href="/chat"
-      className="fixed bottom-16 right-4 z-40 w-14 h-14 bg-orange-500 rounded-full shadow-lg flex items-center justify-center hover:bg-orange-600 transition-colors active:scale-95"
+      className="fixed right-4 z-40 w-14 h-14 bg-orange-500 rounded-full shadow-lg flex items-center justify-center hover:bg-orange-600 transition-colors active:scale-95 bottom-nav-offset"
     >
       {/* Chat icon */}
       <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

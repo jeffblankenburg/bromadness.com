@@ -133,11 +133,21 @@ export default function ChatPage() {
   useEffect(() => {
     if (messages.length > 0) {
       if (isInitialLoad.current) {
-        // Use requestAnimationFrame to ensure DOM is painted
+        const scrollToBottom = () => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        }
+
+        // Scroll multiple times to catch late-loading content (like GIFs)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-            isInitialLoad.current = false
+            scrollToBottom()
+            // Scroll again after short delays to catch images loading
+            setTimeout(scrollToBottom, 100)
+            setTimeout(scrollToBottom, 300)
+            setTimeout(() => {
+              scrollToBottom()
+              isInitialLoad.current = false
+            }, 500)
           })
         })
       } else if (shouldAutoScroll.current) {

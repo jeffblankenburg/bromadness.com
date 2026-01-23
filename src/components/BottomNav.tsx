@@ -66,19 +66,32 @@ export function BottomNav() {
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase
-          .from('users')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        setIsAdmin(data?.is_admin ?? false)
-      }
+    const supabase = createClient()
+
+    const checkAdmin = async (userId: string) => {
+      const { data } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('id', userId)
+        .single()
+      setIsAdmin(data?.is_admin ?? false)
     }
-    checkAdmin()
+
+    // Check initial state
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) checkAdmin(user.id)
+    })
+
+    // Listen for auth state changes (e.g., after login redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        checkAdmin(session.user.id)
+      } else {
+        setIsAdmin(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   // Don't show nav on auth pages
