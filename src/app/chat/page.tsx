@@ -9,6 +9,7 @@ interface Message {
   id: string
   content: string | null
   gif_url: string | null
+  image_url: string | null
   created_at: string
   user: { id: string; display_name: string | null } | null
 }
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const gifSearchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Mark as read on mount
   useEffect(() => {
@@ -80,6 +82,7 @@ export default function ChatPage() {
               id,
               content,
               gif_url,
+              image_url,
               created_at,
               user:users!chat_messages_user_id_fkey(id, display_name)
             `)
@@ -92,6 +95,7 @@ export default function ChatPage() {
               id: newMessage.id,
               content: newMessage.content,
               gif_url: newMessage.gif_url,
+              image_url: newMessage.image_url,
               created_at: newMessage.created_at,
               user: Array.isArray(newMessage.user) ? newMessage.user[0] : newMessage.user
             }
@@ -302,6 +306,92 @@ export default function ChatPage() {
     }
   }
 
+  // Compress image using canvas
+  const compressImage = (file: File, maxWidth: number, quality: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = document.createElement('img')
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'))
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob)
+            else reject(new Error('Failed to compress image'))
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || sending) return
+
+    // Reset input so same file can be selected again
+    e.target.value = ''
+
+    setSending(true)
+
+    try {
+      // Compress image (max 800px wide, 70% quality)
+      const compressed = await compressImage(file, 800, 0.7)
+
+      // Upload to storage
+      const formData = new FormData()
+      formData.append('image', compressed, 'photo.jpg')
+
+      const uploadRes = await fetch('/api/chat-images/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        const error = await uploadRes.json()
+        throw new Error(error.error || 'Upload failed')
+      }
+
+      const { url } = await uploadRes.json()
+
+      // Send message with image
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: url }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setMessages(prev => [...prev, data.message])
+      }
+    } catch (error) {
+      console.error('Failed to send photo:', error)
+      alert('Failed to upload photo. Please try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
@@ -381,15 +471,15 @@ export default function ChatPage() {
                 </span>
                 <span className="text-xs text-zinc-500">{formatTime(msg.created_at)}</span>
               </div>
-              {msg.gif_url ? (
+              {msg.gif_url || msg.image_url ? (
                 <div className={`px-4 py-2 max-w-[85%] ${
                   isOwnMessage
                     ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
                     : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                 }`}>
                   <Image
-                    src={msg.gif_url}
-                    alt="GIF"
+                    src={msg.gif_url || msg.image_url || ''}
+                    alt={msg.gif_url ? 'GIF' : 'Photo'}
                     width={200}
                     height={150}
                     className="rounded-lg max-w-[200px]"
@@ -472,6 +562,14 @@ export default function ChatPage() {
 
       {/* Input - never scrolls */}
       <div className="flex-none border-t border-zinc-800 p-3 bg-zinc-900">
+        {/* Hidden file input for photos */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoSelect}
+          className="hidden"
+        />
         <div className="flex gap-2">
           <button
             onClick={() => setShowGifPicker(!showGifPicker)}
@@ -482,6 +580,15 @@ export default function ChatPage() {
             }`}
           >
             GIF
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            className="px-2 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
           </button>
           <input
             type="text"

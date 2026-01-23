@@ -26,6 +26,7 @@ export async function GET(request: Request) {
         id,
         content,
         gif_url,
+        image_url,
         created_at,
         user:users!chat_messages_user_id_fkey(id, display_name)
       `)
@@ -65,25 +66,27 @@ export async function POST(request: Request) {
     // Get active user ID (may be simulated)
     const activeUserId = await getActiveUserId(user.id)
 
-    const { content, gif_url } = await request.json()
+    const { content, gif_url, image_url } = await request.json()
 
-    // Must have either content or gif_url
+    // Must have either content, gif_url, or image_url
     const hasContent = content && typeof content === 'string' && content.trim().length > 0
     const hasGif = gif_url && typeof gif_url === 'string' && gif_url.startsWith('https://media')
+    const hasImage = image_url && typeof image_url === 'string' && image_url.startsWith('http')
 
-    if (!hasContent && !hasGif) {
-      return NextResponse.json({ error: 'Message content or GIF required' }, { status: 400 })
+    if (!hasContent && !hasGif && !hasImage) {
+      return NextResponse.json({ error: 'Message content, GIF, or image required' }, { status: 400 })
     }
 
     if (hasContent && content.length > 500) {
       return NextResponse.json({ error: 'Message too long (max 500 chars)' }, { status: 400 })
     }
 
-    const insertData: { user_id: string; content?: string; gif_url?: string } = {
+    const insertData: { user_id: string; content?: string; gif_url?: string; image_url?: string } = {
       user_id: activeUserId,
     }
     if (hasContent) insertData.content = content.trim()
     if (hasGif) insertData.gif_url = gif_url
+    if (hasImage) insertData.image_url = image_url
 
     // Use admin client if simulating (to bypass RLS)
     const simulatedUserId = await getSimulatedUserId()
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
         id,
         content,
         gif_url,
+        image_url,
         created_at,
         user:users!chat_messages_user_id_fkey(id, display_name)
       `)
