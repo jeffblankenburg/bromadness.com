@@ -411,8 +411,8 @@ export function BracketView({ tournament, regions, teams, games, userPicks = [] 
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
           </svg>
         </Link>
-        <h1 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-          {tournament.year} Bracket
+        <h1 className="text-lg font-bold text-white uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+          {tournament.year} Brocket
         </h1>
         <div className="w-8" />
       </div>
