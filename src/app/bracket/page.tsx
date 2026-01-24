@@ -50,23 +50,37 @@ export default async function BracketPage() {
     .order('round')
     .order('game_number')
 
-  // Get user's pick'em picks - use real user, not simulated
-  const { data: pickemEntry } = await supabase
-    .from('pickem_entries')
+  // Get user's pick'em picks
+  // First get pickem_days for this tournament
+  const { data: pickemDays } = await supabase
+    .from('pickem_days')
     .select('id')
     .eq('tournament_id', tournament.id)
-    .eq('user_id', user.id)
-    .maybeSingle()
 
   let userPicks: { game_id: string; picked_team_id: string }[] = []
-  if (pickemEntry?.id) {
-    const { data: picks } = await supabase
-      .from('pickem_picks')
-      .select('game_id, picked_team_id')
-      .eq('entry_id', pickemEntry.id)
-      .not('picked_team_id', 'is', null)
 
-    userPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
+  if (pickemDays && pickemDays.length > 0) {
+    const dayIds = pickemDays.map(d => d.id)
+
+    // Get user's entries for these days
+    const { data: userEntries } = await supabase
+      .from('pickem_entries')
+      .select('id')
+      .eq('user_id', activeUserId)
+      .in('pickem_day_id', dayIds)
+
+    if (userEntries && userEntries.length > 0) {
+      const entryIds = userEntries.map(e => e.id)
+
+      // Get all picks for these entries
+      const { data: picks } = await supabase
+        .from('pickem_picks')
+        .select('game_id, picked_team_id')
+        .in('entry_id', entryIds)
+        .not('picked_team_id', 'is', null)
+
+      userPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
+    }
   }
 
   return (
