@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/admin/pickem', label: "Pick'em" },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/trip-cost', label: 'Trip Cost' },
+  { href: '/admin/payouts', label: 'Payouts' },
   { href: '/admin/menu', label: 'Food Menu' },
   { href: '/admin/dev', label: 'Dev' },
 ]

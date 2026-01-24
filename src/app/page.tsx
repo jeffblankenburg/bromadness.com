@@ -90,13 +90,11 @@ export default async function Home() {
     points: number
   }> = []
   let userTotalPoints = 0
-  let userPlace = 0
-  let userPayout = 0
   let userAuctionTeamIds: string[] = []
   let userPickemTeamIds: string[] = []
-  let userPickemPayout = 0
   let tripBalance = 0
   let simulatedTime: string | null = null
+  let totalWinnings = 0
 
   if (tournament) {
     simulatedTime = tournament.dev_simulated_time as string | null
@@ -206,46 +204,9 @@ export default async function Home() {
     const sortedUsers = Object.entries(userPoints)
       .sort(([, a], [, b]) => b - a)
 
-    // Find current user's place and calculate payout
+    // Find current user's points
     if (user) {
       userTotalPoints = userPoints[activeUserId] || 0
-      const userIndex = sortedUsers.findIndex(([id]) => id === activeUserId)
-      userPlace = userIndex >= 0 ? userIndex + 1 : 0
-
-      // Calculate payout considering ties
-      const payouts = tournament.auction_payouts as {
-        points_1st?: number
-        points_2nd?: number
-        points_3rd?: number
-        points_4th?: number
-      } | null
-
-      if (payouts && userPlace > 0 && userPlace <= 4) {
-        const payoutAmounts = [
-          payouts.points_1st || 0,
-          payouts.points_2nd || 0,
-          payouts.points_3rd || 0,
-          payouts.points_4th || 0,
-        ]
-
-        // Find all users tied with current user
-        const tiedUsers = sortedUsers.filter(([, pts]) => pts === userTotalPoints)
-        const tiedCount = tiedUsers.length
-
-        // Find the starting position (1-indexed)
-        const startPos = sortedUsers.findIndex(([, pts]) => pts === userTotalPoints) + 1
-
-        // Sum up all payouts for positions occupied by tied users
-        let totalPayout = 0
-        for (let i = startPos; i < startPos + tiedCount && i <= 4; i++) {
-          totalPayout += payoutAmounts[i - 1]
-        }
-
-        // Split equally among tied users
-        if (totalPayout > 0) {
-          userPayout = Math.round((totalPayout / tiedCount) * 100) / 100
-        }
-      }
 
       // Get user's teams
       const userTeams = (allAuctionData || []).filter(a => a.user_id === activeUserId)
@@ -283,136 +244,6 @@ export default async function Home() {
           .filter((id): id is string => id !== null)
       }
 
-      // Calculate user's pick'em payout
-      // Entry fee per day, payouts auto-calculated: 1st=60%, 2nd=30%, 3rd=10%
-      const pickemConfig = tournament.pickem_payouts as { entry_fee?: number } | null
-      const entryFee = pickemConfig?.entry_fee || 10
-
-      // Get pickem days for this tournament
-      const { data: pickemDays } = await supabase
-        .from('pickem_days')
-        .select('id, contest_date')
-        .eq('tournament_id', tournament.id)
-
-      if (pickemDays && pickemDays.length > 0) {
-        const dayIds = pickemDays.map(d => d.id)
-
-        // Get all paid entries
-        const { data: allEntries } = await supabase
-          .from('pickem_entries')
-          .select('id, user_id, pickem_day_id, has_paid')
-          .in('pickem_day_id', dayIds)
-          .eq('has_paid', true)
-
-        // Get round 1 games (pick'em games) with results
-        const { data: pickemGames } = await supabase
-          .from('games')
-          .select('id, scheduled_at, winner_id')
-          .eq('tournament_id', tournament.id)
-          .eq('round', 1)
-          .not('winner_id', 'is', null)
-          .order('scheduled_at')
-
-        if (allEntries && pickemGames && pickemGames.length > 0) {
-          const gameIds = pickemGames.map(g => g.id)
-          const entryIds = allEntries.map(e => e.id)
-
-          // Get all picks for completed games
-          const { data: allPicks } = await supabase
-            .from('pickem_picks')
-            .select('id, entry_id, game_id, is_correct')
-            .in('entry_id', entryIds)
-            .in('game_id', gameIds)
-
-          if (allPicks) {
-            // Group games by date and session
-            const gamesByDate: Record<string, typeof pickemGames> = {}
-            for (const game of pickemGames) {
-              if (game.scheduled_at) {
-                const date = game.scheduled_at.split('T')[0]
-                if (!gamesByDate[date]) gamesByDate[date] = []
-                gamesByDate[date].push(game)
-              }
-            }
-
-            // Calculate payouts for each session the user is in the money
-            for (const date of Object.keys(gamesByDate)) {
-              const dayGames = gamesByDate[date]
-              const midpoint = Math.ceil(dayGames.length / 2)
-              const sessions = [
-                dayGames.slice(0, midpoint),
-                dayGames.slice(midpoint),
-              ]
-
-              const pickemDay = pickemDays.find(d => d.contest_date === date)
-              if (!pickemDay) continue
-
-              // Calculate session pot for this day
-              const paidEntriesForDay = allEntries.filter(e => e.pickem_day_id === pickemDay.id).length
-              const dayPot = paidEntriesForDay * entryFee
-              const sessionPot = dayPot / 2
-              const sessionPayouts = {
-                first: Math.floor(sessionPot * 0.6),
-                second: Math.floor(sessionPot * 0.3),
-                third: Math.floor(sessionPot * 0.1),
-              }
-
-              for (const sessionGames of sessions) {
-                if (sessionGames.length === 0) continue
-                const sessionGameIds = sessionGames.map(g => g.id)
-
-                // Calculate correct picks per user for this session
-                const userCorrectPicks: Record<string, number> = {}
-                const dayEntries = allEntries.filter(e => e.pickem_day_id === pickemDay.id)
-
-                for (const entry of dayEntries) {
-                  const entryPicks = allPicks.filter(p =>
-                    p.entry_id === entry.id &&
-                    p.game_id &&
-                    sessionGameIds.includes(p.game_id) &&
-                    p.is_correct === true
-                  )
-                  userCorrectPicks[entry.user_id] = entryPicks.length
-                }
-
-                // Sort by correct picks to get rankings
-                const sortedPickemUsers = Object.entries(userCorrectPicks)
-                  .sort(([, a], [, b]) => b - a)
-
-                const userScore = userCorrectPicks[activeUserId] || 0
-                if (userScore === 0) continue
-
-                // Find user's rank (with ties)
-                const rank = sortedPickemUsers.findIndex(([, score]) => score === userScore) + 1
-
-                if (rank <= 3) {
-                  const payoutAmounts = [
-                    sessionPayouts.first,
-                    sessionPayouts.second,
-                    sessionPayouts.third,
-                  ]
-
-                  // Find all users tied at this score
-                  const tiedUsers = sortedPickemUsers.filter(([, score]) => score === userScore)
-                  const tiedCount = tiedUsers.length
-
-                  // Sum payouts for positions occupied by tied users
-                  let totalPayout = 0
-                  for (let i = rank; i < rank + tiedCount && i <= 3; i++) {
-                    totalPayout += payoutAmounts[i - 1]
-                  }
-
-                  // Split equally (round down to whole dollars)
-                  if (totalPayout > 0) {
-                    userPickemPayout += Math.floor(totalPayout / tiedCount)
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
       // Get user's trip cost balance
       const { data: tripCost } = await supabase
         .from('trip_costs')
@@ -430,25 +261,68 @@ export default async function Home() {
         const totalPaid = (tripPayments || []).reduce((sum, p) => sum + p.amount, 0)
         tripBalance = tripCost.amount_owed - totalPaid
       }
+
+      // Get total paid winnings for this user
+      const { data: paidPayouts } = await supabase
+        .from('payouts')
+        .select('amount')
+        .eq('tournament_id', tournament.id)
+        .eq('user_id', activeUserId)
+        .eq('is_paid', true)
+
+      totalWinnings = (paidPayouts || []).reduce((sum, p) => sum + p.amount, 0)
     }
   }
 
   const currentDay = getTournamentDay(tournament?.start_date ?? null)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white flex flex-col items-center p-6 pt-8">
+    <div
+      className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white flex flex-col items-center px-6 pb-6"
+      style={{
+        marginTop: 'calc(-1 * (env(safe-area-inset-top) + 12px))',
+        paddingTop: 'env(safe-area-inset-top)'
+      }}
+    >
       {/* DEV ONLY - Toggle with SHOW_DEV_TOOLS flag */}
       {SHOW_DEV_TOOLS && user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
 
+      {/* Page Header */}
+      <h1 className="text-xl font-bold text-orange-500 mb-4" style={{ fontFamily: 'var(--font-display)' }}>
+        Welcome to Bro Madness
+      </h1>
+
       <div className="text-center space-y-6 w-full max-w-sm">
             <div className="space-y-4">
-              {profile?.display_name && (
-                <h1
-                  className="text-4xl text-orange-400 uppercase tracking-wide"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  {profile.display_name}
-                </h1>
+              {/* Name and Winnings */}
+              {totalWinnings > 0 ? (
+                <div className="flex items-center justify-between">
+                  {profile?.display_name && (
+                    <h1
+                      className="text-4xl text-orange-400 uppercase tracking-wide text-left"
+                      style={{ fontFamily: 'var(--font-display)' }}
+                    >
+                      {profile.display_name}
+                    </h1>
+                  )}
+                  <div className="w-20 h-20 flex-shrink-0 bg-gradient-to-br from-green-900/60 to-emerald-900/60 border border-green-500/50 rounded-xl flex flex-col items-center justify-center">
+                    <div className="text-green-400 text-[10px] font-medium uppercase tracking-wide">
+                      Winnings
+                    </div>
+                    <div className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                      ${totalWinnings}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                profile?.display_name && (
+                  <h1
+                    className="text-4xl text-orange-400 uppercase tracking-wide"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {profile.display_name}
+                  </h1>
+                )
               )}
 
               {/* Trip Balance Reminder */}
@@ -466,7 +340,6 @@ export default async function Home() {
                   games={currentGames}
                   userAuctionTeamIds={userAuctionTeamIds}
                   userPickemTeamIds={userPickemTeamIds}
-                  pickemPayout={userPickemPayout}
                   simulatedTime={simulatedTime}
                 />
               )}
@@ -475,7 +348,6 @@ export default async function Home() {
               <AuctionTeamsCard
                 teams={userAuctionTeams}
                 totalPoints={userTotalPoints}
-                payout={userPayout}
               />
 
               {/* Today's Menu */}

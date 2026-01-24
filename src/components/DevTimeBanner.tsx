@@ -25,7 +25,7 @@ const formatTime = (timeStr: string) => {
 
 export function DevTimeBanner({ simulatedTime }: Props) {
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-purple-500/90 text-white px-4 py-1.5 text-xs text-center">
+    <div className="fixed left-0 right-0 z-50 bg-purple-500/90 text-white px-4 py-1.5 text-xs text-center" style={{ top: 'env(safe-area-inset-top)' }}>
       <span className="font-bold">DEV MODE:</span> Simulated time is {formatTime(simulatedTime)}
     </div>
   )

@@ -24,7 +24,10 @@ export function SimulatedUserBanner({ userName, hasDevBanner = false }: Props) {
   }
 
   return (
-    <div className={`fixed left-0 right-0 z-50 bg-purple-500/90 text-white px-4 py-1.5 text-xs text-center ${hasDevBanner ? 'top-8' : 'top-0'}`}>
+    <div
+      className="fixed left-0 right-0 z-50 bg-purple-500/90 text-white px-4 py-1.5 text-xs text-center"
+      style={{ top: hasDevBanner ? 'calc(env(safe-area-inset-top) + 2rem)' : 'env(safe-area-inset-top)' }}
+    >
       <span className="font-bold">SIMULATING:</span> {userName}
       <button
         onClick={handleStop}

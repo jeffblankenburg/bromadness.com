@@ -296,6 +296,7 @@ export function PickemClient({
   // Calculate standings for a session
   const calculateSessionStandings = (sessionGames: Game[]) => {
     const completedGames = sessionGames.filter(g => g.winner_id !== null)
+      .sort((a, b) => parseTimestamp(a.scheduled_at || '').getTime() - parseTimestamp(b.scheduled_at || '').getTime())
     const completedGameIds = completedGames.map(g => g.id)
     const sessionGameIds = sessionGames.map(g => g.id)
     const dayEntries = currentDay
@@ -311,19 +312,15 @@ export function PickemClient({
         p.is_correct === true && completedGameIds.includes(p.game_id!)
       ).length
 
-      // Tiebreaker
-      const sortedPicks = entryPicks
-        .filter(pick => completedGameIds.includes(pick.game_id!))
-        .map(pick => {
-          const game = completedGames.find(g => g.id === pick.game_id)
-          return { ...pick, scheduled_at: game?.scheduled_at || '' }
-        })
-        .sort((a, b) => parseTimestamp(a.scheduled_at).getTime() - parseTimestamp(b.scheduled_at).getTime())
-
+      // Tiebreaker: check each completed game in order
+      // Missing picks count as losses!
       let firstLoss: number | null = null
       let secondLoss: number | null = null
-      sortedPicks.forEach((pick, index) => {
-        if (pick.is_correct === false) {
+      completedGames.forEach((game, index) => {
+        const pick = entryPicks.find(p => p.game_id === game.id)
+        // Loss = no pick made OR pick was incorrect
+        const isLoss = !pick || pick.is_correct === false
+        if (isLoss) {
           if (firstLoss === null) firstLoss = index + 1
           else if (secondLoss === null) secondLoss = index + 1
         }
@@ -355,8 +352,23 @@ export function PickemClient({
   }
 
   const getRank = (standings: ReturnType<typeof calculateSessionStandings>, index: number) => {
-    const currentScore = standings[index].correct_picks
-    return standings.findIndex(s => s.correct_picks === currentScore) + 1
+    const current = standings[index]
+    // Find rank by checking all tiebreaker values, not just correct_picks
+    return standings.findIndex(s =>
+      s.correct_picks === current.correct_picks &&
+      s.second_loss === current.second_loss &&
+      s.first_loss === current.first_loss
+    ) + 1
+  }
+
+  // Check if two standings entries are truly tied
+  const isTied = (standings: ReturnType<typeof calculateSessionStandings>, index: number) => {
+    if (index >= standings.length - 1) return false
+    const current = standings[index]
+    const next = standings[index + 1]
+    return current.correct_picks === next.correct_picks &&
+           current.second_loss === next.second_loss &&
+           current.first_loss === next.first_loss
   }
 
   const renderGame = (game: Game) => {
@@ -471,17 +483,33 @@ export function PickemClient({
       )
     }
 
+    // Count truly tied entries (same score AND same tiebreakers)
+    const getTiedCount = (index: number) => {
+      const current = standings[index]
+      return standings.filter(s =>
+        s.correct_picks === current.correct_picks &&
+        s.second_loss === current.second_loss &&
+        s.first_loss === current.first_loss
+      ).length
+    }
+
     return (
       <div className="space-y-1">
         {standings.map((standing, index) => {
           const rank = getRank(standings, index)
-          const tiedCount = standings.filter(s => s.correct_picks === standing.correct_picks).length
+          const tiedCount = getTiedCount(index)
           const payoutAmounts = [sessionPayouts.first, sessionPayouts.second, sessionPayouts.third]
           let totalPayoutForTie = 0
           for (let pos = rank; pos < rank + tiedCount && pos <= 3; pos++) {
             totalPayoutForTie += payoutAmounts[pos - 1]
           }
           const payout = totalPayoutForTie > 0 ? Math.floor(totalPayoutForTie / tiedCount) : 0
+
+          // Show tiebreaker info if there are others with same correct picks
+          const othersWithSameScore = standings.filter(s =>
+            s.correct_picks === standing.correct_picks && s.user_id !== standing.user_id
+          )
+          const showTiebreaker = othersWithSameScore.length > 0 && standing.first_loss !== null
 
           return (
             <div
@@ -499,9 +527,16 @@ export function PickemClient({
                 }`}>
                   {rank}
                 </span>
-                <span className={standing.is_current_user ? 'font-medium' : ''}>
-                  {standing.display_name}
-                </span>
+                <div className="flex flex-col">
+                  <span className={standing.is_current_user ? 'font-medium' : ''}>
+                    {standing.display_name}
+                  </span>
+                  {showTiebreaker && (
+                    <span className="text-xs text-zinc-500">
+                      1st miss: G{standing.first_loss}{standing.second_loss ? `, 2nd: G${standing.second_loss}` : ''}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-zinc-400">
