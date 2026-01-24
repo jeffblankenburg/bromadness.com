@@ -83,7 +83,7 @@ function TeamCell({
 
   return (
     <div
-      className={`flex items-center gap-1 px-1 ${showAsWinner ? 'bg-green-900/50' : 'bg-zinc-800'} ${borderClasses}`}
+      className={`flex items-center gap-1 px-1 ${showAsWinner ? 'bg-green-900/50' : ''} ${borderClasses}`}
       style={{ height: CELL_HEIGHT, width: GAME_WIDTH }}
     >
       <span className="text-[9px] text-zinc-500 w-3 text-center flex-shrink-0">
