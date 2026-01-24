@@ -68,19 +68,32 @@ function TeamCell({
     borderLeft ? 'border-l border-zinc-500' : '',
   ].filter(Boolean).join(' ')
 
+  // Only show winner styling if there's actually a team
+  const showAsWinner = isWinner && team
+
+  // If no team, render empty cell
+  if (!team) {
+    return (
+      <div
+        className={`${borderClasses}`}
+        style={{ height: CELL_HEIGHT, width: GAME_WIDTH }}
+      />
+    )
+  }
+
   return (
     <div
-      className={`flex items-center gap-1 px-1 ${isWinner ? 'bg-green-900/50' : 'bg-zinc-800'} ${borderClasses}`}
+      className={`flex items-center gap-1 px-1 ${showAsWinner ? 'bg-green-900/50' : 'bg-zinc-800'} ${borderClasses}`}
       style={{ height: CELL_HEIGHT, width: GAME_WIDTH }}
     >
       <span className="text-[9px] text-zinc-500 w-3 text-center flex-shrink-0">
-        {team?.seed || ''}
+        {team.seed}
       </span>
-      <span className={`text-[10px] flex-1 truncate ${isWinner ? 'text-white font-semibold' : 'text-zinc-300'}`}>
-        {team?.short_name || team?.name || 'TBD'}
+      <span className={`text-[10px] flex-1 truncate ${showAsWinner ? 'text-white font-semibold' : 'text-zinc-300'}`}>
+        {team.short_name || team.name}
       </span>
       {score != null && (
-        <span className={`text-[9px] flex-shrink-0 ${isWinner ? 'text-white font-bold' : 'text-zinc-500'}`}>
+        <span className={`text-[9px] flex-shrink-0 ${showAsWinner ? 'text-white font-bold' : 'text-zinc-500'}`}>
           {score}
         </span>
       )}
