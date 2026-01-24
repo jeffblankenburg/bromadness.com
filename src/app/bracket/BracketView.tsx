@@ -172,7 +172,6 @@ function RegionBracket({
         score={r1Score ?? undefined}
         isWinner={!!r1IsWinner}
         borderBottom={isR1Top}
-        {...{ [borderSide]: true }}
       />
     )
 
