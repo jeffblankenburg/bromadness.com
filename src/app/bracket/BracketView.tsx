@@ -177,13 +177,12 @@ function RegionBracket({
     )
 
     // === CONNECTOR R1->R2 ===
-    // Connection pattern for 4-row blocks: top row has bottom border, rows in between have side border
-    const r1Block = Math.floor(row / 4)
+    // R1 games at rows 0-1 and 2-3 connect to R2 game at rows 1-2
     const r1PosInBlock = row % 4
-    // Top game exits at row 0, bottom game exits at row 2, they meet at row 1
-    // Border on right/left side for rows 0 and 2, horizontal at row 1
+    // Horizontal lines exit from between team1/team2 of each R1 game (rows 0 and 2)
     const c1BottomBorder = r1PosInBlock === 0 || r1PosInBlock === 2
-    const c1SideBorder = r1PosInBlock === 0 || r1PosInBlock === 1 || r1PosInBlock === 2
+    // Vertical line spans from row 1 to row 2 (connecting the two exit points)
+    const c1SideBorder = r1PosInBlock === 1 || r1PosInBlock === 2
     cells.push(
       <EmptyCell
         key="c1"
@@ -210,7 +209,6 @@ function RegionBracket({
           score={r2Score ?? undefined}
           isWinner={!!r2IsWinner}
           borderBottom={isTop}
-          {...{ [borderSide]: true }}
         />
       )
     } else {
@@ -218,13 +216,12 @@ function RegionBracket({
     }
 
     // === CONNECTOR R2->R3 ===
-    // Connection pattern for 8-row blocks
-    const r2Block = Math.floor(row / 8)
+    // R2 games at rows 1-2 and 5-6 connect to R3 game at rows 3-4
     const r2PosInBlock = row % 8
-    // Games at rows 1-2 and 5-6 within each 8-row block connect to game at 3-4
-    // Top game (1-2) connects down, bottom game (5-6) connects up, meet at row 3-4
+    // Horizontal lines exit from between team1/team2 of each R2 game
     const c2BottomBorder = r2PosInBlock === 1 || r2PosInBlock === 5
-    const c2SideBorder = r2PosInBlock >= 1 && r2PosInBlock <= 5
+    // Vertical line spans from row 2 to row 5 (connecting the two exit points)
+    const c2SideBorder = r2PosInBlock >= 2 && r2PosInBlock <= 5
     cells.push(
       <EmptyCell
         key="c2"
@@ -251,7 +248,6 @@ function RegionBracket({
           score={r3Score ?? undefined}
           isWinner={!!r3IsWinner}
           borderBottom={isTop}
-          {...{ [borderSide]: true }}
         />
       )
     } else {
@@ -259,9 +255,11 @@ function RegionBracket({
     }
 
     // === CONNECTOR R3->R4 ===
-    // Connection for 16 rows - games at 3-4 and 11-12 connect to game at 7-8
+    // R3 games at rows 3-4 and 11-12 connect to R4 game at rows 7-8
+    // Horizontal lines exit from between team1/team2 of each R3 game
     const c3BottomBorder = row === 3 || row === 11
-    const c3SideBorder = row >= 3 && row <= 11
+    // Vertical line spans from row 4 to row 11 (connecting the two exit points)
+    const c3SideBorder = row >= 4 && row <= 11
     cells.push(
       <EmptyCell
         key="c3"
