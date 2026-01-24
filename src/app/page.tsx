@@ -375,18 +375,10 @@ export default async function Home() {
 
               {/* Bracket Link */}
               <Link href="/bracket" className="block">
-                <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 hover:bg-zinc-700 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-orange-400 font-bold uppercase tracking-wide text-sm" style={{ fontFamily: 'var(--font-display)' }}>
-                        Brocket
-                      </h3>
-                      <p className="text-zinc-400 text-xs">View the full tournament bracket</p>
-                    </div>
-                    <svg className="w-5 h-5 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                    </svg>
-                  </div>
+                <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 hover:bg-zinc-700 transition-colors text-center">
+                  <span className="text-orange-400 font-bold uppercase tracking-wide text-sm" style={{ fontFamily: 'var(--font-display)' }}>
+                    View the Brocket
+                  </span>
                 </div>
               </Link>
             </div>
