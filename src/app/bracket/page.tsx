@@ -56,16 +56,17 @@ export default async function BracketPage() {
     .select('id')
     .eq('tournament_id', tournament.id)
     .eq('user_id', activeUserId)
-    .single()
+    .maybeSingle()
 
   let userPicks: { game_id: string; picked_team_id: string }[] = []
-  if (pickemEntry) {
+  if (pickemEntry?.id) {
     const { data: picks } = await supabase
       .from('pickem_picks')
       .select('game_id, picked_team_id')
       .eq('entry_id', pickemEntry.id)
+      .not('picked_team_id', 'is', null)
 
-    userPicks = (picks || []).filter(p => p.picked_team_id !== null) as { game_id: string; picked_team_id: string }[]
+    userPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
   }
 
   return (
