@@ -96,14 +96,14 @@ function TeamCell({
       <span className="text-[9px] text-zinc-500 w-3 text-center flex-shrink-0">
         {team.seed}
       </span>
-      <span className={`text-[10px] flex-1 truncate ${showAsWinner ? 'text-white font-semibold' : 'text-zinc-300'}`}>
-        {team.short_name || team.name}
+      <span className={`text-[10px] flex-1 flex items-center gap-0.5 min-w-0 ${showAsWinner ? 'text-white font-semibold' : 'text-zinc-300'}`}>
+        <span className="truncate">{team.short_name || team.name}</span>
+        {isPicked && (
+          <svg className="w-3 h-3 flex-shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        )}
       </span>
-      {isPicked && (
-        <svg className="w-3 h-3 flex-shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-        </svg>
-      )}
       {score != null && (
         <span className={`text-[9px] flex-shrink-0 ${showAsWinner ? 'text-white font-bold' : 'text-zinc-500'}`}>
           {score}
