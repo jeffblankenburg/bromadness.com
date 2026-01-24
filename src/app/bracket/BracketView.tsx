@@ -34,11 +34,17 @@ interface Tournament {
   year: number
 }
 
+interface Pick {
+  game_id: string
+  picked_team_id: string
+}
+
 interface Props {
   tournament: Tournament
   regions: Region[]
   teams: Team[]
   games: Game[]
+  userPicks?: Pick[]
 }
 
 const CELL_HEIGHT = 24 // Height of each cell row
@@ -50,6 +56,7 @@ function TeamCell({
   team,
   score,
   isWinner,
+  isPicked = false,
   borderBottom = false,
   borderRight = false,
   borderLeft = false,
@@ -57,6 +64,7 @@ function TeamCell({
   team: Team | null | undefined
   score: number | null | undefined
   isWinner: boolean
+  isPicked?: boolean
   borderBottom?: boolean
   borderRight?: boolean
   borderLeft?: boolean
@@ -91,6 +99,11 @@ function TeamCell({
       <span className={`text-[10px] flex-1 truncate ${showAsWinner ? 'text-white font-semibold' : 'text-zinc-300'}`}>
         {team.short_name || team.name}
       </span>
+      {isPicked && (
+        <svg className="w-3 h-3 flex-shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+      )}
       {score != null && (
         <span className={`text-[9px] flex-shrink-0 ${showAsWinner ? 'text-white font-bold' : 'text-zinc-500'}`}>
           {score}
@@ -126,11 +139,13 @@ function RegionBracket({
   region,
   games,
   teams,
+  userPicks = [],
   flowDirection = 'right'
 }: {
   region: Region
   games: Game[]
   teams: Team[]
+  userPicks?: Pick[]
   flowDirection?: 'left' | 'right'
 }) {
   const regionGames = games.filter(g => g.region_id === region.id)
@@ -141,6 +156,11 @@ function RegionBracket({
 
   const getTeam = (teamId: string | null) =>
     teamId ? regionTeams.find(t => t.id === teamId) || teams.find(t => t.id === teamId) : null
+
+  const isPicked = (gameId: string | undefined, teamId: string | null) => {
+    if (!gameId || !teamId) return false
+    return userPicks.some(p => p.game_id === gameId && p.picked_team_id === teamId)
+  }
 
   const r1Games = getGamesForRound(1)
   const r2Games = getGamesForRound(2)
@@ -160,9 +180,10 @@ function RegionBracket({
     const r1GameIdx = Math.floor(row / 2)
     const r1Game = r1Games[r1GameIdx]
     const isR1Top = row % 2 === 0
-    const r1Team = isR1Top ? getTeam(r1Game?.team1_id || null) : getTeam(r1Game?.team2_id || null)
+    const r1TeamId = isR1Top ? r1Game?.team1_id : r1Game?.team2_id
+    const r1Team = getTeam(r1TeamId || null)
     const r1Score = isR1Top ? r1Game?.team1_score : r1Game?.team2_score
-    const r1IsWinner = r1Game?.winner_id === (isR1Top ? r1Game?.team1_id : r1Game?.team2_id)
+    const r1IsWinner = r1Game?.winner_id === r1TeamId
 
     cells.push(
       <TeamCell
@@ -170,6 +191,7 @@ function RegionBracket({
         team={r1Team}
         score={r1Score ?? undefined}
         isWinner={!!r1IsWinner}
+        isPicked={isPicked(r1Game?.id, r1TeamId || null)}
         borderBottom={isR1Top}
       />
     )
@@ -197,15 +219,17 @@ function RegionBracket({
 
     if (r2RowInGame === 1 || r2RowInGame === 2) {
       const isTop = r2RowInGame === 1
-      const r2Team = isTop ? getTeam(r2Game?.team1_id || null) : getTeam(r2Game?.team2_id || null)
+      const r2TeamId = isTop ? r2Game?.team1_id : r2Game?.team2_id
+      const r2Team = getTeam(r2TeamId || null)
       const r2Score = isTop ? r2Game?.team1_score : r2Game?.team2_score
-      const r2IsWinner = r2Game?.winner_id === (isTop ? r2Game?.team1_id : r2Game?.team2_id)
+      const r2IsWinner = r2Game?.winner_id === r2TeamId
       cells.push(
         <TeamCell
           key="r2"
           team={r2Team}
           score={r2Score ?? undefined}
           isWinner={!!r2IsWinner}
+          isPicked={isPicked(r2Game?.id, r2TeamId || null)}
           borderBottom={isTop}
         />
       )
@@ -236,15 +260,17 @@ function RegionBracket({
 
     if (r3RowInGame === 3 || r3RowInGame === 4) {
       const isTop = r3RowInGame === 3
-      const r3Team = isTop ? getTeam(r3Game?.team1_id || null) : getTeam(r3Game?.team2_id || null)
+      const r3TeamId = isTop ? r3Game?.team1_id : r3Game?.team2_id
+      const r3Team = getTeam(r3TeamId || null)
       const r3Score = isTop ? r3Game?.team1_score : r3Game?.team2_score
-      const r3IsWinner = r3Game?.winner_id === (isTop ? r3Game?.team1_id : r3Game?.team2_id)
+      const r3IsWinner = r3Game?.winner_id === r3TeamId
       cells.push(
         <TeamCell
           key="r3"
           team={r3Team}
           score={r3Score ?? undefined}
           isWinner={!!r3IsWinner}
+          isPicked={isPicked(r3Game?.id, r3TeamId || null)}
           borderBottom={isTop}
         />
       )
@@ -271,15 +297,17 @@ function RegionBracket({
     const r4Game = r4Games[0]
     if (row === 7 || row === 8) {
       const isTop = row === 7
-      const r4Team = isTop ? getTeam(r4Game?.team1_id || null) : getTeam(r4Game?.team2_id || null)
+      const r4TeamId = isTop ? r4Game?.team1_id : r4Game?.team2_id
+      const r4Team = getTeam(r4TeamId || null)
       const r4Score = isTop ? r4Game?.team1_score : r4Game?.team2_score
-      const r4IsWinner = r4Game?.winner_id === (isTop ? r4Game?.team1_id : r4Game?.team2_id)
+      const r4IsWinner = r4Game?.winner_id === r4TeamId
       cells.push(
         <TeamCell
           key="r4"
           team={r4Team}
           score={r4Score ?? undefined}
           isWinner={!!r4IsWinner}
+          isPicked={isPicked(r4Game?.id, r4TeamId || null)}
           borderBottom={isTop}
         />
       )
@@ -318,16 +346,23 @@ function RegionBracket({
 function GameBox({
   game,
   teams,
+  userPicks = [],
   label,
   labelColor = 'text-orange-400'
 }: {
   game: Game | undefined
   teams: Team[]
+  userPicks?: Pick[]
   label: string
   labelColor?: string
 }) {
   const getTeam = (teamId: string | null) =>
     teamId ? teams.find(t => t.id === teamId) : null
+
+  const isPicked = (teamId: string | null) => {
+    if (!game?.id || !teamId) return false
+    return userPicks.some(p => p.game_id === game.id && p.picked_team_id === teamId)
+  }
 
   const team1 = getTeam(game?.team1_id || null)
   const team2 = getTeam(game?.team2_id || null)
@@ -344,19 +379,21 @@ function GameBox({
           team={team1}
           score={game?.team1_score ?? undefined}
           isWinner={!!team1IsWinner}
+          isPicked={isPicked(game?.team1_id || null)}
           borderBottom
         />
         <TeamCell
           team={team2}
           score={game?.team2_score ?? undefined}
           isWinner={!!team2IsWinner}
+          isPicked={isPicked(game?.team2_id || null)}
         />
       </div>
     </div>
   )
 }
 
-export function BracketView({ tournament, regions, teams, games }: Props) {
+export function BracketView({ tournament, regions, teams, games, userPicks = [] }: Props) {
   const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
 
   const finalFourGames = games.filter(g => g.round === 5).sort((a, b) => a.game_number - b.game_number)
@@ -382,7 +419,7 @@ export function BracketView({ tournament, regions, teams, games }: Props) {
 
       {/* Scrollable Bracket */}
       <div className="flex-1 overflow-auto">
-        <div className="p-4 flex items-start gap-2" style={{ minWidth: '1200px' }}>
+        <div className="p-6 pb-12 flex items-start gap-2" style={{ minWidth: '1200px' }}>
           {/* Left regions stacked */}
           <div className="flex flex-col gap-6">
             {leftRegions.map(region => (
@@ -391,6 +428,7 @@ export function BracketView({ tournament, regions, teams, games }: Props) {
                 region={region}
                 games={games}
                 teams={teams}
+                userPicks={userPicks}
                 flowDirection="right"
               />
             ))}
@@ -398,9 +436,9 @@ export function BracketView({ tournament, regions, teams, games }: Props) {
 
           {/* Center: Final Four + Championship */}
           <div className="flex flex-col items-center justify-center gap-4 px-2" style={{ minHeight: 16 * CELL_HEIGHT * 2 + 48 }}>
-            <GameBox game={finalFourGames[0]} teams={teams} label="Final Four" />
-            <GameBox game={championshipGame} teams={teams} label="Championship" labelColor="text-yellow-400" />
-            <GameBox game={finalFourGames[1]} teams={teams} label="Final Four" />
+            <GameBox game={finalFourGames[0]} teams={teams} userPicks={userPicks} label="Final Four" />
+            <GameBox game={championshipGame} teams={teams} userPicks={userPicks} label="Championship" labelColor="text-yellow-400" />
+            <GameBox game={finalFourGames[1]} teams={teams} userPicks={userPicks} label="Final Four" />
           </div>
 
           {/* Right regions stacked */}
@@ -411,6 +449,7 @@ export function BracketView({ tournament, regions, teams, games }: Props) {
                 region={region}
                 games={games}
                 teams={teams}
+                userPicks={userPicks}
                 flowDirection="left"
               />
             ))}

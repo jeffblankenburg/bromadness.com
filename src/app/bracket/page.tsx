@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BracketView } from './BracketView'
+import { getActiveUserId } from '@/lib/simulation'
 
 export default async function BracketPage() {
   const supabase = await createClient()
@@ -8,6 +9,8 @@ export default async function BracketPage() {
   // Require authentication
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const activeUserId = await getActiveUserId(user.id)
 
   // Get active tournament
   const { data: tournament } = await supabase
@@ -47,12 +50,31 @@ export default async function BracketPage() {
     .order('round')
     .order('game_number')
 
+  // Get user's pick'em picks
+  const { data: pickemEntry } = await supabase
+    .from('pickem_entries')
+    .select('id')
+    .eq('tournament_id', tournament.id)
+    .eq('user_id', activeUserId)
+    .single()
+
+  let userPicks: { game_id: string; picked_team_id: string }[] = []
+  if (pickemEntry) {
+    const { data: picks } = await supabase
+      .from('pickem_picks')
+      .select('game_id, picked_team_id')
+      .eq('entry_id', pickemEntry.id)
+
+    userPicks = (picks || []).filter(p => p.picked_team_id !== null) as { game_id: string; picked_team_id: string }[]
+  }
+
   return (
     <BracketView
       tournament={tournament}
       regions={regions || []}
       teams={teams || []}
       games={games || []}
+      userPicks={userPicks}
     />
   )
 }
