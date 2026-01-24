@@ -412,7 +412,7 @@ export function BracketView({ tournament, regions, teams, games, userPicks = [] 
           </svg>
         </Link>
         <h1 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-          {tournament.year} Bracket <span className="text-xs text-zinc-500">({userPicks.length} picks)</span>
+          {tournament.year} Bracket
         </h1>
         <div className="w-8" />
       </div>
