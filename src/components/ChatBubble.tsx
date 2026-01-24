@@ -9,21 +9,25 @@ export function ChatBubble() {
 
   useEffect(() => {
     const supabase = createClient()
+    let currentUserId: string | null = null
 
-    // Fetch initial unread count
-    const fetchUnreadCount = async () => {
+    // Get current user and fetch initial unread count
+    const initialize = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        currentUserId = user?.id || null
+
         const res = await fetch('/api/messages/unread-count')
         if (res.ok) {
           const data = await res.json()
           setUnreadCount(data.count)
         }
       } catch (error) {
-        console.error('Failed to fetch unread count:', error)
+        console.error('Failed to initialize chat bubble:', error)
       }
     }
 
-    fetchUnreadCount()
+    initialize()
 
     // Subscribe to new messages in realtime
     const channel = supabase
@@ -31,9 +35,11 @@ export function ChatBubble() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-        () => {
-          // New message arrived, increment unread count
-          setUnreadCount(prev => prev + 1)
+        (payload) => {
+          // Only increment for messages from other users
+          if (payload.new && payload.new.user_id !== currentUserId) {
+            setUnreadCount(prev => prev + 1)
+          }
         }
       )
       .subscribe()

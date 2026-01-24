@@ -19,9 +19,11 @@ export async function GET() {
       .single()
 
     // Build query - if no read status, count all messages (first time user)
+    // Exclude user's own messages from unread count
     let query = supabase
       .from('chat_messages')
       .select('id', { count: 'exact', head: true })
+      .neq('user_id', user.id)
 
     if (readStatus?.last_read_at) {
       query = query.gt('created_at', readStatus.last_read_at)

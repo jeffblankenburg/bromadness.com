@@ -42,6 +42,7 @@ interface PeekState {
   userName: string
   x: number
   y: number
+  isFromFreeColumn: boolean
 }
 
 function findD1Team(teamName: string) {
@@ -80,16 +81,16 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
 
   const isPlayerDone = (idx: number) => draftBoard[idx].paidTeams.length >= teamsPerPlayer
 
-  const handlePeekStart = (e: React.MouseEvent | React.TouchEvent, teamEntry: TeamEntry, userName: string) => {
+  const handlePeekStart = (e: React.MouseEvent | React.TouchEvent, teamEntry: TeamEntry, userName: string, isFromFreeColumn: boolean = false) => {
     const target = e.currentTarget as HTMLElement
     const containerRect = containerRef.current?.getBoundingClientRect()
     const targetRect = target.getBoundingClientRect()
 
     if (containerRect) {
-      // Position tooltip centered above the element
+      // Position tooltip above the element
       const x = targetRect.left - containerRect.left + targetRect.width / 2
       const y = targetRect.top - containerRect.top
-      setPeeking({ teamEntry, userName, x, y })
+      setPeeking({ teamEntry, userName, x, y, isFromFreeColumn })
     }
   }
 
@@ -97,7 +98,7 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
     setPeeking(null)
   }
 
-  const renderTeamBlock = (teamEntry: TeamEntry, userName: string, size: 'normal' | 'small' = 'normal') => {
+  const renderTeamBlock = (teamEntry: TeamEntry, userName: string, size: 'normal' | 'small' = 'normal', isFromFreeColumn: boolean = false) => {
     const d1Team = teamEntry.team ? findD1Team(teamEntry.team.name) : null
     const logo = d1Team ? getTeamLogoUrl(d1Team) : null
     const bgColor = d1Team?.primaryColor || '#3f3f46'
@@ -108,10 +109,10 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
     return (
       <div
         key={teamEntry.id}
-        onMouseDown={(e) => handlePeekStart(e, teamEntry, userName)}
+        onMouseDown={(e) => handlePeekStart(e, teamEntry, userName, isFromFreeColumn)}
         onMouseUp={handlePeekEnd}
         onMouseLeave={handlePeekEnd}
-        onTouchStart={(e) => handlePeekStart(e, teamEntry, userName)}
+        onTouchStart={(e) => handlePeekStart(e, teamEntry, userName, isFromFreeColumn)}
         onTouchEnd={handlePeekEnd}
         className={`${sizeClass} rounded-sm flex items-center justify-center flex-shrink-0 cursor-pointer select-none`}
         style={{ backgroundColor: bgColor }}
@@ -145,6 +146,38 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
         const { bg: bgColor, border: borderColor } = getDarkerColor(primary, secondary)
         const textColor = getContrastColor(bgColor)
         const teamName = peekD1Team?.shortName || peeking.teamEntry.team?.short_name || peeking.teamEntry.team?.name
+
+        // For free column, show tooltip above with arrow on bottom-right, extending left
+        if (peeking.isFromFreeColumn) {
+          return (
+            <div
+              className="absolute z-20 pointer-events-none"
+              style={{
+                left: peeking.x,
+                top: peeking.y - 8,
+                transform: 'translate(calc(-100% + 18px), -100%)'
+              }}
+            >
+              <div
+                className="rounded-lg px-3 py-2 text-sm whitespace-nowrap"
+                style={{ backgroundColor: bgColor, border: `4px solid ${borderColor}`, color: textColor }}
+              >
+                <span className="font-semibold">#{peeking.teamEntry.team?.seed} {teamName}</span>
+                <span className="mx-2">-</span>
+                <span>{peeking.userName}</span>
+                <span className="ml-2 font-semibold">${peeking.teamEntry.bid_amount}</span>
+              </div>
+              {/* Arrow at bottom-right, offset from corner like original */}
+              <div className="flex justify-end pr-[18px]">
+                <div
+                  className="w-3 h-3 rotate-45 -mt-[7px]"
+                  style={{ backgroundColor: bgColor, borderRight: `4px solid ${borderColor}`, borderBottom: `4px solid ${borderColor}` }}
+                />
+              </div>
+            </div>
+          )
+        }
+
         return (
           <div
             className="absolute z-20 pointer-events-none"
@@ -225,7 +258,7 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
                   <td className="px-0.5 py-1 align-top">
                     {entry.bonusTeams.length > 0 ? (
                       <div className="grid grid-cols-2 gap-0.5 w-11 h-11 content-start justify-start">
-                        {entry.bonusTeams.map(bt => renderTeamBlock(bt, userName, 'small'))}
+                        {entry.bonusTeams.map(bt => renderTeamBlock(bt, userName, 'small', true))}
                       </div>
                     ) : (
                       <div className="w-11 h-11 flex items-center justify-center">
