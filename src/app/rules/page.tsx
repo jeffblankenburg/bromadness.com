@@ -54,7 +54,7 @@ export default function RulesPage() {
             >
               ← Back
             </button>
-            <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{game?.title}</h1>
+            <h1 className="text-lg font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{game?.title}</h1>
             <div className="w-12"></div>
           </div>
           {renderGameRules(selectedGame)}
@@ -68,7 +68,7 @@ export default function RulesPage() {
       <div className="p-4 max-w-md mx-auto">
         <div className="flex items-center justify-between mb-4">
           <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
-          <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Game Rules</h1>
+          <h1 className="text-lg font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Game Rules</h1>
           <div className="w-10"></div>
         </div>
 

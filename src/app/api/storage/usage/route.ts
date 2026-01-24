@@ -62,11 +62,16 @@ export async function GET() {
       }
     }
 
+    // Extract project ID from Supabase URL (https://{project-id}.supabase.co)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || ''
+
     return NextResponse.json({
       totalBytes: totalSize,
       totalFiles,
       limitBytes: 1024 * 1024 * 1024, // 1GB free tier limit
-      usagePercent: (totalSize / (1024 * 1024 * 1024)) * 100
+      usagePercent: (totalSize / (1024 * 1024 * 1024)) * 100,
+      projectId
     })
   } catch (error) {
     console.error('Error in storage usage:', error)

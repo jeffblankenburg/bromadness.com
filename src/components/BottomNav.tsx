@@ -112,7 +112,7 @@ export function BottomNav() {
               href={item.href}
               className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
                 isActive
-                  ? 'text-orange-500'
+                  ? 'text-orange-400'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >

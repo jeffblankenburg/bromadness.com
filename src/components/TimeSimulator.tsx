@@ -177,14 +177,14 @@ export function TimeSimulator({ tournamentId, currentSimulatedTime, firstGameTim
                   <button
                     onClick={() => handleQuickSet(5, time)}
                     disabled={saving}
-                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
+                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-600/30 transition-colors"
                   >
                     5min after
                   </button>
                   <button
                     onClick={() => handleQuickSet(60, time)}
                     disabled={saving}
-                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
+                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-600/30 transition-colors"
                   >
                     1hr after
                   </button>

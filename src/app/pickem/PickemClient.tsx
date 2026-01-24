@@ -435,7 +435,7 @@ export function PickemClient({
             </span>
           )}
           {isPicked && !isComplete && (
-            <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="w-5 h-5 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
           )}
@@ -558,7 +558,7 @@ export function PickemClient({
 
   return (
     <div className="p-4 pb-20 space-y-4">
-      <h1 className="text-xl font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>NCAA Pick'em</h1>
+      <h1 className="text-xl font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>NCAA Pick'em</h1>
       {/* Day Tabs */}
       <div className="flex gap-2">
         {enabledDays.map((dayName) => {

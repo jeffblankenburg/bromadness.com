@@ -424,7 +424,7 @@ export default function ChatPage() {
       {/* Header - never scrolls */}
       <div className="flex-none flex items-center justify-between px-4 py-3 pt-safe border-b border-zinc-800 bg-black">
         <div className="w-8" />
-        <h1 className="text-xl font-bold text-orange-500" style={{ fontFamily: 'var(--font-display)' }}>
+        <h1 className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
           Bro Chat
         </h1>
         <Link href="/" className="text-zinc-400 hover:text-white p-1">
@@ -474,7 +474,7 @@ export default function ChatPage() {
               {msg.gif_url || msg.image_url ? (
                 <div className={`px-4 py-2 max-w-[85%] ${
                   isOwnMessage
-                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
                     : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                 }`}>
                   <Image
@@ -490,7 +490,7 @@ export default function ChatPage() {
               ) : emojiOnly ? (
                 <div className={`px-4 py-2 ${
                   isOwnMessage
-                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
                     : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                 }`}>
                   <span style={{ fontSize: '4rem', lineHeight: 1 }}>{msg.content}</span>
@@ -498,7 +498,7 @@ export default function ChatPage() {
               ) : (
                 <div className={`px-4 py-2 max-w-[85%] ${
                   isOwnMessage
-                    ? 'bg-orange-600 rounded-2xl rounded-tr-sm'
+                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
                     : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                 }`}>
                   <p className="text-sm text-white break-words">{msg.content}</p>

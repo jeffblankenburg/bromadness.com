@@ -37,7 +37,7 @@ export default function InfoPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
       <div className="p-6 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-orange-500 uppercase tracking-wide mb-6" style={{ fontFamily: 'var(--font-display)' }}>Info</h1>
+        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-6" style={{ fontFamily: 'var(--font-display)' }}>Info</h1>
 
         <div className="space-y-3">
           {infoItems.map((item) => (
@@ -46,7 +46,7 @@ export default function InfoPage() {
               href={item.href}
               className="flex items-center gap-4 p-4 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-colors"
             >
-              <div className="text-orange-500">
+              <div className="text-orange-400">
                 {item.icon}
               </div>
               <div className="flex-1">

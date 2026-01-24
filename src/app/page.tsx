@@ -6,6 +6,7 @@ import { MenuDisplay } from '@/components/MenuDisplay'
 import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 import { CurrentGames } from '@/components/CurrentGames'
 import { ChatBubble } from '@/components/ChatBubble'
+import { InstallPrompt } from '@/components/InstallPrompt'
 import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
@@ -288,42 +289,55 @@ export default async function Home() {
       {SHOW_DEV_TOOLS && user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
 
       {/* Page Header */}
-      <h1 className="text-xl font-bold text-orange-500 mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-        Welcome to Bro Madness
-      </h1>
+      <div className="bg-orange-500 -mx-6 px-6 py-2 mb-4 w-screen">
+        <h1 className="text-xl font-bold text-white text-center" style={{ fontFamily: 'var(--font-display)' }}>
+          Welcome to Bro Madness
+        </h1>
+      </div>
 
-      <div className="text-center space-y-6 w-full max-w-sm">
-            <div className="space-y-4">
+      <div className="text-center space-y-4 w-full max-w-sm">
+        <InstallPrompt />
+            <div className="space-y-3">
               {/* Name and Winnings */}
-              {totalWinnings > 0 ? (
-                <div className="flex items-center justify-between">
-                  {profile?.display_name && (
-                    <h1
-                      className="text-4xl text-orange-400 uppercase tracking-wide text-left"
-                      style={{ fontFamily: 'var(--font-display)' }}
-                    >
-                      {profile.display_name}
-                    </h1>
-                  )}
-                  <div className="w-20 h-20 flex-shrink-0 bg-gradient-to-br from-green-900/60 to-emerald-900/60 border border-green-500/50 rounded-xl flex flex-col items-center justify-center">
-                    <div className="text-green-400 text-[10px] font-medium uppercase tracking-wide">
-                      Winnings
-                    </div>
-                    <div className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-                      ${totalWinnings}
+              {(() => {
+                const fullName = profile?.display_name || ''
+                const shouldTruncate = totalWinnings > 0 && fullName.length > 10
+                const displayName = shouldTruncate ? fullName.slice(0, 10) + '...' : fullName
+                const nameLength = shouldTruncate ? 10 : fullName.length
+                const nameSize = nameLength <= 5 ? 'text-6xl' :
+                                 nameLength <= 8 ? 'text-5xl' :
+                                 nameLength <= 12 ? 'text-4xl' : 'text-3xl'
+
+                return totalWinnings > 0 ? (
+                  <div className="flex items-center justify-between">
+                    {displayName && (
+                      <h1
+                        className={`${nameSize} text-white uppercase tracking-wide text-left`}
+                        style={{ fontFamily: 'var(--font-display)' }}
+                      >
+                        {displayName}
+                      </h1>
+                    )}
+                    <div className="w-20 h-20 flex-shrink-0 bg-gradient-to-br from-green-900/60 to-emerald-900/60 border border-green-500/50 rounded-xl flex flex-col items-center justify-center">
+                      <div className="text-green-400 text-[10px] font-medium uppercase tracking-wide">
+                        Winnings
+                      </div>
+                      <div className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                        ${totalWinnings}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                profile?.display_name && (
-                  <h1
-                    className="text-4xl text-orange-400 uppercase tracking-wide"
-                    style={{ fontFamily: 'var(--font-display)' }}
-                  >
-                    {profile.display_name}
-                  </h1>
+                ) : (
+                  displayName && (
+                    <h1
+                      className={`${nameSize} text-white uppercase tracking-wide`}
+                      style={{ fontFamily: 'var(--font-display)' }}
+                    >
+                      {displayName}
+                    </h1>
+                  )
                 )
-              )}
+              })()}
 
               {/* Trip Balance Reminder */}
               {tripBalance > 0 && (

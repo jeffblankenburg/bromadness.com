@@ -7,6 +7,7 @@ interface StorageData {
   totalFiles: number
   limitBytes: number
   usagePercent: number
+  projectId: string
 }
 
 function formatBytes(bytes: number): string {
@@ -42,9 +43,30 @@ export function StorageUsage() {
     fetchUsage()
   }, [])
 
+  const supabaseUrl = data?.projectId
+    ? `https://supabase.com/dashboard/project/${data.projectId}/storage/buckets/chat-images`
+    : null
+
   return (
-    <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-      <h3 className="text-lg font-semibold text-white mb-3">Storage Usage</h3>
+    <div className="bg-zinc-800/50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3
+          className="text-sm font-semibold text-orange-400 uppercase tracking-wide"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          Storage Usage
+        </h3>
+        {supabaseUrl && (
+          <a
+            href={supabaseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-zinc-400 hover:text-orange-500 transition-colors"
+          >
+            Open in Supabase
+          </a>
+        )}
+      </div>
 
       {loading ? (
         <p className="text-zinc-400">Loading...</p>

@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TimeSimulator } from '@/components/TimeSimulator'
 import { UserSimulator } from '@/components/UserSimulator'
-import { StorageUsage } from '@/components/StorageUsage'
 import { getSimulatedUserId } from '@/lib/simulation'
 
 export default async function AdminDevPage() {
@@ -100,8 +99,6 @@ export default async function AdminDevPage() {
         users={users || []}
         currentSimulatedUser={currentSimulatedUser}
       />
-
-      <StorageUsage />
     </div>
   )
 }

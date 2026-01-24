@@ -34,7 +34,7 @@ export default async function MenuPage() {
       <div className="max-w-md mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <Link href="/info" className="text-zinc-400 hover:text-white text-sm">← Info</Link>
-          <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Menu</h1>
+          <h1 className="text-lg font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Menu</h1>
           <div className="w-10"></div>
         </div>
 

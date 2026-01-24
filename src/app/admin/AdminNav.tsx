@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/admin/trip-cost', label: 'Trip Cost' },
   { href: '/admin/payouts', label: 'Payouts' },
   { href: '/admin/menu', label: 'Food Menu' },
+  { href: '/admin/chat', label: 'Chat' },
   { href: '/admin/dev', label: 'Dev' },
 ]
 
@@ -47,7 +48,7 @@ export function AdminNav() {
     <div className="relative" ref={menuRef}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold text-orange-500 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{pageTitle}</h1>
+          <h1 className="text-lg font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{pageTitle}</h1>
           <div id="admin-header-actions" />
         </div>
         <button

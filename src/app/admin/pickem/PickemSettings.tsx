@@ -114,7 +114,7 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
                         type="checkbox"
                         checked={enabledDays.includes(day)}
                         onChange={() => toggleDay(day)}
-                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-orange-500 focus:ring-orange-500"
+                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-orange-400 focus:ring-orange-500"
                       />
                       <span className="text-sm text-zinc-300">{day}</span>
                     </label>
