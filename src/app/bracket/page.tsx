@@ -50,12 +50,12 @@ export default async function BracketPage() {
     .order('round')
     .order('game_number')
 
-  // Get user's pick'em picks
+  // Get user's pick'em picks - use real user, not simulated
   const { data: pickemEntry } = await supabase
     .from('pickem_entries')
     .select('id')
     .eq('tournament_id', tournament.id)
-    .eq('user_id', activeUserId)
+    .eq('user_id', user.id)
     .maybeSingle()
 
   let userPicks: { game_id: string; picked_team_id: string }[] = []
