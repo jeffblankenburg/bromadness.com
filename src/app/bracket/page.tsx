@@ -83,6 +83,20 @@ export default async function BracketPage() {
     }
   }
 
+  // Get auction team owners
+  const { data: auctionTeams } = await supabase
+    .from('auction_teams')
+    .select('team_id, user:users(display_name)')
+    .eq('tournament_id', tournament.id)
+
+  const teamOwners: Record<string, string> = {}
+  for (const at of auctionTeams || []) {
+    const userData = at.user as unknown as { display_name: string } | null
+    if (at.team_id && userData?.display_name) {
+      teamOwners[at.team_id] = userData.display_name
+    }
+  }
+
   return (
     <BracketView
       tournament={tournament}
@@ -90,6 +104,7 @@ export default async function BracketPage() {
       teams={teams || []}
       games={games || []}
       userPicks={userPicks}
+      teamOwners={teamOwners}
     />
   )
 }
