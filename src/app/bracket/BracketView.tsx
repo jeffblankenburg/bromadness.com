@@ -1,6 +1,5 @@
 'use client'
 
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import Link from 'next/link'
 
 interface Region {
@@ -381,77 +380,42 @@ export function BracketView({ tournament, regions, teams, games }: Props) {
         <div className="w-8" />
       </div>
 
-      {/* Zoom/Pan Bracket */}
-      <div className="flex-1 overflow-hidden">
-        <TransformWrapper
-          initialScale={0.5}
-          minScale={0.25}
-          maxScale={2}
-          centerOnInit
-          wheel={{ step: 0.1 }}
-          doubleClick={{ mode: 'zoomIn' }}
-        >
-          {({ zoomIn, zoomOut, resetTransform }) => (
-            <>
-              <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-                <button onClick={() => zoomOut()} className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-white hover:bg-zinc-700 border border-zinc-700">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
-                  </svg>
-                </button>
-                <button onClick={() => resetTransform()} className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-white hover:bg-zinc-700 border border-zinc-700 text-xs font-bold">
-                  FIT
-                </button>
-                <button onClick={() => zoomIn()} className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-white hover:bg-zinc-700 border border-zinc-700">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
-              </div>
+      {/* Scrollable Bracket */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-4 flex items-start gap-2" style={{ minWidth: '1200px' }}>
+          {/* Left regions stacked */}
+          <div className="flex flex-col gap-6">
+            {leftRegions.map(region => (
+              <RegionBracket
+                key={region.id}
+                region={region}
+                games={games}
+                teams={teams}
+                flowDirection="right"
+              />
+            ))}
+          </div>
 
-              <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
-                <div className="p-8 flex items-start gap-2" style={{ minWidth: '1400px' }}>
-                  {/* Left regions stacked */}
-                  <div className="flex flex-col gap-6">
-                    {leftRegions.map(region => (
-                      <RegionBracket
-                        key={region.id}
-                        region={region}
-                        games={games}
-                        teams={teams}
-                        flowDirection="right"
-                      />
-                    ))}
-                  </div>
+          {/* Center: Final Four + Championship */}
+          <div className="flex flex-col items-center justify-center gap-4 px-2" style={{ minHeight: 16 * CELL_HEIGHT * 2 + 48 }}>
+            <GameBox game={finalFourGames[0]} teams={teams} label="Final Four" />
+            <GameBox game={championshipGame} teams={teams} label="Championship" labelColor="text-yellow-400" />
+            <GameBox game={finalFourGames[1]} teams={teams} label="Final Four" />
+          </div>
 
-                  {/* Center: Final Four + Championship */}
-                  <div className="flex flex-col items-center justify-center gap-4 px-2" style={{ minHeight: 16 * CELL_HEIGHT * 2 + 48 }}>
-                    <GameBox game={finalFourGames[0]} teams={teams} label="Final Four" />
-                    <GameBox game={championshipGame} teams={teams} label="Championship" labelColor="text-yellow-400" />
-                    <GameBox game={finalFourGames[1]} teams={teams} label="Final Four" />
-                  </div>
-
-                  {/* Right regions stacked */}
-                  <div className="flex flex-col gap-6">
-                    {rightRegions.map(region => (
-                      <RegionBracket
-                        key={region.id}
-                        region={region}
-                        games={games}
-                        teams={teams}
-                        flowDirection="left"
-                      />
-                    ))}
-                  </div>
-                </div>
-              </TransformComponent>
-            </>
-          )}
-        </TransformWrapper>
-      </div>
-
-      <div className="absolute bottom-16 left-4 text-zinc-600 text-xs">
-        Pinch to zoom • Drag to pan
+          {/* Right regions stacked */}
+          <div className="flex flex-col gap-6">
+            {rightRegions.map(region => (
+              <RegionBracket
+                key={region.id}
+                region={region}
+                games={games}
+                teams={teams}
+                flowDirection="left"
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
