@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
@@ -82,6 +82,8 @@ const getChannelNumber = (channelName: string | null) => {
 export function GameResults({ tournament, teams, games }: Props) {
   const [activeRound, setActiveRound] = useState(1)
   const [saving, setSaving] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -292,6 +294,94 @@ export function GameResults({ tournament, teams, games }: Props) {
     })
   }
 
+  // Reset all results
+  const handleResetAllResults = async () => {
+    setResetting(true)
+    try {
+      // 1. Clear all game results (scores and winners)
+      await supabase
+        .from('games')
+        .update({
+          winner_id: null,
+          team1_score: null,
+          team2_score: null,
+        })
+        .eq('tournament_id', tournament.id)
+
+      // 2. Clear team propagation for rounds 2-6 (teams that advanced)
+      await supabase
+        .from('games')
+        .update({
+          team1_id: null,
+          team2_id: null,
+        })
+        .eq('tournament_id', tournament.id)
+        .gt('round', 1)
+
+      // 3. Reset is_eliminated for all teams
+      await supabase
+        .from('teams')
+        .update({ is_eliminated: false })
+        .eq('tournament_id', tournament.id)
+
+      // 4. Reset all pickem_picks is_correct to null
+      // First get all pickem_days for this tournament
+      const { data: pickemDays } = await supabase
+        .from('pickem_days')
+        .select('id')
+        .eq('tournament_id', tournament.id)
+
+      if (pickemDays && pickemDays.length > 0) {
+        const dayIds = pickemDays.map(d => d.id)
+
+        // Get all entries for these days
+        const { data: entries } = await supabase
+          .from('pickem_entries')
+          .select('id')
+          .in('pickem_day_id', dayIds)
+
+        if (entries && entries.length > 0) {
+          const entryIds = entries.map(e => e.id)
+
+          // Reset all picks is_correct
+          await supabase
+            .from('pickem_picks')
+            .update({ is_correct: null })
+            .in('entry_id', entryIds)
+
+          // Reset all entries correct_picks to 0
+          await supabase
+            .from('pickem_entries')
+            .update({ correct_picks: 0 })
+            .in('id', entryIds)
+        }
+      }
+
+      // 5. Reset all brocket_picks is_correct to null
+      const { data: brocketEntries } = await supabase
+        .from('brocket_entries')
+        .select('id')
+        .eq('tournament_id', tournament.id)
+
+      if (brocketEntries && brocketEntries.length > 0) {
+        const brocketEntryIds = brocketEntries.map(e => e.id)
+
+        await supabase
+          .from('brocket_picks')
+          .update({ is_correct: null })
+          .in('entry_id', brocketEntryIds)
+      }
+
+      setShowResetConfirm(false)
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to reset all results:', err)
+      alert('Failed to reset results. Check console for details.')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Round Tabs */}
@@ -337,6 +427,47 @@ export function GameResults({ tournament, teams, games }: Props) {
           <p className="text-zinc-500 text-sm">No games in this round yet.</p>
         )}
       </div>
+
+      {/* Reset All Results Button */}
+      <div className="pt-8 border-t border-zinc-800">
+        <button
+          onClick={() => setShowResetConfirm(true)}
+          className="w-full py-3 px-4 bg-red-600 rounded-xl text-white text-sm font-medium hover:bg-red-500 transition-colors"
+        >
+          Reset All Results
+        </button>
+      </div>
+
+      {/* Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full space-y-4 border border-zinc-700">
+            <h3 className="text-lg font-bold text-white">Reset All Results?</h3>
+            <p className="text-sm text-zinc-400">
+              This will clear all scores, winners, team advancement, and pick correctness for the entire tournament.
+            </p>
+            <p className="text-sm text-red-400 font-medium">
+              This action cannot be reversed.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                disabled={resetting}
+                className="flex-1 py-2 px-4 bg-zinc-800 rounded-lg text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetAllResults}
+                disabled={resetting}
+                className="flex-1 py-2 px-4 bg-red-600 rounded-lg text-white text-sm font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+              >
+                {resetting ? 'Resetting...' : 'Yes, Reset All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -353,6 +484,12 @@ interface GameCardProps {
 function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: GameCardProps) {
   const [team1Score, setTeam1Score] = useState(game.team1_score?.toString() || '')
   const [team2Score, setTeam2Score] = useState(game.team2_score?.toString() || '')
+
+  // Sync local state with props when game data changes (e.g., after reset)
+  useEffect(() => {
+    setTeam1Score(game.team1_score?.toString() || '')
+    setTeam2Score(game.team2_score?.toString() || '')
+  }, [game.team1_score, game.team2_score])
 
   const hasResult = game.winner_id !== null
   const canEnterResult = team1 && team2

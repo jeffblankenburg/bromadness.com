@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 
@@ -133,8 +133,45 @@ export function BrocketClient({
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
-  // Check if picks are locked
+  // Check if picks are locked (games have started)
   const isLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+
+  // Default states based on lock status:
+  // Before games: leaderboard closed, picks open
+  // After games: leaderboard open, picks closed
+  const [leaderboardExpanded, setLeaderboardExpanded] = useState(isLocked)
+  const [picksExpanded, setPicksExpanded] = useState(!isLocked)
+
+  // Load expanded state from localStorage (overrides defaults if user has manually toggled)
+  useEffect(() => {
+    const savedLeaderboard = localStorage.getItem('brocket-leaderboard-expanded')
+    const savedPicks = localStorage.getItem('brocket-picks-expanded')
+
+    // Only use localStorage if there's a saved value, otherwise use isLocked-based defaults
+    if (savedLeaderboard !== null) {
+      setLeaderboardExpanded(savedLeaderboard === 'true')
+    } else {
+      setLeaderboardExpanded(isLocked)
+    }
+
+    if (savedPicks !== null) {
+      setPicksExpanded(savedPicks === 'true')
+    } else {
+      setPicksExpanded(!isLocked)
+    }
+  }, [isLocked])
+
+  const toggleLeaderboard = () => {
+    const newValue = !leaderboardExpanded
+    setLeaderboardExpanded(newValue)
+    localStorage.setItem('brocket-leaderboard-expanded', String(newValue))
+  }
+
+  const togglePicks = () => {
+    const newValue = !picksExpanded
+    setPicksExpanded(newValue)
+    localStorage.setItem('brocket-picks-expanded', String(newValue))
+  }
 
   // Get games for selected region (sorted by bracket order)
   const regionGames = games
@@ -227,6 +264,32 @@ export function BrocketClient({
         // Sort by points descending, then max_possible descending as tiebreaker
         if (b.points !== a.points) return b.points - a.points
         return b.max_possible - a.max_possible
+      })
+  }
+
+  // Calculate participant pick counts (for pre-lock view)
+  const calculateParticipants = () => {
+    const totalGames = 32 // Round 1 has 32 games
+    return allEntries
+      .map(entry => {
+        const user = users.find(u => u.id === entry.user_id)
+        const entryPicks = allPicks.filter(p => p.entry_id === entry.id)
+        const pickCount = entryPicks.length
+
+        return {
+          user_id: entry.user_id,
+          display_name: user?.display_name || 'Unknown',
+          pick_count: pickCount,
+          total_games: totalGames,
+          is_complete: pickCount >= totalGames,
+          is_current_user: entry.user_id === userId,
+          has_paid: entry.has_paid === true,
+        }
+      })
+      .sort((a, b) => {
+        // Sort by pick count descending, then alphabetically
+        if (b.pick_count !== a.pick_count) return b.pick_count - a.pick_count
+        return a.display_name.localeCompare(b.display_name)
       })
   }
 
@@ -402,76 +465,149 @@ export function BrocketClient({
         <p className="text-xs text-zinc-500 mt-0.5">Earn points for the seed of your winners.</p>
       </div>
 
-      {/* Leaderboard Container */}
+      {/* Leaderboard / Participants Container */}
       <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
-        <div className={`px-4 py-2 text-sm text-center flex items-center justify-center gap-2 ${isLocked ? 'bg-zinc-700/50 text-white font-medium' : 'text-zinc-400'}`}>
-          {isLocked ? (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-2.752 0" />
-              </svg>
-              Leaderboard
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-              Picks lock {formatLockTime(firstGameTime)}
-            </>
-          )}
-        </div>
-        <div className="p-3">
-          {/* Payouts */}
-          {(payouts.first > 0 || payouts.second > 0 || payouts.third > 0) && (
-            <div className="bg-zinc-900/50 rounded-lg px-4 py-2 text-center mb-3">
-              <div className="flex justify-center gap-6 text-sm">
-                <span><span className="text-yellow-400">1st</span> ${payouts.first}</span>
-                <span><span className="text-zinc-300">2nd</span> ${payouts.second}</span>
-                <span><span className="text-orange-400">3rd</span> ${payouts.third}</span>
-              </div>
-            </div>
-          )}
-          {renderLeaderboard()}
-        </div>
-      </div>
-
-      {/* Region Tabs */}
-      <div className="flex gap-2">
-        {regions.map((region) => {
-          const regionGameCount = games.filter(g => g.region_id === region.id).length
-          const regionPickCount = userPicks.filter(p => {
-            const game = games.find(g => g.id === p.game_id)
-            return game?.region_id === region.id
-          }).length
-
-          return (
-            <button
-              key={region.id}
-              onClick={() => setSelectedRegionId(region.id)}
-              className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
-                selectedRegionId === region.id
-                  ? 'bg-orange-500 text-orange-950'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-              }`}
-            >
-              <div>{region.name}</div>
-              <div className={`text-[10px] ${selectedRegionId === region.id ? 'text-orange-800' : 'text-zinc-500'}`}>
-                {regionPickCount}/{regionGameCount}
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Games for selected region */}
-      <div className="space-y-2">
-        {regionGames.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-zinc-400">No games scheduled for this region yet.</p>
+        <button
+          onClick={toggleLeaderboard}
+          className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+              {isLocked ? 'Leaderboard' : `Picks lock ${formatLockTime(firstGameTime)}`}
+            </h3>
           </div>
-        ) : (
-          regionGames.map(game => renderGame(game))
+          <svg
+            className={`w-4 h-4 text-zinc-400 transition-transform ${leaderboardExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
+
+        {leaderboardExpanded && (
+          <div className="px-4 pb-4">
+            {isLocked ? (
+              <>
+                {/* Payouts */}
+                {(payouts.first > 0 || payouts.second > 0 || payouts.third > 0) && (
+                  <div className="bg-zinc-900/50 rounded-lg px-4 py-2 text-center mb-3">
+                    <div className="flex justify-center gap-6 text-sm">
+                      <span><span className="text-yellow-400">1st</span> ${payouts.first}</span>
+                      <span><span className="text-zinc-300">2nd</span> ${payouts.second}</span>
+                      <span><span className="text-orange-400">3rd</span> ${payouts.third}</span>
+                    </div>
+                  </div>
+                )}
+                {renderLeaderboard()}
+              </>
+            ) : (
+              /* Pre-lock: Show participants with pick counts */
+              <div className="space-y-1">
+                {calculateParticipants().length === 0 ? (
+                  <div className="text-sm text-zinc-500 text-center py-4">
+                    No participants yet
+                  </div>
+                ) : (
+                  calculateParticipants().map((participant) => (
+                    <div
+                      key={participant.user_id}
+                      className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg ${
+                        participant.is_current_user ? 'bg-orange-500/20' : 'bg-zinc-800/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={participant.is_current_user ? 'font-medium' : ''}>
+                          {participant.display_name}
+                        </span>
+                        {participant.is_complete && (
+                          <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        )}
+                        {!participant.has_paid && (
+                          <span className="text-[10px] text-yellow-500 uppercase">unpaid</span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className={`${participant.is_complete ? 'text-green-400' : 'text-zinc-400'}`}>
+                          {participant.pick_count}
+                        </span>
+                        <span className="text-zinc-500">/{participant.total_games}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Your Picks - Collapsible */}
+      <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+        <button
+          onClick={togglePicks}
+          className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
+        >
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+            Your Picks
+          </h3>
+          <svg
+            className={`w-4 h-4 text-zinc-400 transition-transform ${picksExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
+
+        {picksExpanded && (
+          <div className="px-4 pb-4 space-y-4">
+            {/* Region Tabs */}
+            <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-xl">
+              {regions.map((region) => {
+                const regionGameCount = games.filter(g => g.region_id === region.id).length
+                const regionPickCount = userPicks.filter(p => {
+                  const game = games.find(g => g.id === p.game_id)
+                  return game?.region_id === region.id
+                }).length
+                const isActive = selectedRegionId === region.id
+
+                return (
+                  <button
+                    key={region.id}
+                    onClick={() => setSelectedRegionId(region.id)}
+                    className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-orange-500 text-white'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                    }`}
+                  >
+                    <div>{region.name}</div>
+                    <div className={`text-xs ${isActive ? 'text-orange-200' : 'text-zinc-500'}`}>
+                      {regionPickCount}/{regionGameCount}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Games for selected region */}
+            <div className="space-y-2">
+              {regionGames.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-zinc-400">No games scheduled for this region yet.</p>
+                </div>
+              ) : (
+                regionGames.map(game => renderGame(game))
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

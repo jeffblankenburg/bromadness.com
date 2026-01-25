@@ -22,17 +22,13 @@ export async function POST(request: Request) {
       .single()
 
     if (lookupError || !existingUser) {
-      console.log('Login attempt blocked - phone not found:', phone10)
       return NextResponse.json({ error: 'Unable to send verification code. Please contact an administrator.' }, { status: 403 })
     }
 
     // User exists, now send the OTP
     // signInWithOtp needs + prefix, but Supabase normalizes for lookup
-    const e164Phone = `+1${phone10}`
-    console.log('Sending OTP to:', e164Phone)
-
     const { error: otpError } = await adminClient.auth.signInWithOtp({
-      phone: e164Phone,
+      phone: `+1${phone10}`,
     })
 
     if (otpError) {

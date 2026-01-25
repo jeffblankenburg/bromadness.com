@@ -17,7 +17,7 @@ const games: GameRule[] = [
   { id: 'digits', title: 'Digits', description: 'Match the final digit' },
   { id: 'pickem', title: "Pick'em", description: 'Pick winners against the spread' },
   { id: 'auction', title: 'NCAA Auction', description: 'Bid on teams, earn points' },
-  { id: 'parlays', title: 'Parlays', description: 'Coming soon' },
+  // { id: 'parlays', title: 'Parlays', description: 'Coming soon' },
 ]
 
 export default function RulesPage() {

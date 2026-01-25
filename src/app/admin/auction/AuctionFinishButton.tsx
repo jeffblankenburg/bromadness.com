@@ -62,7 +62,7 @@ export function AuctionFinishButton({ tournamentId, auctionComplete }: Props) {
     <>
       <button
         onClick={() => setShowConfirm(true)}
-        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg"
+        className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg text-sm transition-colors"
       >
         Auction Is Finished
       </button>

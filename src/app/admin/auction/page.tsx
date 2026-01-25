@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AuctionEditor } from './AuctionEditor'
 import { AuctionSettings } from './AuctionSettings'
 import { AuctionFinishButton } from './AuctionFinishButton'
+import { AuctionResetButton } from './AuctionResetButton'
 import { HeaderAction } from '../HeaderAction'
 
 export default async function AuctionPage() {
@@ -86,11 +87,12 @@ export default async function AuctionPage() {
         settings={settings}
       />
 
-      <div className="pt-6 border-t border-zinc-700">
+      <div className="pt-6 border-t border-zinc-700 flex gap-3">
         <AuctionFinishButton
           tournamentId={tournament.id}
           auctionComplete={tournament.auction_complete ?? false}
         />
+        <AuctionResetButton tournamentId={tournament.id} />
       </div>
     </div>
   )
