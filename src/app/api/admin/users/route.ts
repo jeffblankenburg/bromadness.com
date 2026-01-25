@@ -64,6 +64,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
+    // Normalize phone to 10 digits if provided
+    const phone10 = phone ? phone.replace(/\D/g, '').slice(-10) : null
+
     const adminClient = createAdminClient()
 
     // Get current user data to check what actually changed
@@ -79,17 +82,17 @@ export async function PUT(request: Request) {
     if (fullName !== undefined) updates.full_name = fullName
 
     // Only include phone in updates if it actually changed
-    const phoneChanged = phone && currentUser?.phone !== phone
-    if (phoneChanged) updates.phone = phone
+    const phoneChanged = phone10 && currentUser?.phone !== phone10
+    if (phoneChanged) updates.phone = phone10
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    // If phone actually changed, also update in auth.users
+    // If phone actually changed, also update in auth.users (use +1 prefix)
     if (phoneChanged) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
-        phone,
+        phone: `+1${phone10}`,
       })
       if (authError) {
         console.error('Auth update error:', authError)
@@ -164,12 +167,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Phone and name are required' }, { status: 400 })
     }
 
+    // Normalize to 10 digits
+    const phone10 = phone.replace(/\D/g, '').slice(-10)
+    if (phone10.length !== 10) {
+      return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
+    }
+
     // Use admin client to create user
     const adminClient = createAdminClient()
 
-    // Create auth user with phone
+    // Create auth user with phone (use +1 prefix to match existing records)
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-      phone,
+      phone: `+1${phone10}`,
       phone_confirm: true, // Auto-confirm the phone
     })
 
@@ -186,12 +195,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create auth user' }, { status: 500 })
     }
 
-    // Create public.users record
+    // Create public.users record (store just 10 digits)
     const { error: profileError } = await adminClient
       .from('users')
       .insert({
         id: authUser.user.id,
-        phone,
+        phone: phone10,
         display_name: displayName,
         full_name: fullName || null,
       })

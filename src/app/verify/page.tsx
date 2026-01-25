@@ -69,7 +69,7 @@ export default function VerifyPage() {
 
     try {
       const { error } = await supabase.auth.verifyOtp({
-        phone,
+        phone: `+1${phone}`,
         token: verificationCode,
         type: 'sms',
       })
@@ -97,12 +97,16 @@ export default function VerifyPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
       })
 
-      if (error) {
-        setError(error.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to resend code')
       } else {
         setError('')
         setCode(['', '', '', '', '', ''])

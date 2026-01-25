@@ -74,15 +74,14 @@ export function UserList({ users }: Props) {
     setError('')
     setSaving(true)
 
-    // Convert formatted phone to E.164 format
-    const digits = phone.replace(/\D/g, '')
-    const e164Phone = `+1${digits}`
+    // Use just 10 digits
+    const digits = phone.replace(/\D/g, '').slice(-10)
 
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: e164Phone, displayName, fullName: fullName || null }),
+        body: JSON.stringify({ phone: digits, displayName, fullName: fullName || null }),
         credentials: 'include',
       })
 
@@ -112,9 +111,8 @@ export function UserList({ users }: Props) {
     setError('')
     setSaving(true)
 
-    // Convert formatted phone to E.164 format
-    const digits = phone.replace(/\D/g, '')
-    const e164Phone = `+1${digits}`
+    // Use just 10 digits
+    const digits = phone.replace(/\D/g, '').slice(-10)
 
     try {
       const res = await fetch('/api/admin/users', {
@@ -124,7 +122,7 @@ export function UserList({ users }: Props) {
           userId: editingUser.id,
           displayName,
           fullName: fullName || null,
-          phone: e164Phone,
+          phone: digits,
         }),
         credentials: 'include',
       })

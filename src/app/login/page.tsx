@@ -38,14 +38,11 @@ export default function LoginPage() {
       return
     }
 
-    // Format for Supabase (E.164 format)
-    const formattedPhone = `+1${phoneNumbers}`
-
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formattedPhone }),
+        body: JSON.stringify({ phone: phoneNumbers }),
       })
 
       const data = await res.json()
@@ -57,7 +54,7 @@ export default function LoginPage() {
       }
 
       // Store phone for verification page
-      sessionStorage.setItem('pendingPhone', formattedPhone)
+      sessionStorage.setItem('pendingPhone', phoneNumbers)
       router.push('/verify')
     } catch {
       setError('Something went wrong. Please try again.')
