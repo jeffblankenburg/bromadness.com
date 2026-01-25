@@ -89,10 +89,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    // If phone actually changed, also update in auth.users (use +1 prefix)
+    // If phone actually changed, also update in auth.users (no + prefix)
     if (phoneChanged) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
-        phone: `+1${phone10}`,
+        phone: `1${phone10}`,
       })
       if (authError) {
         console.error('Auth update error:', authError)
@@ -176,9 +176,9 @@ export async function POST(request: Request) {
     // Use admin client to create user
     const adminClient = createAdminClient()
 
-    // Create auth user with phone (use +1 prefix to match existing records)
+    // Create auth user with phone (no + prefix - matches what signInWithOtp stores)
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-      phone: `+1${phone10}`,
+      phone: `1${phone10}`,
       phone_confirm: true, // Auto-confirm the phone
     })
 

@@ -69,7 +69,7 @@ export default function VerifyPage() {
 
     try {
       const { error } = await supabase.auth.verifyOtp({
-        phone: `+1${phone}`,
+        phone: `1${phone}`,
         token: verificationCode,
         type: 'sms',
       })
