@@ -427,6 +427,176 @@ export default async function PayoutsPage() {
     }
   }
 
+  // ============================================
+  // BROCKET WINNERS
+  // ============================================
+
+  // Get brocket entries (paid only)
+  const { data: brocketEntries } = await supabase
+    .from('brocket_entries')
+    .select('id, user_id, has_paid')
+    .eq('tournament_id', tournament.id)
+    .eq('has_paid', true)
+
+  // Get brocket picks
+  const brocketEntryIds = (brocketEntries || []).map(e => e.id)
+  let brocketPicks: Array<{ id: string; entry_id: string; game_id: string; picked_team_id: string }> = []
+
+  if (brocketEntryIds.length > 0) {
+    const { data } = await supabase
+      .from('brocket_picks')
+      .select('id, entry_id, game_id, picked_team_id')
+      .in('entry_id', brocketEntryIds)
+    brocketPicks = data || []
+  }
+
+  // Get round 1 games for brocket (sorted chronologically for tiebreakers)
+  const round1Games = (games || [])
+    .filter(g => g.round === 1)
+    .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''))
+
+  // Create game order map for tiebreakers
+  const brocketGameOrderMap = new Map<string, number>()
+  round1Games.forEach((game, index) => {
+    brocketGameOrderMap.set(game.id, index)
+  })
+
+  // Check if brocket is complete (all round 1 games have winners)
+  const isBrocketComplete = round1Games.length > 0 && round1Games.every(g => g.winner_id != null)
+
+  // Calculate brocket standings
+  const brocketStandings = (brocketEntries || []).map(entry => {
+    const entryPicks = brocketPicks.filter(p => p.entry_id === entry.id)
+
+    let points = 0
+    const losses: number[] = []
+
+    entryPicks.forEach(pick => {
+      const game = round1Games.find(g => g.id === pick.game_id)
+      if (!game) return
+
+      const pickedTeamId = pick.picked_team_id
+      const pickedSeed = teamSeedMap.get(pickedTeamId) || 0
+
+      if (game.winner_id === pickedTeamId) {
+        // Correct pick - add seed points
+        points += pickedSeed
+      } else if (game.winner_id !== null) {
+        // Wrong pick - track when this loss occurred
+        const gameOrder = brocketGameOrderMap.get(game.id)
+        if (gameOrder !== undefined) {
+          losses.push(gameOrder)
+        }
+      }
+    })
+
+    losses.sort((a, b) => a - b)
+
+    return {
+      user_id: entry.user_id,
+      points,
+      first_loss: losses[0] ?? null,
+      second_loss: losses[1] ?? null,
+    }
+  }).sort((a, b) => {
+    // Primary: points descending
+    if (b.points !== a.points) return b.points - a.points
+    // Tiebreaker 1: 2nd loss (later is better, null = best)
+    if (a.second_loss !== b.second_loss) {
+      if (a.second_loss === null) return -1
+      if (b.second_loss === null) return 1
+      return b.second_loss - a.second_loss
+    }
+    // Tiebreaker 2: 1st loss (later is better, null = best)
+    if (a.first_loss !== b.first_loss) {
+      if (a.first_loss === null) return -1
+      if (b.first_loss === null) return 1
+      return b.first_loss - a.first_loss
+    }
+    return 0
+  })
+
+  // Calculate brocket payouts (50/30/20 rounded to $5)
+  const brocketEntryFee = 10 // Could be fetched from tournament settings
+  const brocketPot = (brocketEntries || []).length * brocketEntryFee
+
+  const calculateBrocketPayouts = (pot: number) => {
+    const roundTo5 = (n: number) => Math.round(n / 5) * 5
+    let first = roundTo5(pot * 0.5)
+    let second = roundTo5(pot * 0.3)
+    let third = roundTo5(pot * 0.2)
+    const diff = pot - (first + second + third)
+    first += diff
+    return { first, second, third }
+  }
+
+  const brocketPayoutAmounts = calculateBrocketPayouts(brocketPot)
+
+  // Helper to check if two brocket entries are tied
+  const isBrocketTied = (a: typeof brocketStandings[0], b: typeof brocketStandings[0]) => {
+    if (!a || !b) return false
+    return a.points === b.points &&
+           a.second_loss === b.second_loss &&
+           a.first_loss === b.first_loss
+  }
+
+  // Assign brocket places with tie detection
+  const brocketPlaceAmounts = [brocketPayoutAmounts.first, brocketPayoutAmounts.second, brocketPayoutAmounts.third]
+  let brocketPlaceIndex = 0
+  let brocketStandingsIndex = 0
+
+  while (brocketPlaceIndex < 3 && brocketStandingsIndex < brocketStandings.length) {
+    // Find all people tied at this position
+    const tiedEntries = [brocketStandings[brocketStandingsIndex]]
+    while (brocketStandingsIndex + tiedEntries.length < brocketStandings.length &&
+           isBrocketTied(brocketStandings[brocketStandingsIndex], brocketStandings[brocketStandingsIndex + tiedEntries.length])) {
+      tiedEntries.push(brocketStandings[brocketStandingsIndex + tiedEntries.length])
+    }
+
+    // Calculate prize: sum of places they're tied for, split evenly
+    let totalPrize = 0
+    for (let p = brocketPlaceIndex; p < Math.min(brocketPlaceIndex + tiedEntries.length, 3); p++) {
+      totalPrize += brocketPlaceAmounts[p]
+    }
+    const splitPrize = Math.round(totalPrize / tiedEntries.length)
+
+    // Create entries for each tied person
+    const placeLabel = brocketPlaceIndex === 0 ? '1st' : brocketPlaceIndex === 1 ? '2nd' : '3rd'
+    const tieLabel = tiedEntries.length > 1 ? ` (T-${tiedEntries.length})` : ''
+
+    for (const entry of tiedEntries) {
+      winners.push({
+        oderId: orderCounter++,
+        oderlabel: 'Brocket',
+        payout_type: `brocket_${placeLabel.toLowerCase()}_${entry.user_id}`,
+        payout_label: `${placeLabel} Place${tieLabel}`,
+        amount: splitPrize,
+        user_id: entry.user_id,
+        user_name: userMap.get(entry.user_id) || null,
+        is_complete: isBrocketComplete,
+      })
+    }
+
+    brocketStandingsIndex += tiedEntries.length
+    brocketPlaceIndex += tiedEntries.length
+  }
+
+  // Fill remaining brocket places if not enough entries
+  while (brocketPlaceIndex < 3) {
+    const placeLabel = brocketPlaceIndex === 0 ? '1st' : brocketPlaceIndex === 1 ? '2nd' : '3rd'
+    winners.push({
+      oderId: orderCounter++,
+      oderlabel: 'Brocket',
+      payout_type: `brocket_${placeLabel.toLowerCase()}`,
+      payout_label: `${placeLabel} Place`,
+      amount: brocketPlaceAmounts[brocketPlaceIndex],
+      user_id: null,
+      user_name: null,
+      is_complete: isBrocketComplete,
+    })
+    brocketPlaceIndex++
+  }
+
   // Merge with existing payout records (for is_paid status)
   const winnersWithPayStatus = winners.map(w => ({
     ...w,

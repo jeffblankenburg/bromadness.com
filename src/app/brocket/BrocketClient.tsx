@@ -222,6 +222,20 @@ export function BrocketClient({
 
   // Calculate standings for leaderboard
   const calculateStandings = () => {
+    // Sort games chronologically by scheduled_at for tiebreaker calculations
+    const sortedGames = [...games].sort((a, b) => {
+      if (!a.scheduled_at && !b.scheduled_at) return 0
+      if (!a.scheduled_at) return 1
+      if (!b.scheduled_at) return -1
+      return a.scheduled_at.localeCompare(b.scheduled_at)
+    })
+
+    // Create a map of game_id to chronological index
+    const gameOrderMap = new Map<string, number>()
+    sortedGames.forEach((game, index) => {
+      gameOrderMap.set(game.id, index)
+    })
+
     return allEntries
       .filter(e => e.has_paid === true)
       .map(entry => {
@@ -230,6 +244,9 @@ export function BrocketClient({
 
         let points = 0
         let maxPossible = 0
+
+        // Track losses in chronological order for tiebreakers
+        const losses: number[] = []
 
         entryPicks.forEach(pick => {
           const game = games.find(g => g.id === pick.game_id)
@@ -248,9 +265,17 @@ export function BrocketClient({
           } else if (game.winner_id === null) {
             // Game not played yet - counts toward max possible
             maxPossible += pickedTeam.seed
+          } else {
+            // Wrong pick - track when this loss occurred
+            const gameOrder = gameOrderMap.get(game.id)
+            if (gameOrder !== undefined) {
+              losses.push(gameOrder)
+            }
           }
-          // Wrong pick: 0 points, 0 max for this game
         })
+
+        // Sort losses chronologically
+        losses.sort((a, b) => a - b)
 
         return {
           user_id: entry.user_id,
@@ -258,11 +283,29 @@ export function BrocketClient({
           points,
           max_possible: maxPossible,
           is_current_user: entry.user_id === userId,
+          first_loss: losses[0] ?? null,
+          second_loss: losses[1] ?? null,
         }
       })
       .sort((a, b) => {
-        // Sort by points descending, then max_possible descending as tiebreaker
+        // Primary: Sort by points descending
         if (b.points !== a.points) return b.points - a.points
+
+        // Tiebreaker 1: Games until 2nd loss (higher/later is better, null = no 2nd loss = best)
+        if (a.second_loss !== b.second_loss) {
+          if (a.second_loss === null) return -1
+          if (b.second_loss === null) return 1
+          return b.second_loss - a.second_loss
+        }
+
+        // Tiebreaker 2: Games until 1st loss (higher/later is better, null = no 1st loss = best)
+        if (a.first_loss !== b.first_loss) {
+          if (a.first_loss === null) return -1
+          if (b.first_loss === null) return 1
+          return b.first_loss - a.first_loss
+        }
+
+        // Final fallback: max_possible descending
         return b.max_possible - a.max_possible
       })
   }
@@ -293,14 +336,26 @@ export function BrocketClient({
       })
   }
 
-  // Calculate payouts
+  // Calculate payouts (50/30/20 split, rounded to nearest $5, totaling the pool)
   const paidEntriesCount = allEntries.filter(e => e.has_paid === true).length
   const totalPot = paidEntriesCount * entryFee
-  const payouts = {
-    first: Math.round(totalPot * 0.5),
-    second: Math.round(totalPot * 0.3),
-    third: Math.round(totalPot * 0.2),
+
+  const calculatePayouts = (pot: number) => {
+    const roundTo5 = (n: number) => Math.round(n / 5) * 5
+
+    // Start with percentage-based amounts rounded to $5
+    let first = roundTo5(pot * 0.5)
+    let second = roundTo5(pot * 0.3)
+    let third = roundTo5(pot * 0.2)
+
+    // Adjust to ensure total equals pot (add/subtract difference from 1st place)
+    const diff = pot - (first + second + third)
+    first += diff
+
+    return { first, second, third }
   }
+
+  const payouts = calculatePayouts(totalPot)
 
   const renderGame = (game: Game) => {
     if (!game.team1 || !game.team2) return null

@@ -118,9 +118,10 @@ export function PayoutsManager({ tournamentId, winners, pickemDates }: Props) {
     }
   }
 
-  // Get unique tabs - Pick'em days first, then Auction last
+  // Get unique tabs - Pick'em days first, then Brocket, then Auction last
   const auctionWinners = localWinners.filter(w => w.payout_type.startsWith('auction_'))
   const pickemWinners = localWinners.filter(w => w.payout_type.startsWith('pickem_'))
+  const brocketWinners = localWinners.filter(w => w.payout_type.startsWith('brocket_'))
 
   // Extract tab name from oderlabel format "THU|THURSDAY Pick'em Early Games"
   const getTabName = (label: string) => label.split('|')[0]
@@ -129,12 +130,20 @@ export function PayoutsManager({ tournamentId, winners, pickemDates }: Props) {
   // Get unique Pick'em day tabs (THU, FRI, etc.)
   const pickemTabs = [...new Set(pickemWinners.map(w => getTabName(w.oderlabel)))]
 
-  const tabs = [...pickemTabs, 'Auction']
+  // Build tabs: Pick'em days, Brocket (if has entries), Auction
+  const tabs = [
+    ...pickemTabs,
+    ...(brocketWinners.length > 0 ? ['Brocket'] : []),
+    'Auction'
+  ]
 
   // Get winners for current tab
   const getTabWinners = () => {
     if (activeTab === 'Auction') {
       return auctionWinners
+    }
+    if (activeTab === 'Brocket') {
+      return brocketWinners
     }
     // For Pick'em tabs, show both sessions for that date
     return pickemWinners.filter(w => getTabName(w.oderlabel) === activeTab)
