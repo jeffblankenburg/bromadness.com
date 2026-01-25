@@ -15,7 +15,7 @@ export function SimulatedUserBanner({ userName, hasDevBanner = false }: Props) {
   const handleStop = async () => {
     setStopping(true)
     try {
-      await fetch('/api/admin/simulate-user', { method: 'DELETE' })
+      await fetch('/api/admin/simulate-user', { method: 'DELETE', credentials: 'include' })
       router.refresh()
     } catch (error) {
       console.error('Failed to stop simulation:', error)

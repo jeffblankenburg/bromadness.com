@@ -28,7 +28,7 @@ export function ChatManager({ messageCount, leaderboard }: ChatManagerProps) {
     setError(null)
 
     try {
-      const res = await fetch('/api/chat/delete-all', { method: 'DELETE' })
+      const res = await fetch('/api/chat/delete-all', { method: 'DELETE', credentials: 'include' })
 
       if (!res.ok) {
         const data = await res.json()

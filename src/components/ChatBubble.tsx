@@ -17,7 +17,7 @@ export function ChatBubble() {
         const { data: { user } } = await supabase.auth.getUser()
         currentUserId = user?.id || null
 
-        const res = await fetch('/api/messages/unread-count')
+        const res = await fetch('/api/messages/unread-count', { credentials: 'include' })
         if (res.ok) {
           const data = await res.json()
           setUnreadCount(data.count)

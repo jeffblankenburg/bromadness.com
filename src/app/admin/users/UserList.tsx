@@ -39,6 +39,7 @@ export function UserList({ users }: Props) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isAdmin: !currentStatus }),
+        credentials: 'include',
       })
 
       if (!res.ok) {
@@ -82,6 +83,7 @@ export function UserList({ users }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: e164Phone, displayName, fullName: fullName || null }),
+        credentials: 'include',
       })
 
       const data = await res.json()
@@ -124,6 +126,7 @@ export function UserList({ users }: Props) {
           fullName: fullName || null,
           phone: e164Phone,
         }),
+        credentials: 'include',
       })
 
       const data = await res.json()
@@ -172,6 +175,7 @@ export function UserList({ users }: Props) {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: deletingUser.id }),
+        credentials: 'include',
       })
 
       const data = await res.json()

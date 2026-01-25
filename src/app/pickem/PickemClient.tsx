@@ -258,7 +258,8 @@ export function PickemClient({
           pickemDayId: currentDay.id,
           gameId,
           teamId,
-        })
+        }),
+        credentials: 'include',
       })
 
       if (!res.ok) {

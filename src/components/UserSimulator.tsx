@@ -30,7 +30,8 @@ export function UserSimulator({ users, currentSimulatedUser }: Props) {
       const res = await fetch('/api/admin/simulate-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: selectedUserId })
+        body: JSON.stringify({ userId: selectedUserId }),
+        credentials: 'include',
       })
 
       if (!res.ok) {
@@ -50,7 +51,8 @@ export function UserSimulator({ users, currentSimulatedUser }: Props) {
     setSaving(true)
     try {
       const res = await fetch('/api/admin/simulate-user', {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include',
       })
 
       if (!res.ok) {

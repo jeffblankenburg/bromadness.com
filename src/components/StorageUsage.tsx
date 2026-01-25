@@ -26,7 +26,7 @@ export function StorageUsage() {
   useEffect(() => {
     const fetchUsage = async () => {
       try {
-        const res = await fetch('/api/storage/usage')
+        const res = await fetch('/api/storage/usage', { credentials: 'include' })
         if (res.ok) {
           const storageData = await res.json()
           setData(storageData)

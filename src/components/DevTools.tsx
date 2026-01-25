@@ -10,7 +10,7 @@ export function DevTools({ isAdmin }: { isAdmin: boolean }) {
   const toggleAdmin = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/dev/toggle-admin', { method: 'POST' })
+      const res = await fetch('/api/dev/toggle-admin', { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
         setAdmin(data.is_admin)

@@ -41,7 +41,7 @@ export default function ChatPage() {
 
   // Mark as read on mount
   useEffect(() => {
-    fetch('/api/messages/read', { method: 'POST' }).catch(console.error)
+    fetch('/api/messages/read', { method: 'POST', credentials: 'include' }).catch(console.error)
   }, [])
 
   // Fetch messages on mount and subscribe to realtime updates
@@ -50,7 +50,7 @@ export default function ChatPage() {
 
     const fetchMessages = async () => {
       try {
-        const res = await fetch('/api/messages?limit=50')
+        const res = await fetch('/api/messages?limit=50', { credentials: 'include' })
         if (res.ok) {
           const data = await res.json()
           setMessages(data.messages)
@@ -125,7 +125,7 @@ export default function ChatPage() {
     setLoadingOlder(true)
 
     try {
-      const res = await fetch(`/api/messages?limit=50&before=${encodeURIComponent(oldestMessage.created_at)}`)
+      const res = await fetch(`/api/messages?limit=50&before=${encodeURIComponent(oldestMessage.created_at)}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         if (data.messages.length > 0) {
@@ -246,7 +246,7 @@ export default function ChatPage() {
       const url = query
         ? `/api/giphy/search?q=${encodeURIComponent(query)}&limit=20`
         : '/api/giphy/search?limit=20'
-      const res = await fetch(url)
+      const res = await fetch(url, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setGifs(data.gifs)
@@ -270,6 +270,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
+        credentials: 'include',
       })
 
       if (res.ok) {
@@ -293,6 +294,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gif_url: gifUrl }),
+        credentials: 'include',
       })
 
       if (res.ok) {
@@ -364,6 +366,7 @@ export default function ChatPage() {
       const uploadRes = await fetch('/api/chat-images/upload', {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       })
 
       if (!uploadRes.ok) {
@@ -378,6 +381,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_url: url }),
+        credentials: 'include',
       })
 
       if (res.ok) {
