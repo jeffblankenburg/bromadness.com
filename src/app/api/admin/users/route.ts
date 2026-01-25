@@ -66,24 +66,34 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient()
 
+    // Get current user data to check what actually changed
+    const { data: currentUser } = await adminClient
+      .from('users')
+      .select('phone')
+      .eq('id', userId)
+      .single()
+
     // Build update object with only provided fields
     const updates: Record<string, string> = {}
     if (displayName !== undefined) updates.display_name = displayName
     if (fullName !== undefined) updates.full_name = fullName
-    if (phone !== undefined) updates.phone = phone
+
+    // Only include phone in updates if it actually changed
+    const phoneChanged = phone && currentUser?.phone !== phone
+    if (phoneChanged) updates.phone = phone
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    // If phone is being updated, also update in auth.users
-    if (phone) {
+    // If phone actually changed, also update in auth.users
+    if (phoneChanged) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
         phone,
       })
       if (authError) {
         console.error('Auth update error:', authError)
-        return NextResponse.json({ error: 'Failed to update phone number' }, { status: 500 })
+        return NextResponse.json({ error: authError.message || 'Failed to update phone number' }, { status: 500 })
       }
     }
 
@@ -100,7 +110,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error updating user:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

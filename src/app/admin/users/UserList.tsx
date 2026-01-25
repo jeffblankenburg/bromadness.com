@@ -166,6 +166,22 @@ export function UserList({ users }: Props) {
     setError('')
   }
 
+  const handleForceSignOut = async (userId: string, displayName: string) => {
+    // Since Supabase doesn't easily allow remote session invalidation,
+    // the reliable way to force sign out is to delete and recreate the user
+    const confirmed = window.confirm(
+      `To force sign out ${displayName}, you should:\n\n` +
+      `1. Delete this user account\n` +
+      `2. Recreate them with the correct phone number\n` +
+      `3. Have them log in fresh\n\n` +
+      `Would you like to delete this user now?`
+    )
+
+    if (confirmed) {
+      setDeletingUser(users.find(u => u.id === userId) || null)
+    }
+  }
+
   const handleDelete = async () => {
     if (!deletingUser || deleteConfirm !== 'DELETE') return
 
@@ -335,6 +351,15 @@ export function UserList({ users }: Props) {
                         className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
                       >
                         {user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleForceSignOut(user.id, user.display_name)
+                          setMenuOpenFor(null)
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-yellow-400 hover:bg-zinc-700 transition-colors"
+                      >
+                        Force Sign Out
                       </button>
                       <button
                         onClick={() => {

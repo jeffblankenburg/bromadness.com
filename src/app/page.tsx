@@ -373,14 +373,6 @@ export default async function Home() {
                 </Link>
               )}
 
-              {/* Bracket Link */}
-              <Link href="/bracket" className="block">
-                <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 hover:bg-zinc-700 transition-colors text-center">
-                  <span className="text-orange-400 font-bold uppercase tracking-wide text-sm" style={{ fontFamily: 'var(--font-display)' }}>
-                    View the Brocket
-                  </span>
-                </div>
-              </Link>
             </div>
       </div>
 

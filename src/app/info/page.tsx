@@ -37,7 +37,12 @@ export default function InfoPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white pb-20">
       <div className="p-6 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-6" style={{ fontFamily: 'var(--font-display)' }}>Info</h1>
+        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-6 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          Info
+        </h1>
 
         <div className="space-y-3">
           {infoItems.map((item) => (

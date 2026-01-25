@@ -14,6 +14,12 @@ function getDayName(dateStr: string): string {
   return date.toLocaleDateString('en-US', { weekday: 'long' })
 }
 
+const PickemIcon = () => (
+  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+)
+
 export default async function PickemPage() {
   const supabase = await createClient()
 
@@ -34,7 +40,10 @@ export default async function PickemPage() {
   if (!tournament) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-4" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em</h1>
+        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-4 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+          <PickemIcon />
+          Pick&apos;em
+        </h1>
         <p className="text-zinc-400">No tournament found.</p>
       </div>
     )
@@ -74,7 +83,10 @@ export default async function PickemPage() {
   if (games.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-4" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em</h1>
+        <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-4 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+          <PickemIcon />
+          Pick&apos;em
+        </h1>
         <p className="text-zinc-400">Pick&apos;em coming soon!</p>
       </div>
     )

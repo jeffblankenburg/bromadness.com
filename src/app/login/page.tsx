@@ -3,14 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   // Format phone number as user types
   const formatPhone = (value: string) => {
@@ -44,12 +42,16 @@ export default function LoginPage() {
     const formattedPhone = `+1${phoneNumbers}`
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone }),
       })
 
-      if (error) {
-        setError(error.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to send verification code')
         setLoading(false)
         return
       }

@@ -452,7 +452,10 @@ export default async function AuctionPage() {
   return (
     <AuctionClient auctionComplete={auctionComplete}>
     <div className="p-4 pb-20 space-y-4">
-      <h1 className="text-xl font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>NCAA Auction</h1>
+      <h1 className="text-xl font-bold text-orange-400 uppercase tracking-wide flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+        <img src="/auction.svg" alt="" className="w-6 h-6" style={{ filter: 'brightness(0) saturate(100%) invert(64%) sepia(54%) saturate(2067%) hue-rotate(340deg) brightness(100%) contrast(97%)' }} />
+        NCAA Auction
+      </h1>
 
       {/* My Teams Row - show during auction too */}
       {currentUserTeams.length > 0 && (
