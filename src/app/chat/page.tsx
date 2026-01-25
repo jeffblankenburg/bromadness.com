@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [gifSearch, setGifSearch] = useState('')
   const [gifs, setGifs] = useState<GiphyGif[]>([])
   const [loadingGifs, setLoadingGifs] = useState(false)
+  const [gifError, setGifError] = useState<string | null>(null)
   const [activeUserId, setActiveUserId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -241,6 +242,7 @@ export default function ChatPage() {
 
   const fetchGifs = async (query: string) => {
     setLoadingGifs(true)
+    setGifError(null)
     try {
       const url = query
         ? `/api/giphy/search?q=${encodeURIComponent(query)}&limit=20`
@@ -248,10 +250,13 @@ export default function ChatPage() {
       const res = await fetch(url, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setGifs(data.gifs)
+        setGifs(data.gifs || [])
+      } else {
+        const errorData = await res.json().catch(() => ({}))
+        setGifError(`${res.status}: ${errorData.error || res.statusText}`)
       }
     } catch (error) {
-      console.error('Failed to fetch GIFs:', error)
+      setGifError(`Network error: ${error instanceof Error ? error.message : 'Unknown'}`)
     } finally {
       setLoadingGifs(false)
     }
@@ -535,6 +540,10 @@ export default function ChatPage() {
           <div className="h-40 overflow-y-auto">
             {loadingGifs ? (
               <div className="text-center text-zinc-500 py-4">Loading...</div>
+            ) : gifError ? (
+              <div className="text-center text-red-400 py-4 text-sm">{gifError}</div>
+            ) : gifs.length === 0 ? (
+              <div className="text-center text-zinc-500 py-4">No GIFs found</div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {gifs.map(gif => (
