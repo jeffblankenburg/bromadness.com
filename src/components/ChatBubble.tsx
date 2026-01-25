@@ -30,7 +30,7 @@ export function ChatBubble() {
     initialize()
 
     // Subscribe to new messages in realtime
-    const channel = supabase
+    const messageChannel = supabase
       .channel('chat-unread')
       .on(
         'postgres_changes',
@@ -44,8 +44,33 @@ export function ChatBubble() {
       )
       .subscribe()
 
+    // Subscribe to reactions on user's own messages
+    const reactionChannel = supabase
+      .channel('chat-reaction-unread')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_reactions' },
+        async (payload) => {
+          // Check if this reaction is on one of my messages
+          if (payload.new && payload.new.user_id !== currentUserId) {
+            const { data: message } = await supabase
+              .from('chat_messages')
+              .select('user_id')
+              .eq('id', payload.new.message_id)
+              .single()
+
+            // Only increment if this is MY message
+            if (message?.user_id === currentUserId) {
+              setUnreadCount(prev => prev + 1)
+            }
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(messageChannel)
+      supabase.removeChannel(reactionChannel)
     }
   }, [])
 

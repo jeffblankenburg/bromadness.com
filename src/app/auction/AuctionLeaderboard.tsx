@@ -158,9 +158,9 @@ export function AuctionLeaderboard({ leaderboard, entryFee }: Props) {
           >
             {/* Diagonal ribbon for unpaid */}
             {!entry.hasPaid && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="rotate-[15deg] bg-red-600/90 text-white text-xs font-bold py-1 w-[200%] text-center shadow-lg">
-                  NEEDS TO PAY BRO ${entryFee}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="rotate-[-15deg] bg-red-600/90 text-white text-sm font-bold py-1.5 w-[300%] text-center shadow-lg tracking-wider">
+                  PAY BRO ${entryFee}
                 </div>
               </div>
             )}

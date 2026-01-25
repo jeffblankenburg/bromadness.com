@@ -213,11 +213,13 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
           <thead>
             <tr className="bg-zinc-800">
               <th className="text-left px-1 py-1 text-zinc-400 font-medium text-[10px]">Player</th>
-              {Array.from({ length: teamsPerPlayer }).map((_, i) => (
-                <th key={i} className="px-0.5 py-1 text-zinc-400 font-medium text-[10px] w-12">
-                  Team {i + 1}
-                </th>
-              ))}
+              <th colSpan={teamsPerPlayer} className="p-0 text-zinc-400 font-medium text-[10px]">
+                <div className="flex justify-center">
+                  {Array.from({ length: teamsPerPlayer }).map((_, i) => (
+                    <div key={i} className="px-0.5 py-1 w-12 text-center">Team {i + 1}</div>
+                  ))}
+                </div>
+              </th>
               <th className="px-0.5 py-1 text-zinc-400 font-medium text-[10px]">Free Teams</th>
               <th className="text-right px-1 py-1 text-zinc-400 font-medium text-[10px]">Left</th>
             </tr>
@@ -231,29 +233,37 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
                   key={entry.user.id}
                   className={idx % 2 === 0 ? 'bg-zinc-900/40' : 'bg-zinc-700/40'}
                 >
-                  <td className={`relative px-1 py-1 ${isCurrentThrower ? 'font-bold text-orange-400' : 'font-medium text-zinc-300'} text-[11px] whitespace-nowrap`}>
-                    {!entry.hasPaid && (
-                      <span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 text-center text-red-500/20 text-[8px] font-black whitespace-nowrap tracking-widest pointer-events-none" style={{ width: '250%' }}>
-                        PAY ${entryFee}
-                      </span>
-                    )}
-                    <span className="relative">{truncateName(userName)}</span>
+                  {/* Player name */}
+                  <td className={`px-1 py-1 ${isCurrentThrower ? 'font-bold text-orange-400' : 'font-medium text-zinc-300'} text-[11px] whitespace-nowrap`}>
+                    {truncateName(userName)}
                   </td>
-                  {/* Paid teams */}
-                  {Array.from({ length: teamsPerPlayer }).map((_, i) => {
-                    const teamEntry = entry.paidTeams[i]
-                    return (
-                      <td key={i} className="px-0.5 py-1">
-                        {teamEntry ? (
-                          renderTeamBlock(teamEntry, userName)
-                        ) : (
-                          <div className="w-11 h-11 rounded-sm bg-zinc-800/30 flex items-center justify-center">
-                            <span className="text-zinc-700 text-xs">—</span>
+                  {/* Team columns with watermark */}
+                  <td colSpan={teamsPerPlayer} className="p-0">
+                    <div className="relative flex justify-center">
+                      {/* Watermark centered over team columns */}
+                      {!entry.hasPaid && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="whitespace-nowrap tracking-widest text-sm font-bold" style={{ color: 'rgba(239, 68, 68, 0.2)' }}>
+                            PAY BRO ${entryFee}
+                          </span>
+                        </div>
+                      )}
+                      {Array.from({ length: teamsPerPlayer }).map((_, i) => {
+                        const teamEntry = entry.paidTeams[i]
+                        return (
+                          <div key={i} className="px-0.5 py-1">
+                            {teamEntry ? (
+                              renderTeamBlock(teamEntry, userName)
+                            ) : (
+                              <div className="w-11 h-11 rounded-sm bg-zinc-800/30 flex items-center justify-center">
+                                <span className="text-zinc-700 text-xs">—</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </td>
-                    )
-                  })}
+                        )
+                      })}
+                    </div>
+                  </td>
                   {/* Bonus teams */}
                   <td className="px-0.5 py-1 align-top">
                     {entry.bonusTeams.length > 0 ? (
@@ -266,6 +276,7 @@ export function DraftBoard({ draftBoard, teamsPerPlayer, salaryCap, entryFee, cu
                       </div>
                     )}
                   </td>
+                  {/* Money left */}
                   <td className="text-right px-1 py-1 text-white text-[11px] font-semibold whitespace-nowrap">
                     ${salaryCap - entry.totalSpent}
                   </td>

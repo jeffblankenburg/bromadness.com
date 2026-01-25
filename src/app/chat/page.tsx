@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { ReactionPicker } from '@/components/ReactionPicker'
+import { ReactionDisplay } from '@/components/ReactionDisplay'
+
+interface Reaction {
+  id: string
+  emoji: string
+  user: { id: string; display_name: string | null } | null
+}
 
 interface Message {
   id: string
@@ -12,6 +20,7 @@ interface Message {
   image_url: string | null
   created_at: string
   user: { id: string; display_name: string | null } | null
+  reactions?: Reaction[]
 }
 
 interface GiphyGif {
@@ -35,14 +44,22 @@ export default function ChatPage() {
   const [loadingGifs, setLoadingGifs] = useState(false)
   const [gifError, setGifError] = useState<string | null>(null)
   const [activeUserId, setActiveUserId] = useState<string | null>(null)
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null)
+  const [reactionPickerY, setReactionPickerY] = useState<number>(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const gifSearchTimeout = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Mark as read on mount
+  // Mark messages and reactions as read on mount
   useEffect(() => {
-    fetch('/api/messages/read', { method: 'POST', credentials: 'include' }).catch(console.error)
+    Promise.all([
+      fetch('/api/messages/read', { method: 'POST', credentials: 'include' }),
+      fetch('/api/messages/reactions/read', { method: 'POST', credentials: 'include' })
+    ]).catch(console.error)
   }, [])
 
   // Fetch messages on mount and subscribe to realtime updates
@@ -59,6 +76,9 @@ export default function ChatPage() {
           if (data.activeUserId) {
             setActiveUserId(data.activeUserId)
           }
+          if (data.isAdmin) {
+            setIsAdmin(data.isAdmin)
+          }
         }
       } catch (error) {
         console.error('Failed to fetch messages:', error)
@@ -69,9 +89,19 @@ export default function ChatPage() {
 
     fetchMessages()
 
-    // Subscribe to new messages in realtime
-    const channel = supabase
+    // Subscribe to message changes in realtime
+    const messageChannel = supabase
       .channel('chat-messages')
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          // Remove deleted message from state
+          if (payload.old && payload.old.id) {
+            setMessages(prev => prev.filter(m => m.id !== payload.old.id))
+          }
+        }
+      )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
@@ -98,7 +128,8 @@ export default function ChatPage() {
               gif_url: newMessage.gif_url,
               image_url: newMessage.image_url,
               created_at: newMessage.created_at,
-              user: Array.isArray(newMessage.user) ? newMessage.user[0] : newMessage.user
+              user: Array.isArray(newMessage.user) ? newMessage.user[0] : newMessage.user,
+              reactions: []
             }
 
             setMessages(prev => {
@@ -113,8 +144,40 @@ export default function ChatPage() {
       )
       .subscribe()
 
+    // Subscribe to reaction changes
+    const reactionChannel = supabase
+      .channel('chat-reactions')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_reactions' },
+        async (payload) => {
+          // Get the message ID from either new or old payload
+          const messageId = (payload.new as { message_id?: string })?.message_id ||
+                           (payload.old as { message_id?: string })?.message_id
+          if (messageId) {
+            // Fetch updated reactions for this message
+            const { data: reactions } = await supabase
+              .from('chat_reactions')
+              .select('id, emoji, user:users!chat_reactions_user_id_fkey(id, display_name)')
+              .eq('message_id', messageId)
+
+            const formattedReactions = (reactions || []).map(r => ({
+              id: r.id,
+              emoji: r.emoji,
+              user: Array.isArray(r.user) ? r.user[0] : r.user
+            }))
+
+            setMessages(prev => prev.map(m =>
+              m.id === messageId ? { ...m, reactions: formattedReactions } : m
+            ))
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(messageChannel)
+      supabase.removeChannel(reactionChannel)
     }
   }, [])
 
@@ -401,6 +464,45 @@ export default function ChatPage() {
     }
   }
 
+  const handleReaction = async (messageId: string, emoji: string) => {
+    if (!emoji) {
+      // Remove reaction
+      await fetch('/api/messages/reactions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: messageId }),
+        credentials: 'include',
+      })
+    } else {
+      // Add/update reaction
+      await fetch('/api/messages/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: messageId, emoji }),
+        credentials: 'include',
+      })
+    }
+    setShowReactionPicker(null)
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (res.ok) {
+        // Message will be removed via realtime subscription
+        setDeleteConfirmId(null)
+      }
+    } catch (error) {
+      console.error('Failed to delete message:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
@@ -469,6 +571,7 @@ export default function ChatPage() {
           messages.map(msg => {
             const isOwnMessage = activeUserId && msg.user?.id === activeUserId
             const emojiOnly = isEmojiOnly(msg.content)
+            const myReaction = msg.reactions?.find(r => r.user?.id === activeUserId)
             return (
             <div key={msg.id} className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
               <div className={`flex items-baseline gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
@@ -480,39 +583,93 @@ export default function ChatPage() {
                 </span>
                 <span className="text-xs text-zinc-500">{formatTime(msg.created_at)}</span>
               </div>
-              {msg.gif_url || msg.image_url ? (
-                <div className={`px-4 py-2 max-w-[85%] ${
-                  isOwnMessage
-                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
-                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
-                }`}>
-                  <Image
-                    src={msg.gif_url || msg.image_url || ''}
-                    alt={msg.gif_url ? 'GIF' : 'Photo'}
-                    width={200}
-                    height={150}
-                    className="rounded-lg max-w-[200px]"
-                    unoptimized
-                    onLoad={scrollToBottom}
-                  />
-                </div>
-              ) : emojiOnly ? (
-                <div className={`px-4 py-2 ${
-                  isOwnMessage
-                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
-                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
-                }`}>
-                  <span style={{ fontSize: '4rem', lineHeight: 1 }}>{msg.content}</span>
-                </div>
-              ) : (
-                <div className={`px-4 py-2 max-w-[85%] ${
-                  isOwnMessage
-                    ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
-                    : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
-                }`}>
-                  <p className="text-sm text-white break-words">{msg.content}</p>
-                </div>
-              )}
+              <div className="relative group max-w-[85%]">
+                {/* Admin delete button */}
+                {isAdmin && (
+                  <button
+                    onClick={() => setDeleteConfirmId(msg.id)}
+                    className={`absolute ${isOwnMessage ? '-left-3' : '-right-3'} -top-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full w-6 h-6 flex items-center justify-center z-10`}
+                    title="Delete message"
+                  >
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                {msg.gif_url || msg.image_url ? (
+                  <div className={`px-4 py-2 ${
+                    isOwnMessage
+                      ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
+                      : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                  }`}>
+                    <Image
+                      src={msg.gif_url || msg.image_url || ''}
+                      alt={msg.gif_url ? 'GIF' : 'Photo'}
+                      width={200}
+                      height={150}
+                      className="rounded-lg max-w-[200px]"
+                      unoptimized
+                      onLoad={scrollToBottom}
+                    />
+                  </div>
+                ) : emojiOnly ? (
+                  <div className={`px-4 py-2 ${
+                    isOwnMessage
+                      ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
+                      : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                  }`}>
+                    <span style={{ fontSize: '4rem', lineHeight: 1 }}>{msg.content}</span>
+                  </div>
+                ) : (
+                  <div className={`px-4 py-2 ${
+                    isOwnMessage
+                      ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
+                      : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
+                  }`}>
+                    <p className="text-sm text-white break-words">{msg.content}</p>
+                  </div>
+                )}
+                {/* Reaction button - bottom corner furthest from screen edge */}
+                <button
+                  onClick={(e) => {
+                    if (showReactionPicker === msg.id) {
+                      setShowReactionPicker(null)
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      setReactionPickerY(rect.top)
+                      setShowReactionPicker(msg.id)
+                    }
+                  }}
+                  className={`absolute ${isOwnMessage ? '-left-2 -bottom-2' : '-right-2 -bottom-2'} bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 rounded-full w-6 h-6 flex items-center justify-center text-xs`}
+                >
+                  {myReaction ? myReaction.emoji : '😊'}
+                </button>
+                {/* Reaction picker - centered on screen, above the button */}
+                {showReactionPicker === msg.id && (
+                  <div
+                    className="fixed left-1/2 -translate-x-1/2 z-50"
+                    style={{ top: reactionPickerY - 60 }}
+                  >
+                    <ReactionPicker
+                      onSelect={(emoji) => handleReaction(msg.id, emoji)}
+                      onClose={() => setShowReactionPicker(null)}
+                      currentEmoji={myReaction?.emoji}
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Display reactions */}
+              <ReactionDisplay
+                reactions={msg.reactions || []}
+                isOwnMessage={!!isOwnMessage}
+                onReactionClick={(emoji) => {
+                  if (myReaction?.emoji === emoji) {
+                    handleReaction(msg.id, '')
+                  } else {
+                    handleReaction(msg.id, emoji)
+                  }
+                }}
+              />
             </div>
           )}))
         }
@@ -621,6 +778,43 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                Delete Message
+              </h3>
+            </div>
+            <p className="text-zinc-300 text-sm mb-6">
+              Are you sure you want to delete this message? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteMessage(deleteConfirmId)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

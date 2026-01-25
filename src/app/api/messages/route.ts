@@ -44,9 +44,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
     }
 
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+
     // Reverse to get chronological order for display
     const hasMore = (messages?.length || 0) === limit
-    return NextResponse.json({ messages: (messages || []).reverse(), activeUserId, hasMore })
+    return NextResponse.json({
+      messages: (messages || []).reverse(),
+      activeUserId,
+      hasMore,
+      isAdmin: profile?.is_admin || false
+    })
   } catch (error) {
     console.error('Error in messages GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
