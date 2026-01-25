@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -481,13 +480,11 @@ export default function ChatPage() {
                     ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
                     : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                 }`}>
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={msg.gif_url || msg.image_url || ''}
                     alt={msg.gif_url ? 'GIF' : 'Photo'}
-                    width={200}
-                    height={150}
-                    className="rounded-lg max-w-[200px]"
-                    unoptimized
+                    className="rounded-lg max-w-[200px] max-h-[150px] object-contain"
                     onLoad={scrollToBottom}
                   />
                 </div>
@@ -546,12 +543,12 @@ export default function ChatPage() {
                     onClick={() => handleSendGif(gif.images.fixed_height.url)}
                     className="relative aspect-square overflow-hidden rounded hover:ring-2 hover:ring-orange-500"
                   >
-                    <Image
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={gif.images.fixed_height_small.url}
                       alt="GIF"
-                      fill
-                      className="object-cover"
-                      unoptimized
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="lazy"
                     />
                   </button>
                 ))}
