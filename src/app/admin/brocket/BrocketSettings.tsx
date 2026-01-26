@@ -8,12 +8,14 @@ interface Props {
   tournamentId: string
   entryFee: number
   enabled: boolean
+  lockIndividual: boolean
 }
 
-export function BrocketSettings({ tournamentId, entryFee: initialEntryFee, enabled: initialEnabled }: Props) {
+export function BrocketSettings({ tournamentId, entryFee: initialEntryFee, enabled: initialEnabled, lockIndividual: initialLockIndividual }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [entryFee, setEntryFee] = useState(initialEntryFee)
   const [enabled, setEnabled] = useState(initialEnabled)
+  const [lockIndividual, setLockIndividual] = useState(initialLockIndividual)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -28,6 +30,7 @@ export function BrocketSettings({ tournamentId, entryFee: initialEntryFee, enabl
           brocket_payouts: {
             entry_fee: entryFee,
             enabled: enabled,
+            lock_individual: lockIndividual,
           },
         })
         .eq('id', tournamentId)
@@ -105,6 +108,32 @@ export function BrocketSettings({ tournamentId, entryFee: initialEntryFee, enabl
                   />
                   <span className="text-sm text-zinc-300">Enable Brocket</span>
                 </label>
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Lock Mode</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="lockMode"
+                      checked={!lockIndividual}
+                      onChange={() => setLockIndividual(false)}
+                      className="w-4 h-4 border-zinc-600 bg-zinc-800 text-orange-400 focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-zinc-300">Lock all picks at first game</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="lockMode"
+                      checked={lockIndividual}
+                      onChange={() => setLockIndividual(true)}
+                      className="w-4 h-4 border-zinc-600 bg-zinc-800 text-orange-400 focus:ring-orange-500"
+                    />
+                    <span className="text-sm text-zinc-300">Lock each pick at game start</span>
+                  </label>
+                </div>
               </div>
 
               <div className="text-xs text-zinc-500">

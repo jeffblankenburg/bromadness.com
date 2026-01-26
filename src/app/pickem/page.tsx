@@ -6,6 +6,7 @@ import { getActiveUserId } from '@/lib/simulation'
 interface PickemPayouts {
   entry_fee: number
   enabled_days?: string[]  // Day names like "Thursday", "Friday", etc.
+  lock_individual?: boolean
 }
 
 // Get day name from a date string
@@ -172,6 +173,7 @@ export default async function PickemPage() {
 
   const entryFee = payouts.entry_fee || 10
   const simulatedTime = tournament.dev_simulated_time as string | null
+  const lockIndividual = payouts.lock_individual ?? false
 
   return (
     <PickemClient
@@ -186,6 +188,7 @@ export default async function PickemPage() {
       entryFee={entryFee}
       simulatedTime={simulatedTime}
       enabledDays={enabledDays}
+      lockIndividual={lockIndividual}
     />
   )
 }

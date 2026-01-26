@@ -584,14 +584,14 @@ export default function ChatPage() {
                 <span className="text-xs text-zinc-500">{formatTime(msg.created_at)}</span>
               </div>
               <div className="relative group max-w-[85%]">
-                {/* Admin delete button */}
+                {/* Admin delete button - bottom corner opposite from emoji */}
                 {isAdmin && (
                   <button
                     onClick={() => setDeleteConfirmId(msg.id)}
-                    className={`absolute ${isOwnMessage ? '-left-3' : '-right-3'} -top-3 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full w-6 h-6 flex items-center justify-center z-10`}
+                    className={`absolute ${isOwnMessage ? '-right-2' : '-left-2'} -bottom-2 bg-zinc-600 hover:bg-zinc-500 active:bg-zinc-400 rounded-full w-6 h-6 flex items-center justify-center z-10`}
                     title="Delete message"
                   >
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 text-zinc-300" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
                   </button>

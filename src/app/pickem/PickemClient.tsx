@@ -64,6 +64,7 @@ interface Props {
   entryFee: number
   simulatedTime: string | null
   enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
+  lockIndividual: boolean
 }
 
 function findD1Team(teamName: string) {
@@ -94,6 +95,19 @@ const formatGameTime = (dateStr: string | null) => {
   return `${hour12}:${mins}${ampm}`
 }
 
+const formatLockTime = (dateStr: string | null) => {
+  if (!dateStr) return null
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return null
+  const [, , month, day, hours, mins] = match
+  const hour = parseInt(hours)
+  const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const date = new Date(`${match[1]}-${month}-${day}T12:00:00`)
+  const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
+  return `${dayName} ${hour12}:${mins} ${ampm} ET`
+}
+
 const getChannelNumber = (channelName: string | null) => {
   if (!channelName) return null
   const channel = CHANNELS.find(c => c.name.toLowerCase() === channelName.toLowerCase())
@@ -112,6 +126,7 @@ export function PickemClient({
   entryFee,
   simulatedTime,
   enabledDays,
+  lockIndividual,
 }: Props) {
   // Parse a timestamp string (stored as Eastern) into a Date object
   const parseTimestamp = (timeStr: string): Date => {
@@ -229,8 +244,20 @@ export function PickemClient({
   const sessionPayouts = calculateSessionPayouts(sessionPot)
 
   // Check if day is locked
+  // When lockIndividual is false (default): all picks lock when first game of day starts
+  // When lockIndividual is true: each pick locks when its game starts
   const firstGameTime = dayGames[0]?.scheduled_at
-  const isLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+  const isGloballyLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+
+  // Check if a specific game is locked
+  const isGameLocked = (game: Game): boolean => {
+    if (lockIndividual) {
+      // Individual mode: lock based on this game's start time
+      return game.scheduled_at ? parseTimestamp(game.scheduled_at) <= getCurrentTime() : false
+    }
+    // Global mode: lock based on first game of day
+    return isGloballyLocked
+  }
 
   // Get user's entry and picks
   const userEntry = currentDay ? userEntries.find(e => e.pickem_day_id === currentDay.id) : undefined
@@ -244,7 +271,8 @@ export function PickemClient({
   }
 
   const handlePick = async (gameId: string, teamId: string) => {
-    if (isLocked || saving || !currentDay) return
+    const game = games.find(g => g.id === gameId)
+    if (!game || isGameLocked(game) || saving || !currentDay) return
     setLocalPicks(prev => ({ ...prev, [gameId]: teamId }))
     setSaving(true)
 
@@ -392,6 +420,7 @@ export function PickemClient({
     const savedPick = userDayPicks.find(p => p.game_id === game.id)
     const pickCorrectness = savedPick?.is_correct ?? (isComplete && pickedTeamId ? isPickCorrect(game, pickedTeamId) : null)
     const channelNum = getChannelNumber(game.channel || null)
+    const gameLocked = isGameLocked(game)
 
     const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
       const isPicked = pickedTeamId === team.id
@@ -409,9 +438,9 @@ export function PickemClient({
         <button
           key={team.id}
           onClick={() => handlePick(game.id, team.id)}
-          disabled={isLocked}
+          disabled={gameLocked}
           className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
-            isLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
+            gameLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
           style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
@@ -452,7 +481,7 @@ export function PickemClient({
           {game.scheduled_at && (
             <span className={`px-1 py-0.5 rounded flex items-center gap-1 ${isStarted && !isComplete ? 'bg-red-500/20 text-red-400 font-bold' : 'bg-zinc-800'}`}>
               {isStarted && !isComplete ? 'LIVE' : formatGameTime(game.scheduled_at)}
-              {isLocked && (
+              {gameLocked && (
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                 </svg>
@@ -619,6 +648,20 @@ export function PickemClient({
         })}
       </div>
 
+      {/* Lock Status Header */}
+      {!dayHasNoGames && (
+        <div className="text-center">
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+            {isGloballyLocked
+              ? 'Picks are locked'
+              : lockIndividual
+                ? 'Each pick locks at game start'
+                : `Picks lock ${formatLockTime(firstGameTime)}`
+            }
+          </h3>
+        </div>
+      )}
+
       {/* Sub-tabs: My Picks / Leaderboard */}
       <div className="flex bg-zinc-800 rounded-lg p-1">
         <button
@@ -630,7 +673,7 @@ export function PickemClient({
           }`}
         >
           My Picks
-          {!isLocked && (
+          {(!isGloballyLocked || lockIndividual) && (
             <span className="ml-2 text-xs text-zinc-500">({picksCount}/{totalGames})</span>
           )}
         </button>
@@ -646,12 +689,6 @@ export function PickemClient({
         </button>
       </div>
 
-      {/* Lock Status */}
-      {isLocked && activeTab === 'picks' && (
-        <div className="bg-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm text-center">
-          Picks are locked
-        </div>
-      )}
 
       {/* My Picks Tab */}
       {activeTab === 'picks' && dayHasNoGames && (

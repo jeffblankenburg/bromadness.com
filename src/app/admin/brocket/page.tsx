@@ -6,6 +6,7 @@ import { BrocketSettings } from './BrocketSettings'
 interface BrocketPayouts {
   entry_fee: number
   enabled: boolean
+  lock_individual?: boolean
 }
 
 export default async function AdminBrocketPage() {
@@ -82,6 +83,7 @@ export default async function AdminBrocketPage() {
           tournamentId={tournament.id}
           entryFee={payouts.entry_fee}
           enabled={payouts.enabled ?? true}
+          lockIndividual={payouts.lock_individual ?? false}
         />
       </div>
 

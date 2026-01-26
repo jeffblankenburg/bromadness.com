@@ -6,6 +6,7 @@ import { getActiveUserId } from '@/lib/simulation'
 interface BrocketPayouts {
   entry_fee: number
   enabled: boolean
+  lock_individual?: boolean
 }
 
 interface Region {
@@ -148,6 +149,7 @@ export default async function BrocketPage() {
 
   const entryFee = payouts.entry_fee || 20
   const simulatedTime = tournament.dev_simulated_time as string | null
+  const lockIndividual = payouts.lock_individual ?? false
 
   return (
     <BrocketClient
@@ -163,6 +165,7 @@ export default async function BrocketPage() {
       entryFee={entryFee}
       simulatedTime={simulatedTime}
       firstGameTime={firstGameTime}
+      lockIndividual={lockIndividual}
     />
   )
 }

@@ -64,6 +64,7 @@ interface Props {
   entryFee: number
   simulatedTime: string | null
   firstGameTime: string | null
+  lockIndividual: boolean
 }
 
 function findD1Team(teamName: string) {
@@ -110,6 +111,7 @@ export function BrocketClient({
   entryFee,
   simulatedTime,
   firstGameTime,
+  lockIndividual,
 }: Props) {
   // Parse a timestamp string (stored as Eastern) into a Date object
   const parseTimestamp = (timeStr: string): Date => {
@@ -134,32 +136,44 @@ export function BrocketClient({
   const router = useRouter()
 
   // Check if picks are locked (games have started)
-  const isLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+  // When lockIndividual is false (default): all picks lock when first game starts
+  // When lockIndividual is true: each pick locks when its game starts
+  const isGloballyLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+
+  // Check if a specific game is locked
+  const isGameLocked = (game: Game): boolean => {
+    if (lockIndividual) {
+      // Individual mode: lock based on this game's start time
+      return game.scheduled_at ? parseTimestamp(game.scheduled_at) <= getCurrentTime() : false
+    }
+    // Global mode: lock based on first game start time
+    return isGloballyLocked
+  }
 
   // Default states based on lock status:
   // Before games: leaderboard closed, picks open
   // After games: leaderboard open, picks closed
-  const [leaderboardExpanded, setLeaderboardExpanded] = useState(isLocked)
-  const [picksExpanded, setPicksExpanded] = useState(!isLocked)
+  const [leaderboardExpanded, setLeaderboardExpanded] = useState(isGloballyLocked)
+  const [picksExpanded, setPicksExpanded] = useState(!isGloballyLocked)
 
   // Load expanded state from localStorage (overrides defaults if user has manually toggled)
   useEffect(() => {
     const savedLeaderboard = localStorage.getItem('brocket-leaderboard-expanded')
     const savedPicks = localStorage.getItem('brocket-picks-expanded')
 
-    // Only use localStorage if there's a saved value, otherwise use isLocked-based defaults
+    // Only use localStorage if there's a saved value, otherwise use isGloballyLocked-based defaults
     if (savedLeaderboard !== null) {
       setLeaderboardExpanded(savedLeaderboard === 'true')
     } else {
-      setLeaderboardExpanded(isLocked)
+      setLeaderboardExpanded(isGloballyLocked)
     }
 
     if (savedPicks !== null) {
       setPicksExpanded(savedPicks === 'true')
     } else {
-      setPicksExpanded(!isLocked)
+      setPicksExpanded(!isGloballyLocked)
     }
-  }, [isLocked])
+  }, [isGloballyLocked])
 
   const toggleLeaderboard = () => {
     const newValue = !leaderboardExpanded
@@ -186,7 +200,8 @@ export function BrocketClient({
   }
 
   const handlePick = async (gameId: string, teamId: string) => {
-    if (isLocked || saving) return
+    const game = games.find(g => g.id === gameId)
+    if (!game || isGameLocked(game) || saving) return
     setLocalPicks(prev => ({ ...prev, [gameId]: teamId }))
     setSaving(true)
 
@@ -372,6 +387,7 @@ export function BrocketClient({
     const pickedTeamId = getPickedTeamId(game.id)
     const isComplete = game.winner_id !== null
     const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
+    const gameLocked = isGameLocked(game)
 
     const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null) => {
       const isPicked = pickedTeamId === team.id
@@ -389,9 +405,9 @@ export function BrocketClient({
         <button
           key={team.id}
           onClick={() => handlePick(game.id, team.id)}
-          disabled={isLocked}
+          disabled={gameLocked}
           className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
-            isLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
+            gameLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
           style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
@@ -528,7 +544,12 @@ export function BrocketClient({
         >
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
-              {isLocked ? 'Leaderboard' : `Picks lock ${formatLockTime(firstGameTime)}`}
+              {isGloballyLocked
+                ? 'Leaderboard'
+                : lockIndividual
+                  ? 'Each pick locks at game start'
+                  : `Picks lock ${formatLockTime(firstGameTime)}`
+              }
             </h3>
           </div>
           <svg
@@ -544,7 +565,7 @@ export function BrocketClient({
 
         {leaderboardExpanded && (
           <div className="px-4 pb-4">
-            {isLocked ? (
+            {isGloballyLocked ? (
               <>
                 {/* Payouts */}
                 {(payouts.first > 0 || payouts.second > 0 || payouts.third > 0) && (

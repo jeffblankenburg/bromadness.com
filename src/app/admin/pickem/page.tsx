@@ -7,6 +7,7 @@ import { DeleteAllPicks } from './DeleteAllPicks'
 interface PickemPayouts {
   entry_fee: number
   enabled_days?: string[]  // Day names like "Thursday", "Friday", etc.
+  lock_individual?: boolean
 }
 
 export default async function AdminPickemPage() {
@@ -170,6 +171,7 @@ export default async function AdminPickemPage() {
           tournamentId={tournament.id}
           entryFee={payouts.entry_fee}
           enabledDays={enabledDays}
+          lockIndividual={payouts.lock_individual ?? false}
         />
       </div>
 
