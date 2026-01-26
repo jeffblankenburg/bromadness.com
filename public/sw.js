@@ -10,13 +10,11 @@ self.addEventListener('push', (event) => {
   const data = event.data.json()
   const { title, body, icon, badge, data: notificationData } = data
 
-  // Update the app badge with unread count
-  if (notificationData?.unreadCount !== undefined && 'setAppBadge' in navigator) {
-    if (notificationData.unreadCount > 0) {
-      navigator.setAppBadge(notificationData.unreadCount)
-    } else {
-      navigator.clearAppBadge()
-    }
+  // Update the app badge - increment or set to 1 to indicate new content
+  if ('setAppBadge' in navigator) {
+    // Always set badge to indicate new notification
+    // The exact count will be corrected when app is opened
+    navigator.setAppBadge(1).catch(() => {})
   }
 
   // Show the notification
