@@ -57,7 +57,7 @@ export default async function BracketPage() {
     .select('id')
     .eq('tournament_id', tournament.id)
 
-  let userPicks: { game_id: string; picked_team_id: string }[] = []
+  let pickemPicks: { game_id: string; picked_team_id: string }[] = []
 
   if (pickemDays && pickemDays.length > 0) {
     const dayIds = pickemDays.map(d => d.id)
@@ -79,8 +79,27 @@ export default async function BracketPage() {
         .in('entry_id', entryIds)
         .not('picked_team_id', 'is', null)
 
-      userPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
+      pickemPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
     }
+  }
+
+  // Get user's brocket picks (Round 1 straight-up picks)
+  let brocketPicks: { game_id: string; picked_team_id: string }[] = []
+
+  const { data: brocketEntry } = await supabase
+    .from('brocket_entries')
+    .select('id')
+    .eq('user_id', activeUserId)
+    .eq('tournament_id', tournament.id)
+    .single()
+
+  if (brocketEntry) {
+    const { data: picks } = await supabase
+      .from('brocket_picks')
+      .select('game_id, picked_team_id')
+      .eq('entry_id', brocketEntry.id)
+
+    brocketPicks = (picks || []) as { game_id: string; picked_team_id: string }[]
   }
 
   // Get auction team owners
@@ -103,7 +122,8 @@ export default async function BracketPage() {
       regions={regions || []}
       teams={teams || []}
       games={games || []}
-      userPicks={userPicks}
+      pickemPicks={pickemPicks}
+      brocketPicks={brocketPicks}
       teamOwners={teamOwners}
     />
   )
