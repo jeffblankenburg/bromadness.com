@@ -29,6 +29,7 @@ interface Props {
   games: Game[]
   userAuctionTeamIds: string[]
   userPickemTeamIds: string[]
+  userBrocketTeamIds: string[]
   simulatedTime?: string | null
 }
 
@@ -67,7 +68,7 @@ const parseTimestamp = (timeStr: string): Date => {
   return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(mins), parseInt(secs || '0'))
 }
 
-export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, simulatedTime }: Props) {
+export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, userBrocketTeamIds, simulatedTime }: Props) {
   const [expanded, setExpanded] = useState(true)
 
   // Get current time as a Date object (in Eastern time context)
@@ -118,6 +119,7 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, sim
       const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
       const isAuctionTeam = userAuctionTeamIds.includes(team.id)
       const isPickemTeam = userPickemTeamIds.includes(team.id)
+      const isBrocketTeam = userBrocketTeamIds.includes(team.id)
 
       return (
         <div
@@ -141,17 +143,27 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, sim
               <span className="text-xs text-zinc-400 ml-1">{spreadDisplay}</span>
             )}
           </span>
-          {/* Auction ownership icon (gavel) */}
-          {isAuctionTeam && (
-            <span className="flex-shrink-0" title="Your auction team">
-              <img src="/auction.svg" alt="Auction" className="w-5 h-5 brightness-0 invert opacity-60" />
+          {/* Brocket pick icon (rocket) */}
+          {isBrocketTeam && (
+            <span className="text-zinc-400 flex-shrink-0" title="Your brocket pick">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
+              </svg>
             </span>
           )}
-          {/* Pickem pick icon (circled checkmark) */}
+          {/* Pickem pick icon (checkmark) */}
           {isPickemTeam && (
-            <span className="text-zinc-400 flex-shrink-0" title="Your pick">
+            <span className="text-zinc-400 flex-shrink-0" title="Your pickem pick">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </span>
+          )}
+          {/* Auction ownership icon (dollar) */}
+          {isAuctionTeam && (
+            <span className="text-zinc-400 flex-shrink-0" title="Your auction team">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
             </span>
           )}

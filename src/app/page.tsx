@@ -94,6 +94,7 @@ export default async function Home() {
   let userTotalPoints = 0
   let userAuctionTeamIds: string[] = []
   let userPickemTeamIds: string[] = []
+  let userBrocketTeamIds: string[] = []
   let tripBalance = 0
   let simulatedTime: string | null = null
   let totalWinnings = 0
@@ -244,6 +245,26 @@ export default async function Home() {
           })
           .map(p => p.picked_team_id)
           .filter((id): id is string => id !== null)
+
+        // Get user's brocket picks for current games (Round 1 only)
+        const { data: brocketEntry } = await supabase
+          .from('brocket_entries')
+          .select('id')
+          .eq('user_id', activeUserId)
+          .eq('tournament_id', tournament.id)
+          .single()
+
+        if (brocketEntry) {
+          const { data: brocketPicks } = await supabase
+            .from('brocket_picks')
+            .select('picked_team_id')
+            .eq('entry_id', brocketEntry.id)
+            .in('game_id', currentGameIds)
+
+          userBrocketTeamIds = (brocketPicks || [])
+            .map(p => p.picked_team_id)
+            .filter((id): id is string => id !== null)
+        }
       }
 
       // Get user's trip cost balance
@@ -356,6 +377,7 @@ export default async function Home() {
                   games={currentGames}
                   userAuctionTeamIds={userAuctionTeamIds}
                   userPickemTeamIds={userPickemTeamIds}
+                  userBrocketTeamIds={userBrocketTeamIds}
                   simulatedTime={simulatedTime}
                 />
               )}
