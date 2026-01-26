@@ -10,7 +10,9 @@ export function ChatBubble() {
 
   // Update the app badge whenever unread count changes
   useEffect(() => {
-    updateBadgeCount(unreadCount)
+    updateBadgeCount(unreadCount).catch((err) => {
+      console.warn('Failed to update app badge:', err)
+    })
   }, [unreadCount])
 
   useEffect(() => {
