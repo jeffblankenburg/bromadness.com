@@ -10,13 +10,6 @@ self.addEventListener('push', (event) => {
   const data = event.data.json()
   const { title, body, icon, badge, data: notificationData } = data
 
-  // Update the app badge - increment or set to 1 to indicate new content
-  if ('setAppBadge' in navigator) {
-    // Always set badge to indicate new notification
-    // The exact count will be corrected when app is opened
-    navigator.setAppBadge(1).catch(() => {})
-  }
-
   // Show the notification
   const options = {
     body: body || 'New message',
@@ -38,8 +31,15 @@ self.addEventListener('push', (event) => {
     ]
   }
 
+  // Use waitUntil to ensure both notification and badge complete before SW terminates
   event.waitUntil(
-    self.registration.showNotification(title || 'Bro Madness', options)
+    Promise.all([
+      self.registration.showNotification(title || 'Bro Madness', options),
+      // Set app badge to indicate new content
+      ('setAppBadge' in navigator)
+        ? navigator.setAppBadge(1).catch(() => {})
+        : Promise.resolve()
+    ])
   )
 })
 
