@@ -4,6 +4,7 @@ import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 import { DevTimeBanner } from "@/components/DevTimeBanner";
 import { SimulatedUserBanner } from "@/components/SimulatedUserBanner";
+import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 import { createClient } from "@/lib/supabase/server";
 import { getSimulatedUserId } from "@/lib/simulation";
 
@@ -26,6 +27,7 @@ const graduate = Graduate({
 export const metadata: Metadata = {
   title: "Bro Madness",
   description: "March Madness bracket pool, daily pick'em, and casino",
+  manifest: "/manifest.json",
   icons: {
     icon: "/logo.png",
     apple: "/icons/icon-192x192.png",
@@ -93,6 +95,7 @@ export default async function RootLayout({
             hasDevBanner={!!simulatedTime}
           />
         )}
+        <ServiceWorkerInit />
         <main className={`min-h-screen pt-safe pb-14 ${bannerCount === 1 ? 'mt-8' : bannerCount === 2 ? 'mt-16' : ''}`}>
           {children}
         </main>

@@ -123,6 +123,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
     }
 
+    // Send push notifications to other users (fire and forget)
+    const senderName = (data.user as { display_name?: string })?.display_name || 'Someone'
+    let notificationBody = 'Sent a message'
+    if (hasContent) {
+      notificationBody = content.trim().length > 50
+        ? content.trim().substring(0, 50) + '...'
+        : content.trim()
+    } else if (hasGif) {
+      notificationBody = 'Sent a GIF'
+    } else if (hasImage) {
+      notificationBody = 'Sent an image'
+    }
+
+    // Don't await - fire and forget to avoid slowing down the response
+    fetch(new URL('/api/push/send', request.url).toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      },
+      body: JSON.stringify({
+        excludeUserId: activeUserId,
+        title: senderName,
+        body: notificationBody,
+        data: {
+          type: 'chat_message',
+          messageId: data.id,
+        },
+      }),
+    }).catch(err => {
+      console.error('Failed to send push notifications:', err)
+    })
+
     return NextResponse.json({ message: data })
   } catch (error) {
     console.error('Error in messages POST:', error)

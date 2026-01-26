@@ -7,6 +7,7 @@ import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 import { CurrentGames } from '@/components/CurrentGames'
 import { ChatBubble } from '@/components/ChatBubble'
 import { InstallPrompt } from '@/components/InstallPrompt'
+import { NotificationPrompt } from '@/components/NotificationPrompt'
 import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
@@ -297,6 +298,7 @@ export default async function Home() {
 
       <div className="text-center space-y-4 w-full max-w-sm">
         <InstallPrompt />
+        <NotificationPrompt />
             <div className="space-y-3">
               {/* Name and Winnings */}
               {(() => {

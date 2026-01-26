@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ReactionPicker } from '@/components/ReactionPicker'
 import { ReactionDisplay } from '@/components/ReactionDisplay'
+import { clearBadge } from '@/lib/push-notifications'
 
 interface Reaction {
   id: string
@@ -54,12 +55,15 @@ export default function ChatPage() {
   const gifSearchTimeout = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Mark messages and reactions as read on mount
+  // Mark messages and reactions as read on mount, and clear badge
   useEffect(() => {
     Promise.all([
       fetch('/api/messages/read', { method: 'POST', credentials: 'include' }),
       fetch('/api/messages/reactions/read', { method: 'POST', credentials: 'include' })
     ]).catch(console.error)
+
+    // Clear the app badge when viewing chat
+    clearBadge()
   }, [])
 
   // Fetch messages on mount and subscribe to realtime updates

@@ -3,9 +3,15 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { updateBadgeCount } from '@/lib/push-notifications'
 
 export function ChatBubble() {
   const [unreadCount, setUnreadCount] = useState(0)
+
+  // Update the app badge whenever unread count changes
+  useEffect(() => {
+    updateBadgeCount(unreadCount)
+  }, [unreadCount])
 
   useEffect(() => {
     const supabase = createClient()
