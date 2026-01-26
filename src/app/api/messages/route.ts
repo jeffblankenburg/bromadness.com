@@ -136,8 +136,13 @@ export async function POST(request: Request) {
       notificationBody = 'Sent an image'
     }
 
-    // Don't await - fire and forget to avoid slowing down the response
-    fetch(new URL('/api/push/send', request.url).toString(), {
+    // Send push notifications to other users (fire and forget)
+    // Get the host from the request headers for proper URL construction
+    const host = request.headers.get('host') || 'www.bromadness.com'
+    const protocol = host.includes('localhost') ? 'http' : 'https'
+    const baseUrl = `${protocol}://${host}`
+
+    fetch(`${baseUrl}/api/push/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
