@@ -1,12 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { updateBadgeCount } from '@/lib/push-notifications'
 
 export function ChatBubble() {
   const [unreadCount, setUnreadCount] = useState(0)
+  const unreadCountRef = useRef(unreadCount)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    unreadCountRef.current = unreadCount
+  }, [unreadCount])
 
   // Update the app badge whenever unread count changes
   useEffect(() => {
@@ -14,6 +20,21 @@ export function ChatBubble() {
       console.warn('Failed to update app badge:', err)
     })
   }, [unreadCount])
+
+  // Also set badge when app goes to background (for iOS)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // App going to background - set badge with current count
+        updateBadgeCount(unreadCountRef.current).catch(() => {})
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
