@@ -6,8 +6,6 @@
   **The Ultimate March Madness Companion for Friends**
 
   A comprehensive web platform for managing bracket pools, auctions, pick'em games, and more during the NCAA Tournament.
-
-  <img src="public/bro_madness_walk_swagger.gif" alt="Bro Madness Mascot" width="150" />
 </div>
 
 ---
