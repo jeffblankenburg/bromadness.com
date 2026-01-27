@@ -118,7 +118,7 @@ export function BottomNav() {
   const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur border-t border-zinc-800 pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur border-t border-zinc-800 pb-safe fixed-ios">
       <div className="flex items-center justify-around h-11">
         {visibleItems.map((item) => {
           const isActive = pathname === item.href || (item.href === '/admin' && pathname.startsWith('/admin'))
