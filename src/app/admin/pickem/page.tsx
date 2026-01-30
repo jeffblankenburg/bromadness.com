@@ -166,7 +166,6 @@ export default async function AdminPickemPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-2">
-        <DeleteAllPicks tournamentId={tournament.id} />
         <PickemSettings
           tournamentId={tournament.id}
           entryFee={payouts.entry_fee}
@@ -184,6 +183,10 @@ export default async function AdminPickemPage() {
         entryFee={payouts.entry_fee}
         enabledDays={enabledDays}
       />
+
+      <div className="pt-8 border-t border-zinc-800">
+        <DeleteAllPicks tournamentId={tournament.id} />
+      </div>
     </div>
   )
 }

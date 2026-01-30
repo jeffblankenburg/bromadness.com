@@ -11,8 +11,6 @@ interface Props {
 export function DeleteAllPicks({ tournamentId }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
-  const [error, setError] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -20,10 +18,7 @@ export function DeleteAllPicks({ tournamentId }: Props) {
   void tournamentId
 
   const handleDelete = async () => {
-    if (confirmText !== 'DELETE') return
-
     setDeleting(true)
-    setError('')
     try {
       // Delete ALL picks from pickem_picks table (preserves entries/payment status)
       const { error: picksError } = await supabase
@@ -33,17 +28,16 @@ export function DeleteAllPicks({ tournamentId }: Props) {
 
       if (picksError) {
         console.error('Error deleting picks:', picksError)
-        setError(`Failed to delete picks: ${picksError.message}`)
+        alert('Failed to delete picks')
         setDeleting(false)
         return
       }
 
       setIsOpen(false)
-      setConfirmText('')
       router.refresh()
     } catch (err) {
       console.error('Failed to delete picks:', err)
-      setError('An unexpected error occurred')
+      alert('An unexpected error occurred')
     } finally {
       setDeleting(false)
     }
@@ -53,9 +47,9 @@ export function DeleteAllPicks({ tournamentId }: Props) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm rounded-lg transition-colors"
+        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
       >
-        Delete All Picks
+        Reset All Picks
       </button>
 
       {isOpen && (
@@ -65,9 +59,11 @@ export function DeleteAllPicks({ tournamentId }: Props) {
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md space-y-4">
+          <div className="relative bg-zinc-900 border border-red-700 rounded-xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-red-400">Delete All Picks</h3>
+              <h3 className="text-lg font-semibold text-red-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+                Confirm Reset
+              </h3>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-zinc-400 hover:text-white"
@@ -78,51 +74,23 @@ export function DeleteAllPicks({ tournamentId }: Props) {
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <p className="text-zinc-300">
-                This will permanently delete all pick&apos;em picks from all users.
-              </p>
-              <p className="text-zinc-400">
-                Payment status will be preserved.
-              </p>
-              <p className="text-red-400 font-medium">
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">
-                Type <span className="font-mono text-white">DELETE</span> to confirm
-              </label>
-              <input
-                type="text"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="DELETE"
-                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm"
-              />
-            </div>
-
-            {error && (
-              <p className="text-red-400 text-sm">{error}</p>
-            )}
+            <p className="text-sm text-zinc-300">
+              This will delete all Pick&apos;em picks for all players. Payment status will be preserved.
+            </p>
 
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setIsOpen(false)
-                  setConfirmText('')
-                }}
+                onClick={() => setIsOpen(false)}
                 className="flex-1 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                disabled={confirmText !== 'DELETE' || deleting}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg text-sm"
+                disabled={deleting}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 text-white font-medium rounded-lg text-sm"
               >
-                {deleting ? 'Deleting...' : 'Delete All'}
+                {deleting ? 'Resetting...' : 'Reset All Picks'}
               </button>
             </div>
           </div>

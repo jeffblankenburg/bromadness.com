@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BrocketPaymentTracker } from './BrocketPaymentTracker'
+import { BrocketResetPicks } from './BrocketResetPicks'
 import { BrocketSettings } from './BrocketSettings'
 
 interface BrocketPayouts {
@@ -95,6 +96,10 @@ export default async function AdminBrocketPage() {
         brocketPicks={brocketPicks || []}
         entryFee={payouts.entry_fee}
       />
+
+      <div className="pt-8 border-t border-zinc-800">
+        <BrocketResetPicks tournamentId={tournament.id} />
+      </div>
     </div>
   )
 }

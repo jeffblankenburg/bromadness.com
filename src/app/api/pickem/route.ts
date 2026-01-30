@@ -42,6 +42,79 @@ export async function POST(request: Request) {
     // Use admin client if simulating, otherwise regular client
     const dbClient = isSimulating ? createAdminClient() : supabase
 
+    // === SERVER-SIDE LOCK ENFORCEMENT ===
+    // Fetch pickem_day to get tournament_id and contest_date
+    const { data: pickemDay } = await supabase
+      .from('pickem_days')
+      .select('tournament_id, contest_date')
+      .eq('id', pickemDayId)
+      .single()
+
+    if (!pickemDay) {
+      return NextResponse.json({ error: 'Pickem day not found' }, { status: 404 })
+    }
+
+    // Fetch tournament settings from database (never trust client)
+    const { data: tournament } = await supabase
+      .from('tournaments')
+      .select('pickem_payouts')
+      .eq('id', pickemDay.tournament_id)
+      .single()
+
+    if (!tournament) {
+      return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
+    }
+
+    const pickemPayouts = tournament.pickem_payouts as { lock_individual?: boolean } | null
+    const lockIndividual = pickemPayouts?.lock_individual ?? false
+
+    // Get current time in Eastern timezone
+    const now = new Date()
+    const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+
+    // Fetch the specific game's scheduled time
+    const { data: game } = await supabase
+      .from('games')
+      .select('scheduled_at')
+      .eq('id', gameId)
+      .single()
+
+    if (!game) {
+      return NextResponse.json({ error: 'Game not found' }, { status: 404 })
+    }
+
+    if (lockIndividual) {
+      // Individual mode: check if THIS game has started
+      if (game.scheduled_at) {
+        const gameTime = new Date(game.scheduled_at)
+        if (easternTime >= gameTime) {
+          return NextResponse.json({ error: 'This game has already started - picks are locked' }, { status: 403 })
+        }
+      }
+    } else {
+      // Global mode: check if the first game OF THIS DAY has started
+      // Get the contest_date and find the earliest game on that date
+      const contestDate = pickemDay.contest_date // Format: YYYY-MM-DD
+      const { data: firstGame } = await supabase
+        .from('games')
+        .select('scheduled_at')
+        .eq('tournament_id', pickemDay.tournament_id)
+        .gte('scheduled_at', `${contestDate}T00:00:00`)
+        .lt('scheduled_at', `${contestDate}T23:59:59`)
+        .not('scheduled_at', 'is', null)
+        .order('scheduled_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (firstGame?.scheduled_at) {
+        const firstGameTime = new Date(firstGame.scheduled_at)
+        if (easternTime >= firstGameTime) {
+          return NextResponse.json({ error: 'Picks are locked - games have started' }, { status: 403 })
+        }
+      }
+    }
+    // === END LOCK ENFORCEMENT ===
+
     // Get or create entry
     let entryId: string
 
