@@ -44,11 +44,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
     }
 
-    // Check if user is admin
+    // Check if active user is admin (uses simulated user when simulating)
     const { data: profile } = await supabase
       .from('users')
       .select('is_admin')
-      .eq('id', user.id)
+      .eq('id', activeUserId)
       .single()
 
     // Reverse to get chronological order for display
