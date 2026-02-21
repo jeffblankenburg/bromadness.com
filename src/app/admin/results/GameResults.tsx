@@ -128,6 +128,9 @@ export function GameResults({ tournament, teams, games }: Props) {
       // Update pick'em results
       await updatePickemResults(game, team1Score, team2Score)
 
+      // Update parlay results
+      await updateParlayResults(game, team1Score, team2Score)
+
       router.refresh()
     } catch (err) {
       console.error('Failed to save result:', err)
@@ -234,6 +237,9 @@ export function GameResults({ tournament, teams, games }: Props) {
       // Clear pick'em correctness for this game
       await clearPickemResults(game)
 
+      // Clear parlay correctness for this game
+      await clearParlayResults(game)
+
       router.refresh()
     } catch (err) {
       console.error('Failed to clear result:', err)
@@ -275,6 +281,107 @@ export function GameResults({ tournament, teams, games }: Props) {
       }
     } catch (err) {
       console.error('Failed to clear pick\'em results:', err)
+    }
+  }
+
+  // Update parlay results when a game result is entered
+  const updateParlayResults = async (game: Game, team1Score: number, team2Score: number) => {
+    try {
+      if (game.spread === null) return
+
+      const team1 = teams.find(t => t.id === game.team1_id)
+      const team2 = teams.find(t => t.id === game.team2_id)
+      if (!team1 || !team2) return
+
+      const margin = team1Score - team2Score
+      const team1IsLowerSeed = team1.seed < team2.seed
+      const adjustedMargin = team1IsLowerSeed
+        ? margin + game.spread
+        : margin - game.spread
+      const spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
+
+      // Get all parlay picks for this game
+      const { data: picks } = await supabase
+        .from('parlay_picks')
+        .select('id, parlay_id, picked_team_id')
+        .eq('game_id', game.id)
+
+      if (!picks || picks.length === 0) return
+
+      // Update is_correct for each parlay pick
+      for (const pick of picks) {
+        const isCorrect = pick.picked_team_id === spreadWinnerId
+        await supabase
+          .from('parlay_picks')
+          .update({ is_correct: isCorrect })
+          .eq('id', pick.id)
+      }
+
+      // Evaluate each affected parlay's status
+      const affectedParlayIds = [...new Set(picks.map(p => p.parlay_id))]
+
+      for (const parlayId of affectedParlayIds) {
+        const { data: allParlayPicks } = await supabase
+          .from('parlay_picks')
+          .select('is_correct')
+          .eq('parlay_id', parlayId)
+
+        if (!allParlayPicks) continue
+
+        const hasLoss = allParlayPicks.some(p => p.is_correct === false)
+        const allCorrect = allParlayPicks.every(p => p.is_correct === true)
+
+        const newStatus = hasLoss ? 'lost' : allCorrect ? 'won' : 'open'
+
+        await supabase
+          .from('parlays')
+          .update({ status: newStatus })
+          .eq('id', parlayId)
+      }
+    } catch (err) {
+      console.error('Failed to update parlay results:', err)
+    }
+  }
+
+  // Clear parlay correctness when a game result is cleared
+  const clearParlayResults = async (game: Game) => {
+    try {
+      const { data: picks } = await supabase
+        .from('parlay_picks')
+        .select('id, parlay_id')
+        .eq('game_id', game.id)
+
+      if (!picks || picks.length === 0) return
+
+      // Reset is_correct to null
+      await supabase
+        .from('parlay_picks')
+        .update({ is_correct: null })
+        .eq('game_id', game.id)
+
+      // Re-evaluate each affected parlay
+      const affectedParlayIds = [...new Set(picks.map(p => p.parlay_id))]
+
+      for (const parlayId of affectedParlayIds) {
+        const { data: allParlayPicks } = await supabase
+          .from('parlay_picks')
+          .select('is_correct')
+          .eq('parlay_id', parlayId)
+
+        if (!allParlayPicks) continue
+
+        const hasLoss = allParlayPicks.some(p => p.is_correct === false)
+        const allCorrect = allParlayPicks.every(p => p.is_correct === true)
+
+        const newStatus = hasLoss ? 'lost' : allCorrect ? 'won' : 'open'
+
+        await supabase
+          .from('parlays')
+          .update({ status: newStatus })
+          .eq('id', parlayId)
+      }
+    } catch (err) {
+      console.error('Failed to clear parlay results:', err)
     }
   }
 
@@ -370,6 +477,26 @@ export function GameResults({ tournament, teams, games }: Props) {
           .from('brocket_picks')
           .update({ is_correct: null })
           .in('entry_id', brocketEntryIds)
+      }
+
+      // 6. Reset all parlay picks and statuses
+      const { data: allParlays } = await supabase
+        .from('parlays')
+        .select('id')
+        .eq('tournament_id', tournament.id)
+
+      if (allParlays && allParlays.length > 0) {
+        const parlayIds = allParlays.map(p => p.id)
+
+        await supabase
+          .from('parlay_picks')
+          .update({ is_correct: null })
+          .in('parlay_id', parlayIds)
+
+        await supabase
+          .from('parlays')
+          .update({ status: 'open' })
+          .eq('tournament_id', tournament.id)
       }
 
       setShowResetConfirm(false)

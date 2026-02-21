@@ -17,7 +17,7 @@ const games: GameRule[] = [
   { id: 'digits', title: 'Digits', description: 'Match the final digit' },
   { id: 'pickem', title: "Pick'em", description: 'Pick winners against the spread' },
   { id: 'auction', title: 'NCAA Auction', description: 'Bid on teams, earn points' },
-  // { id: 'parlays', title: 'Parlays', description: 'Coming soon' },
+  { id: 'parlays', title: 'Parlays', description: '4-team spread parlays' },
 ]
 
 export default function RulesPage() {
@@ -320,9 +320,37 @@ function AuctionRules() {
 function ParlaysRules() {
   return (
     <div className="space-y-1">
-      <div className="text-center py-8">
-        <p className="text-zinc-500 text-sm">Coming soon</p>
-      </div>
+      <SectionHeader>Overview</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Pick 4 teams to win against the spread</Rule>
+        <Rule>All 4 picks must be correct to win</Rule>
+        <Rule>Only games with assigned spreads are eligible</Rule>
+        <Rule>Picks lock when each game starts</Rule>
+      </ul>
+
+      <SectionHeader>Betting</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Minimum bet: $1</Rule>
+        <Rule>Maximum bet: $10</Rule>
+        <Rule>You can create multiple parlays</Rule>
+        <Rule>Parlays cannot be edited after submission</Rule>
+      </ul>
+
+      <SectionHeader>Payouts</SectionHeader>
+      <PayoutTable rows={[
+        { label: 'All 4 correct', value: '8:1' },
+        { label: '$1 bet wins', value: '$9' },
+        { label: '$5 bet wins', value: '$45' },
+        { label: '$10 bet wins', value: '$90' },
+      ]} />
+      <Note>Payout includes your original bet returned. ($8 profit + $1 bet = $9 total)</Note>
+
+      <SectionHeader>Status</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Open (green) - all picks still pending or correct</Rule>
+        <Rule>Lost (red) - at least one pick was incorrect</Rule>
+        <Rule>Won (gold) - all 4 picks were correct</Rule>
+      </ul>
     </div>
   )
 }

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/admin/auction', label: 'Auction' },
   { href: '/admin/pickem', label: "Pick'em" },
   { href: '/admin/brocket', label: 'Brocket' },
+  { href: '/admin/parlays', label: 'Parlays' },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/trip-cost', label: 'Trip Cost' },
   { href: '/admin/payouts', label: 'Payouts' },
