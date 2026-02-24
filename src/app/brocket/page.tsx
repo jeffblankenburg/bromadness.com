@@ -71,27 +71,62 @@ export default async function BrocketPage() {
     )
   }
 
-  // Get Round 1 games only (32 games - 8 per region)
+  // Get Round 1 AND Round 2 games (32 + 16 = 48 games)
   const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, scheduled_at, team1_score, team2_score, winner_id, region_id,
-      game_number, location, channel,
+      game_number, location, channel, round, next_game_id, is_team1_slot,
       team1:teams!games_team1_id_fkey(id, name, short_name, seed),
       team2:teams!games_team2_id_fkey(id, name, short_name, seed)
     `)
     .eq('tournament_id', tournament.id)
-    .eq('round', 1)
+    .in('round', [1, 2])
+    .order('round')
     .order('game_number')
 
   // Transform games to extract team objects from arrays
-  const games = (gamesRaw || []).map(g => ({
+  const allFetchedGames = (gamesRaw || []).map(g => ({
     ...g,
     team1: Array.isArray(g.team1) ? g.team1[0] || null : g.team1,
     team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
   }))
 
-  if (games.length === 0) {
+  const allR1Games = allFetchedGames.filter(g => g.round === 1)
+
+  // Helper to check if a game is on a specific day of week
+  const getDayOfWeek = (scheduledAt: string | null): number | null => {
+    if (!scheduledAt) return null
+    const dateStr = scheduledAt.split('T')[0]
+    const date = new Date(dateStr + 'T12:00:00')
+    return date.getDay()
+  }
+
+  // Identify Thursday R1 games (day 4 = Thursday)
+  const thursdayR1GameIds = new Set(
+    allR1Games
+      .filter(g => getDayOfWeek(g.scheduled_at) === 4)
+      .map(g => g.id)
+  )
+
+  // Saturday R2 games = R2 games fed by Thursday R1 games
+  // (Thursday R1 winners play Saturday, Friday R1 winners play Sunday)
+  const saturdayR2GameIds = new Set(
+    allR1Games
+      .filter(g => thursdayR1GameIds.has(g.id) && g.next_game_id)
+      .map(g => g.next_game_id!)
+  )
+
+  // Brocket includes all R1 games + only Saturday R2 games (8 games)
+  const games = allFetchedGames.filter(g => {
+    if (g.round === 1) return true
+    if (g.round === 2) return saturdayR2GameIds.has(g.id)
+    return false
+  })
+
+  const r1Games = games.filter(g => g.round === 1)
+
+  if (r1Games.length === 0) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold text-orange-400 uppercase tracking-wide mb-4 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
@@ -103,8 +138,15 @@ export default async function BrocketPage() {
     )
   }
 
-  // Find the earliest game time (lock time)
-  const firstGameTime = games.reduce((earliest, game) => {
+  // Find the earliest game time per round (lock time)
+  const firstR1GameTime = r1Games.reduce((earliest, game) => {
+    if (!game.scheduled_at) return earliest
+    if (!earliest || game.scheduled_at < earliest) return game.scheduled_at
+    return earliest
+  }, null as string | null)
+
+  const r2Games = games.filter(g => g.round === 2)
+  const firstR2GameTime = r2Games.reduce((earliest, game) => {
     if (!game.scheduled_at) return earliest
     if (!earliest || game.scheduled_at < earliest) return game.scheduled_at
     return earliest
@@ -118,8 +160,7 @@ export default async function BrocketPage() {
     .eq('tournament_id', tournament.id)
     .single()
 
-  // Get user's brocket picks
-  const gameIds = games.map(g => g.id)
+  // Get user's brocket picks (for both R1 and R2 games)
   const { data: userPicks } = userEntry
     ? await supabase
         .from('brocket_picks')
@@ -164,7 +205,8 @@ export default async function BrocketPage() {
       allPicks={allPicks || []}
       entryFee={entryFee}
       simulatedTime={simulatedTime}
-      firstGameTime={firstGameTime}
+      firstR1GameTime={firstR1GameTime}
+      firstR2GameTime={firstR2GameTime}
       lockIndividual={lockIndividual}
     />
   )

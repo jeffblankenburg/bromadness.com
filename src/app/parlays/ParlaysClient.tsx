@@ -622,6 +622,31 @@ export function ParlaysClient({
       {/* My Parlays Tab */}
       {activeTab === 'list' && (
         <div className="space-y-3">
+          {/* Venmo Payment Button */}
+          {(() => {
+            const unpaidTotal = userParlays
+              .filter(p => !p.has_paid)
+              .reduce((sum, p) => sum + p.bet_amount, 0)
+            if (unpaidTotal <= 0) return null
+            const venmoDeepLink = `venmo://paycharge?txn=pay&recipients=Brett-Lyme&amount=${unpaidTotal}&note=Bro%20Madness%20Parlays`
+            const venmoWebLink = `https://venmo.com/Brett-Lyme?txn=pay&amount=${unpaidTotal}&note=Bro%20Madness%20Parlays`
+            return (
+              <a
+                href={venmoDeepLink}
+                onClick={(e) => {
+                  // Try deep link first, fall back to web after a short delay
+                  setTimeout(() => { window.location.href = venmoWebLink }, 500)
+                }}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#008CFF] text-white font-bold uppercase tracking-wide hover:bg-[#0074D4] transition-colors"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.5 3c.9 1.5 1.3 3 1.3 5 0 5.5-4.7 12.7-8.5 17H5.2L3 3.5l5.5-.5 1.2 10c1.1-1.8 2.5-4.6 2.5-6.5 0-1.9-.3-3.2-.8-4.2L19.5 3Z" />
+                </svg>
+                Pay ${unpaidTotal} via Venmo
+              </a>
+            )
+          })()}
           {userParlays.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-zinc-400 text-lg">No parlays yet</p>

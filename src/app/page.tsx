@@ -8,6 +8,7 @@ import { CurrentGames } from '@/components/CurrentGames'
 import { ChatBubble } from '@/components/ChatBubble'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { NotificationPrompt } from '@/components/NotificationPrompt'
+import { ActiveUsers } from '@/components/ActiveUsers'
 import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
@@ -364,10 +365,24 @@ export default async function Home() {
 
               {/* Trip Balance Reminder */}
               {tripBalance > 0 && (
-                <div className="rotating-border p-3">
-                  <div className="relative z-10 text-red-400 text-sm font-medium">
-                    You still owe Bro <span className="text-red-300 font-bold">${tripBalance.toFixed(0)}</span> for the trip!!
+                <div className="space-y-2">
+                  <div className="rotating-border p-3">
+                    <div className="relative z-10 text-red-400 text-sm font-medium">
+                      You still owe Bro <span className="text-red-300 font-bold">${tripBalance.toFixed(0)}</span> for the trip!!
+                    </div>
                   </div>
+                  <a
+                    href={`https://venmo.com/Brett-Lyme?txn=pay&amount=${Math.ceil(tripBalance)}&note=Bro%20Madness%20Trip`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[#008CFF] text-white font-bold text-sm uppercase tracking-wide hover:bg-[#0074D4] transition-colors"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19.5 3c.9 1.5 1.3 3 1.3 5 0 5.5-4.7 12.7-8.5 17H5.2L3 3.5l5.5-.5 1.2 10c1.1-1.8 2.5-4.6 2.5-6.5 0-1.9-.3-3.2-.8-4.2L19.5 3Z" />
+                    </svg>
+                    Pay ${Math.ceil(tripBalance)} via Venmo
+                  </a>
                 </div>
               )}
 
@@ -396,7 +411,7 @@ export default async function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
                     </svg>
                     <span className="text-lg font-bold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
-                      View Bracket
+                      View Full Bracket
                     </span>
                   </div>
                 </div>
@@ -411,6 +426,7 @@ export default async function Home() {
                 </Link>
               )}
 
+              <ActiveUsers userId={activeUserId} displayName={profile?.display_name || 'Unknown'} />
             </div>
       </div>
 

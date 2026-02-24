@@ -636,13 +636,13 @@ export function PickemClient({
                   </svg>
                 )}
               </div>
-              <div className={`text-[10px] ${
-                selectedDayName === dayName
-                  ? (hasGames ? (hasPaid ? 'text-green-700' : 'text-red-600 font-bold') : 'text-orange-800')
-                  : (hasGames ? (hasPaid ? 'text-green-500' : 'text-red-500 font-bold') : 'text-zinc-500')
-              }`}>
-                {hasGames ? (hasPaid ? 'PAID' : `PAY BRO $${entryFee}`) : 'SOON'}
-              </div>
+              {!hasGames && (
+                <div className={`text-[10px] ${
+                  selectedDayName === dayName ? 'text-orange-800' : 'text-zinc-500'
+                }`}>
+                  SOON
+                </div>
+              )}
             </button>
           )
         })}

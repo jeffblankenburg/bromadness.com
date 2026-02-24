@@ -118,15 +118,20 @@ export async function POST(request: Request) {
     const now = new Date()
     const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
 
-    // Fetch the specific game's scheduled time
+    // Fetch the specific game's scheduled time and round
     const { data: game } = await supabase
       .from('games')
-      .select('scheduled_at')
+      .select('scheduled_at, round')
       .eq('id', gameId)
       .single()
 
     if (!game) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 })
+    }
+
+    // Only allow picks for Round 1 and Round 2 games
+    if (game.round !== 1 && game.round !== 2) {
+      return NextResponse.json({ error: 'Brocket only supports Round 1 and Round 2 games' }, { status: 400 })
     }
 
     if (lockIndividual) {
@@ -138,7 +143,7 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      // Global mode: check if ANY Round 1 game has started
+      // Global mode: all brocket picks lock when first Round 1 game starts
       const { data: firstGame } = await supabase
         .from('games')
         .select('scheduled_at')

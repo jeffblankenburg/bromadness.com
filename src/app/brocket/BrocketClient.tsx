@@ -21,6 +21,9 @@ interface Game {
   game_number: number
   location?: string | null
   channel?: string | null
+  round: number
+  next_game_id: string | null
+  is_team1_slot: boolean | null
   team1: Team | null
   team2: Team | null
 }
@@ -63,7 +66,8 @@ interface Props {
   allPicks: BrocketPick[]
   entryFee: number
   simulatedTime: string | null
-  firstGameTime: string | null
+  firstR1GameTime: string | null
+  firstR2GameTime: string | null
   lockIndividual: boolean
 }
 
@@ -78,11 +82,13 @@ const formatGameTime = (dateStr: string | null) => {
   if (!dateStr) return null
   const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
   if (!match) return null
-  const [, , , , hours, mins] = match
+  const [, year, month, day, hours, mins] = match
   const hour = parseInt(hours)
   const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
   const ampm = hour >= 12 ? 'p' : 'a'
-  return `${hour12}:${mins}${ampm}`
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  return `${days[date.getDay()]} ${hour12}:${mins}${ampm}`
 }
 
 const formatLockTime = (dateStr: string | null) => {
@@ -110,7 +116,8 @@ export function BrocketClient({
   allPicks,
   entryFee,
   simulatedTime,
-  firstGameTime,
+  firstR1GameTime,
+  firstR2GameTime,
   lockIndividual,
 }: Props) {
   // Parse a timestamp string (stored as Eastern) into a Date object
@@ -130,38 +137,41 @@ export function BrocketClient({
     return new Date(eastern)
   }
 
+  // Split games by round
+  const r1Games = games.filter(g => g.round === 1)
+  const r2Games = games.filter(g => g.round === 2)
+
+  const [selectedRound, setSelectedRound] = useState<1 | 2>(1)
   const [selectedRegionId, setSelectedRegionId] = useState<string>(regions[0]?.id || '')
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
-  // Check if picks are locked (games have started)
-  // When lockIndividual is false (default): all picks lock when first game starts
-  // When lockIndividual is true: each pick locks when its game starts
-  const isGloballyLocked = firstGameTime ? parseTimestamp(firstGameTime) <= getCurrentTime() : false
+  // Check if rounds are locked
+  const isR1Locked = firstR1GameTime ? parseTimestamp(firstR1GameTime) <= getCurrentTime() : false
+  const isR2Locked = firstR2GameTime ? parseTimestamp(firstR2GameTime) <= getCurrentTime() : false
+  const isGloballyLocked = isR1Locked // For leaderboard expansion default
 
   // Check if a specific game is locked
+  // All brocket picks (R1 + R2) lock when the first R1 game starts
   const isGameLocked = (game: Game): boolean => {
     if (lockIndividual) {
       // Individual mode: lock based on this game's start time
       return game.scheduled_at ? parseTimestamp(game.scheduled_at) <= getCurrentTime() : false
     }
-    // Global mode: lock based on first game start time
-    return isGloballyLocked
+    // Global mode: all picks lock when first R1 game starts
+    return isR1Locked
   }
 
-  // Default states based on lock status:
-  // Before games: leaderboard closed, picks open
-  // After games: leaderboard open, picks closed
+  // Default states based on lock status
   const [leaderboardExpanded, setLeaderboardExpanded] = useState(isGloballyLocked)
   const [picksExpanded, setPicksExpanded] = useState(!isGloballyLocked)
 
-  // Load expanded state from localStorage (overrides defaults if user has manually toggled)
+  // Load expanded state from localStorage
   useEffect(() => {
     const savedLeaderboard = localStorage.getItem('brocket-leaderboard-expanded')
     const savedPicks = localStorage.getItem('brocket-picks-expanded')
 
-    // Only use localStorage if there's a saved value, otherwise use isGloballyLocked-based defaults
     if (savedLeaderboard !== null) {
       setLeaderboardExpanded(savedLeaderboard === 'true')
     } else {
@@ -187,10 +197,42 @@ export function BrocketClient({
     localStorage.setItem('brocket-picks-expanded', String(newValue))
   }
 
+  // Build a map of R2 game ID -> feeder R1 games for projected matchups
+  // R1 games have next_game_id pointing to R2 games, is_team1_slot indicates which slot
+  const getR2ProjectedTeams = (r2GameId: string): { team1: Team | null; team2: Team | null } => {
+    const feederGames = r1Games.filter(g => g.next_game_id === r2GameId)
+    let projectedTeam1: Team | null = null
+    let projectedTeam2: Team | null = null
+
+    for (const feeder of feederGames) {
+      // Find user's pick for this feeder game
+      const pick = localPicks[feeder.id]
+        ? (feeder.team1?.id === localPicks[feeder.id] ? feeder.team1 : feeder.team2)
+        : (() => {
+            const userPick = userPicks.find(p => p.game_id === feeder.id)
+            if (!userPick) return null
+            return feeder.team1?.id === userPick.picked_team_id ? feeder.team1 : feeder.team2
+          })()
+
+      if (feeder.is_team1_slot === true) {
+        projectedTeam1 = pick
+      } else if (feeder.is_team1_slot === false) {
+        projectedTeam2 = pick
+      }
+    }
+
+    return { team1: projectedTeam1, team2: projectedTeam2 }
+  }
+
   // Get games for selected region (sorted by bracket order)
-  const regionGames = games
-    .filter(g => g.region_id === selectedRegionId)
-    .sort((a, b) => a.game_number - b.game_number)
+  const getRegionGames = () => {
+    const roundGames = selectedRound === 1 ? r1Games : r2Games
+    return roundGames
+      .filter(g => g.region_id === selectedRegionId)
+      .sort((a, b) => a.game_number - b.game_number)
+  }
+
+  const regionGames = getRegionGames()
 
   // Get user's picked team for a game
   const getPickedTeamId = (gameId: string): string => {
@@ -235,9 +277,9 @@ export function BrocketClient({
     setSaving(false)
   }
 
-  // Calculate standings for leaderboard
+  // Calculate standings for leaderboard (includes both R1 and R2)
   const calculateStandings = () => {
-    // Sort games chronologically by scheduled_at for tiebreaker calculations
+    // Sort all games chronologically by scheduled_at for tiebreaker calculations
     const sortedGames = [...games].sort((a, b) => {
       if (!a.scheduled_at && !b.scheduled_at) return 0
       if (!a.scheduled_at) return 1
@@ -245,7 +287,6 @@ export function BrocketClient({
       return a.scheduled_at.localeCompare(b.scheduled_at)
     })
 
-    // Create a map of game_id to chronological index
     const gameOrderMap = new Map<string, number>()
     sortedGames.forEach((game, index) => {
       gameOrderMap.set(game.id, index)
@@ -259,8 +300,6 @@ export function BrocketClient({
 
         let points = 0
         let maxPossible = 0
-
-        // Track losses in chronological order for tiebreakers
         const losses: number[] = []
 
         entryPicks.forEach(pick => {
@@ -274,14 +313,11 @@ export function BrocketClient({
           if (!pickedTeam) return
 
           if (game.winner_id === pick.picked_team_id) {
-            // Correct pick - add seed points
             points += pickedTeam.seed
             maxPossible += pickedTeam.seed
           } else if (game.winner_id === null) {
-            // Game not played yet - counts toward max possible
             maxPossible += pickedTeam.seed
           } else {
-            // Wrong pick - track when this loss occurred
             const gameOrder = gameOrderMap.get(game.id)
             if (gameOrder !== undefined) {
               losses.push(gameOrder)
@@ -289,7 +325,6 @@ export function BrocketClient({
           }
         })
 
-        // Sort losses chronologically
         losses.sort((a, b) => a - b)
 
         return {
@@ -303,31 +338,24 @@ export function BrocketClient({
         }
       })
       .sort((a, b) => {
-        // Primary: Sort by points descending
         if (b.points !== a.points) return b.points - a.points
-
-        // Tiebreaker 1: Games until 2nd loss (higher/later is better, null = no 2nd loss = best)
         if (a.second_loss !== b.second_loss) {
           if (a.second_loss === null) return -1
           if (b.second_loss === null) return 1
           return b.second_loss - a.second_loss
         }
-
-        // Tiebreaker 2: Games until 1st loss (higher/later is better, null = no 1st loss = best)
         if (a.first_loss !== b.first_loss) {
           if (a.first_loss === null) return -1
           if (b.first_loss === null) return 1
           return b.first_loss - a.first_loss
         }
-
-        // Final fallback: max_possible descending
         return b.max_possible - a.max_possible
       })
   }
 
   // Calculate participant pick counts (for pre-lock view)
   const calculateParticipants = () => {
-    const totalGames = 32 // Round 1 has 32 games
+    const totalGames = r1Games.length + r2Games.length // 32 + 8 = 40
     return allEntries
       .map(entry => {
         const user = users.find(u => u.id === entry.user_id)
@@ -345,7 +373,6 @@ export function BrocketClient({
         }
       })
       .sort((a, b) => {
-        // Sort by pick count descending, then alphabetically
         if (b.pick_count !== a.pick_count) return b.pick_count - a.pick_count
         return a.display_name.localeCompare(b.display_name)
       })
@@ -358,12 +385,10 @@ export function BrocketClient({
   const calculatePayouts = (pot: number) => {
     const roundTo5 = (n: number) => Math.round(n / 5) * 5
 
-    // Start with percentage-based amounts rounded to $5
     let first = roundTo5(pot * 0.5)
     let second = roundTo5(pot * 0.3)
     let third = roundTo5(pot * 0.2)
 
-    // Adjust to ensure total equals pot (add/subtract difference from 1st place)
     const diff = pot - (first + second + third)
     first += diff
 
@@ -373,14 +398,21 @@ export function BrocketClient({
   const payouts = calculatePayouts(totalPot)
 
   const renderGame = (game: Game) => {
-    if (!game.team1 || !game.team2) return null
+    let team1 = game.team1
+    let team2 = game.team2
 
-    // Sort teams by seed for consistent display (lower seed on top)
-    const topTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
-    const bottomTeam = game.team1.seed < game.team2.seed ? game.team2 : game.team1
+    // For Round 2, derive projected teams from user's R1 picks
+    if (game.round === 2) {
+      const projected = getR2ProjectedTeams(game.id)
+      team1 = projected.team1
+      team2 = projected.team2
+    }
 
-    const d1Top = findD1Team(topTeam.name)
-    const d1Bottom = findD1Team(bottomTeam.name)
+    // Check if both teams are available (for R2, user may not have made all R1 picks)
+    const hasBothTeams = team1 && team2
+
+    const d1Top = team1 ? findD1Team(team1.name) : undefined
+    const d1Bottom = team2 ? findD1Team(team2.name) : undefined
     const logoTop = d1Top ? getTeamLogoUrl(d1Top) : null
     const logoBottom = d1Bottom ? getTeamLogoUrl(d1Bottom) : null
 
@@ -389,7 +421,19 @@ export function BrocketClient({
     const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
     const gameLocked = isGameLocked(game)
 
-    const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null) => {
+    const renderTeamRow = (team: Team | null, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null) => {
+      if (!team) {
+        return (
+          <div className="w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-zinc-700/30">
+            <span className="w-5 text-xs font-mono text-zinc-600">?</span>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-zinc-700">
+              <span className="text-[10px] font-bold text-zinc-500">TBD</span>
+            </div>
+            <span className="flex-1 text-sm text-zinc-500 italic">Pick Round 1 first</span>
+          </div>
+        )
+      }
+
       const isPicked = pickedTeamId === team.id
       const isWinner = isComplete && game.winner_id === team.id
       const isCorrect = isPicked && isWinner
@@ -404,10 +448,10 @@ export function BrocketClient({
       return (
         <button
           key={team.id}
-          onClick={() => handlePick(game.id, team.id)}
-          disabled={gameLocked}
+          onClick={() => hasBothTeams && handlePick(game.id, team.id)}
+          disabled={gameLocked || !hasBothTeams}
           className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
-            gameLocked ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
+            gameLocked || !hasBothTeams ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
           style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
@@ -457,8 +501,8 @@ export function BrocketClient({
             <span className="px-1 py-0.5 bg-zinc-800 rounded">{game.channel}</span>
           )}
         </div>
-        {renderTeamRow(topTeam, d1Top, logoTop)}
-        {renderTeamRow(bottomTeam, d1Bottom, logoBottom)}
+        {renderTeamRow(team1, d1Top, logoTop)}
+        {renderTeamRow(team2, d1Bottom, logoBottom)}
       </div>
     )
   }
@@ -523,6 +567,15 @@ export function BrocketClient({
     )
   }
 
+  // Lock time display - all picks lock at first R1 game
+  const isCurrentRoundLocked = isR1Locked
+
+  // Count picks per round for the user
+  const r1GameIds = new Set(r1Games.map(g => g.id))
+  const r2GameIds = new Set(r2Games.map(g => g.id))
+  const userR1PickCount = userPicks.filter(p => p.game_id && r1GameIds.has(p.game_id)).length
+  const userR2PickCount = userPicks.filter(p => p.game_id && r2GameIds.has(p.game_id)).length
+
   return (
     <div className="p-4 pb-20 space-y-4">
       <div>
@@ -532,7 +585,7 @@ export function BrocketClient({
           </svg>
           Brocket
         </h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Straight-up first round winners - no spread!</p>
+        <p className="text-xs text-zinc-500 mt-0.5">Straight-up winners - no spread!</p>
         <p className="text-xs text-zinc-500 mt-0.5">Earn points for the seed of your winners.</p>
       </div>
 
@@ -548,7 +601,7 @@ export function BrocketClient({
                 ? 'Leaderboard'
                 : lockIndividual
                   ? 'Each pick locks at game start'
-                  : `Picks lock ${formatLockTime(firstGameTime)}`
+                  : `Picks lock ${formatLockTime(firstR1GameTime)}`
               }
             </h3>
           </div>
@@ -603,9 +656,6 @@ export function BrocketClient({
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                           </svg>
                         )}
-                        {!participant.has_paid && (
-                          <span className="text-[10px] text-yellow-500 uppercase">unpaid</span>
-                        )}
                       </div>
                       <div className="text-right">
                         <span className={`${participant.is_complete ? 'text-green-400' : 'text-zinc-400'}`}>
@@ -644,12 +694,50 @@ export function BrocketClient({
 
         {picksExpanded && (
           <div className="px-4 pb-4 space-y-4">
+            {/* Round Selector */}
+            <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-xl">
+              <button
+                onClick={() => setSelectedRound(1)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  selectedRound === 1
+                    ? 'bg-orange-500 text-white'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                }`}
+              >
+                <div>Round 1</div>
+                <div className={`text-xs ${selectedRound === 1 ? 'text-orange-200' : 'text-zinc-500'}`}>
+                  {userR1PickCount}/{r1Games.length}
+                </div>
+              </button>
+              <button
+                onClick={() => setSelectedRound(2)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  selectedRound === 2
+                    ? 'bg-orange-500 text-white'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                }`}
+              >
+                <div>Round 2</div>
+                <div className={`text-xs ${selectedRound === 2 ? 'text-orange-200' : 'text-zinc-500'}`}>
+                  {userR2PickCount}/{r2Games.length}
+                </div>
+              </button>
+            </div>
+
+            {/* Lock status */}
+            {!isCurrentRoundLocked && !lockIndividual && firstR1GameTime && (
+              <div className="text-center text-xs text-zinc-500">
+                All picks lock {formatLockTime(firstR1GameTime)}
+              </div>
+            )}
+
             {/* Region Tabs */}
             <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-xl">
               {regions.map((region) => {
-                const regionGameCount = games.filter(g => g.region_id === region.id).length
+                const roundGames = selectedRound === 1 ? r1Games : r2Games
+                const regionGameCount = roundGames.filter(g => g.region_id === region.id).length
                 const regionPickCount = userPicks.filter(p => {
-                  const game = games.find(g => g.id === p.game_id)
+                  const game = roundGames.find(g => g.id === p.game_id)
                   return game?.region_id === region.id
                 }).length
                 const isActive = selectedRegionId === region.id
@@ -673,7 +761,7 @@ export function BrocketClient({
               })}
             </div>
 
-            {/* Games for selected region */}
+            {/* Games for selected region and round */}
             <div className="space-y-2">
               {regionGames.length === 0 ? (
                 <div className="text-center py-8">

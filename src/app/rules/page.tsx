@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
-type GameId = '3s-ds' | '1st-to-10' | 'digits' | 'pickem' | 'auction' | 'parlays'
+type GameId = '3s-ds' | '1st-to-10' | 'digits' | 'pickem' | 'auction' | 'parlays' | 'brocket'
 
 interface GameRule {
   id: GameId
@@ -18,6 +18,7 @@ const games: GameRule[] = [
   { id: 'pickem', title: "Pick'em", description: 'Pick winners against the spread' },
   { id: 'auction', title: 'NCAA Auction', description: 'Bid on teams, earn points' },
   { id: 'parlays', title: 'Parlays', description: '4-team spread parlays' },
+  { id: 'brocket', title: 'Brocket', description: 'Straight-up winners, Round 1 + Saturday' },
 ]
 
 export default function RulesPage() {
@@ -37,6 +38,8 @@ export default function RulesPage() {
         return <AuctionRules />
       case 'parlays':
         return <ParlaysRules />
+      case 'brocket':
+        return <BrocketRules />
       default:
         return null
     }
@@ -350,6 +353,62 @@ function ParlaysRules() {
         <Rule>Open (green) - all picks still pending or correct</Rule>
         <Rule>Lost (red) - at least one pick was incorrect</Rule>
         <Rule>Won (gold) - all 4 picks were correct</Rule>
+      </ul>
+    </div>
+  )
+}
+
+function BrocketRules() {
+  return (
+    <div className="space-y-1">
+      <SectionHeader>Overview</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Pick the straight-up winner of each game (no spread)</Rule>
+        <Rule>Covers Round 1 (32 games) and Saturday Round 2 (8 games) - 40 total</Rule>
+        <Rule>Entry fee: $20</Rule>
+      </ul>
+
+      <SectionHeader>Scoring</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Points = seed of the team you correctly picked</Rule>
+        <Rule>Higher seeds are worth more points</Rule>
+      </ul>
+      <PayoutTable rows={[
+        { label: '#1 seed correct', value: '1 pt' },
+        { label: '#5 seed correct', value: '5 pts' },
+        { label: '#12 seed correct', value: '12 pts' },
+        { label: '#16 seed correct', value: '16 pts' },
+      ]} />
+      <Note>Rewards correctly picking upsets.</Note>
+
+      <SectionHeader>Round 2 (Saturday Only)</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>Only Saturday&apos;s 8 Round 2 games are included (not Sunday)</Rule>
+        <Rule>Round 2 matchups are based on your Round 1 picks</Rule>
+        <Rule>Your projected winners from Round 1 fill the Saturday bracket</Rule>
+        <Rule>Pick the winner of each projected matchup</Rule>
+        <Rule>Round 2 points count toward the same leaderboard</Rule>
+      </ul>
+
+      <SectionHeader>Payouts</SectionHeader>
+      <PayoutTable rows={[
+        { label: '1st place', value: '50%' },
+        { label: '2nd place', value: '30%' },
+        { label: '3rd place', value: '20%' },
+      ]} />
+      <Note>Payouts rounded to nearest $5.</Note>
+
+      <SectionHeader>Tiebreakers</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>1st: Most points</Rule>
+        <Rule>2nd: Later position of 2nd loss wins</Rule>
+        <Rule>3rd: Later position of 1st loss wins</Rule>
+        <Rule>4th: Higher max possible points</Rule>
+      </ul>
+
+      <SectionHeader>Lock Timing</SectionHeader>
+      <ul className="list-disc list-inside space-y-1">
+        <Rule>All picks (Round 1 and Round 2) lock when the first game starts Thursday</Rule>
       </ul>
     </div>
   )
