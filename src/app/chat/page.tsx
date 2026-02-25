@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ReactionPicker } from '@/components/ReactionPicker'
 import { ReactionDisplay } from '@/components/ReactionDisplay'
 import { clearBadge } from '@/lib/push-notifications'
+import { compressImage } from '@/lib/compress-image'
 
 interface Reaction {
   id: string
@@ -378,44 +379,6 @@ export default function ChatPage() {
     } finally {
       setSending(false)
     }
-  }
-
-  // Compress image using canvas
-  const compressImage = (file: File, maxWidth: number, quality: number): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = document.createElement('img')
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let width = img.width
-        let height = img.height
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width
-          width = maxWidth
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'))
-          return
-        }
-
-        ctx.drawImage(img, 0, 0, width, height)
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob)
-            else reject(new Error('Failed to compress image'))
-          },
-          'image/jpeg',
-          quality
-        )
-      }
-      img.onerror = () => reject(new Error('Failed to load image'))
-      img.src = URL.createObjectURL(file)
-    })
   }
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

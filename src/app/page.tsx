@@ -9,6 +9,7 @@ import { ChatBubble } from '@/components/ChatBubble'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { NotificationPrompt } from '@/components/NotificationPrompt'
 import { ActiveUsers } from '@/components/ActiveUsers'
+import { SoundboardPanel } from '@/components/SoundboardPanel'
 import { getActiveUserId } from '@/lib/simulation'
 
 // Toggle to show/hide dev tools on home page
@@ -50,7 +51,7 @@ export default async function Home() {
   if (user) {
     const { data } = await supabase
       .from('users')
-      .select('display_name, is_admin, casino_credits')
+      .select('display_name, is_admin, casino_credits, can_use_soundboard')
       .eq('id', activeUserId)
       .single()
     profile = data
@@ -427,6 +428,17 @@ export default async function Home() {
               )}
 
               <ActiveUsers userId={activeUserId} displayName={profile?.display_name || 'Unknown'} />
+
+              {profile?.can_use_soundboard && (
+                <SoundboardPanel
+                  displayName={profile.display_name || 'Unknown'}
+                  userId={activeUserId}
+                  isAdmin={profile.is_admin ?? false}
+                />
+              )}
+
+              {/* Spacer for bottom navigation */}
+              <div className="h-4" />
             </div>
       </div>
 

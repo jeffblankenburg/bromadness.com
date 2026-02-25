@@ -26,17 +26,25 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { userId, isAdmin } = await request.json()
+    const { userId, isAdmin, canUseSoundboard } = await request.json()
 
-    if (!userId || typeof isAdmin !== 'boolean') {
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    }
+
+    const updates: Record<string, boolean> = {}
+    if (typeof isAdmin === 'boolean') updates.is_admin = isAdmin
+    if (typeof canUseSoundboard === 'boolean') updates.can_use_soundboard = canUseSoundboard
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
     const adminClient = createAdminClient()
 
     const { error } = await adminClient
       .from('users')
-      .update({ is_admin: isAdmin })
+      .update(updates)
       .eq('id', userId)
 
     if (error) {

@@ -10,6 +10,7 @@ interface User {
   full_name: string | null
   is_admin: boolean
   is_active: boolean
+  can_use_soundboard: boolean
   created_at: string
 }
 
@@ -53,6 +54,27 @@ export function UserList({ users }: Props) {
       alert('Failed to update user')
     } finally {
       setTogglingAdmin(null)
+    }
+  }
+
+  const toggleSoundboard = async (userId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, canUseSoundboard: !currentStatus }),
+        credentials: 'include',
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Failed to update user')
+        return
+      }
+
+      router.refresh()
+    } catch (err) {
+      alert('Failed to update user')
     }
   }
 
@@ -303,6 +325,11 @@ export function UserList({ users }: Props) {
                       Admin
                     </span>
                   )}
+                  {user.can_use_soundboard && (
+                    <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
+                      Sounds
+                    </span>
+                  )}
                   {!user.is_active && (
                     <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">
                       Inactive
@@ -349,6 +376,15 @@ export function UserList({ users }: Props) {
                         className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
                       >
                         {user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          toggleSoundboard(user.id, user.can_use_soundboard)
+                          setMenuOpenFor(null)
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors"
+                      >
+                        {user.can_use_soundboard ? 'Revoke Soundboard' : 'Grant Soundboard'}
                       </button>
                       <button
                         onClick={() => {

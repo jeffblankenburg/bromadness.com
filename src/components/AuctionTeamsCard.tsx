@@ -51,9 +51,32 @@ export function AuctionTeamsCard({ teams, totalPoints }: Props) {
         onClick={toggleExpanded}
         className="w-full flex items-center justify-between p-4 hover:bg-zinc-700/30 transition-colors"
       >
-        <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
-          NCAA Auction {totalPoints > 0 && <span className="text-zinc-400">({totalPoints})</span>}
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
+            NCAA Auction {totalPoints > 0 && <span className="text-zinc-400">({totalPoints})</span>}
+          </h3>
+          {sortedTeams.length > 0 && (
+            <div className="flex items-center gap-1">
+              {sortedTeams.map((at, idx) => {
+                const d1Team = at.team?.name ? findD1Team(at.team.name) : null
+                const logoUrl = d1Team ? getTeamLogoUrl(d1Team) : null
+                return (
+                  <div
+                    key={idx}
+                    className="w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
+                  >
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="" className="w-3.5 h-3.5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                    ) : (
+                      <span className="text-[7px] font-bold text-white">{d1Team?.abbreviation?.slice(0, 2) || at.team?.short_name?.slice(0, 2) || '?'}</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <svg
           className={`w-4 h-4 text-zinc-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
           fill="none"

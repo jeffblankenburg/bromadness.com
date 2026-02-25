@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DevTimeBanner } from "@/components/DevTimeBanner";
 import { SimulatedUserBanner } from "@/components/SimulatedUserBanner";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
+import { SoundListener } from "@/components/SoundListener";
 import { createClient } from "@/lib/supabase/server";
 import { getSimulatedUserId } from "@/lib/simulation";
 
@@ -96,6 +97,7 @@ export default async function RootLayout({
           />
         )}
         <ServiceWorkerInit />
+        <SoundListener />
         <main className={`min-h-screen pt-safe pb-14 ${bannerCount === 1 ? 'mt-8' : bannerCount === 2 ? 'mt-16' : ''}`}>
           {children}
         </main>
