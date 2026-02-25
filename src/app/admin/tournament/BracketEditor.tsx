@@ -7,6 +7,7 @@ import { InlineTeamSearch } from './InlineTeamSearch'
 import { ROUND1_MATCHUPS } from '@/lib/bracket/generate'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 import { CHANNELS } from '@/lib/data/channels'
+import { VENUES, getVenuesForRound, formatVenue } from '@/lib/data/venues'
 
 interface Region {
   id: string
@@ -463,17 +464,20 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                                 className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
                               />
                             </div>
-                            <input
-                              type="text"
-                              defaultValue={game.location || ''}
-                              onBlur={(e) => handleLocationChange(game.id, e.target.value)}
-                              placeholder="Location"
-                              className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] ${
+                            <select
+                              value={game.location || ''}
+                              onChange={(e) => handleLocationChange(game.id, e.target.value)}
+                              className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] cursor-pointer ${
                                 game.location
                                   ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                               }`}
-                            />
+                            >
+                              <option value="">Location</option>
+                              {getVenuesForRound(round).map(v => (
+                                <option key={formatVenue(v)} value={formatVenue(v)}>{formatVenue(v)}</option>
+                              ))}
+                            </select>
                             <select
                               value={game.channel || ''}
                               onChange={(e) => handleChannelChange(game.id, e.target.value)}
@@ -633,18 +637,21 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                       />
                     </div>
                     {/* Location */}
-                    <input
-                      type="text"
-                      defaultValue={game?.location || ''}
-                      onBlur={(e) => game && handleLocationChange(game.id, e.target.value)}
+                    <select
+                      value={game?.location || ''}
+                      onChange={(e) => game && handleLocationChange(game.id, e.target.value)}
                       disabled={!game}
-                      placeholder="Location"
-                      className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] disabled:opacity-30 ${
+                      className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] cursor-pointer disabled:opacity-30 ${
                         game?.location
                           ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                          : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400 placeholder-zinc-500'
+                          : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
                       }`}
-                    />
+                    >
+                      <option value="">Location</option>
+                      {getVenuesForRound(1).map(v => (
+                        <option key={formatVenue(v)} value={formatVenue(v)}>{formatVenue(v)}</option>
+                      ))}
+                    </select>
                     {/* Channel selector */}
                     <select
                       value={game?.channel || ''}
