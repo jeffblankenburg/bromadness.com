@@ -4,4 +4,5 @@ export interface SoundItem {
   audio_url: string
   image_url: string
   created_by: string
+  sort_order: number
 }

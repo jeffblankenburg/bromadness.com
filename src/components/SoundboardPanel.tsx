@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { SoundItem } from '@/lib/sounds'
 import { compressImage } from '@/lib/compress-image'
 import { ensureSoundboardSubscribed } from '@/lib/soundboard-channel'
+import { useSortableGrid } from '@/lib/useSortableGrid'
 
 interface Props {
   displayName: string
@@ -28,6 +29,55 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
   const [editAudioFile, setEditAudioFile] = useState<File | null>(null)
   const [editImageFile, setEditImageFile] = useState<File | null>(null)
   const [error, setError] = useState('')
+  const [savingOrder, setSavingOrder] = useState(false)
+
+  const handleReorder = useCallback(async (reorderedSounds: SoundItem[]) => {
+    setSounds(reorderedSounds)
+
+    const order = reorderedSounds.map((s, i) => ({
+      id: s.id,
+      sort_order: i + 1,
+    }))
+
+    setSavingOrder(true)
+    try {
+      const res = await fetch('/api/soundboard', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        const channel = await ensureSoundboardSubscribed()
+        await channel.send({
+          type: 'broadcast',
+          event: 'sounds_updated',
+          payload: {},
+        })
+      } else {
+        // Revert on failure
+        const refetch = await fetch('/api/soundboard')
+        if (refetch.ok) {
+          const data = await refetch.json()
+          setSounds(data.sounds || [])
+        }
+      }
+    } catch {
+      const refetch = await fetch('/api/soundboard')
+      if (refetch.ok) {
+        const data = await refetch.json()
+        setSounds(data.sounds || [])
+      }
+    }
+    setSavingOrder(false)
+  }, [])
+
+  const { dragIndex, overIndex, getDragHandlers, containerRef } = useSortableGrid({
+    items: sounds,
+    enabled: editMode,
+    onReorder: handleReorder,
+  })
 
   useEffect(() => {
     const fetchSounds = async () => {
@@ -234,6 +284,9 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {isOpen && savingOrder && (
+            <span className="text-[10px] text-zinc-500">Saving...</span>
+          )}
           {isOpen && (
             <button
               onClick={toggleEditMode}
@@ -263,57 +316,69 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
             <p className="text-zinc-500 text-sm text-center py-4">Loading sounds...</p>
           ) : (
             <>
-              <div className="grid grid-cols-4 gap-2">
-                {sounds.map(sound => (
-                  <div key={sound.id} className="relative">
-                    <button
-                      onClick={() => editMode ? openEditForm(sound) : playSound(sound)}
-                      disabled={!editMode && recentlyPlayed === sound.id}
-                      className={`
-                        w-full flex flex-col items-center gap-1 p-2 rounded-xl
-                        border transition-all duration-150 active:scale-95
-                        ${editingSound?.id === sound.id
-                          ? 'bg-orange-500/20 border-orange-500'
-                          : recentlyPlayed === sound.id
-                            ? 'bg-orange-500/20 border-orange-500 scale-95'
-                            : editMode
-                              ? 'bg-zinc-900/50 border-zinc-600 hover:bg-zinc-700/50 hover:border-zinc-500'
-                              : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-700/50 hover:border-zinc-600'
-                        }
-                      `}
+              <div ref={containerRef} className="grid grid-cols-4 gap-2">
+                {sounds.map((sound, index) => {
+                  const isDraggingThis = dragIndex === index
+                  const isOverThis = overIndex === index && dragIndex !== null && dragIndex !== index
+
+                  return (
+                    <div
+                      key={sound.id}
+                      className="relative"
+                      data-drag-index={editMode ? index : undefined}
+                      style={{
+                        opacity: isDraggingThis ? 0.3 : 1,
+                        transform: isOverThis ? 'scale(1.06)' : undefined,
+                        transition: isDraggingThis ? 'none' : 'transform 150ms ease, opacity 150ms ease',
+                      }}
                     >
-                      <img
-                        src={sound.image_url}
-                        alt={sound.name}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <span className="text-[10px] font-medium text-zinc-300 truncate w-full text-center">
-                        {sound.name}
-                      </span>
-                    </button>
-                    {editMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setDeleteConfirmId(deleteConfirmId === sound.id ? null : sound.id)
-                        }}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center text-white text-xs leading-none"
-                      >
-                        &times;
-                      </button>
-                    )}
-                    {editMode && deleteConfirmId === sound.id && (
-                      <div className="absolute inset-0 z-10 bg-black/80 rounded-xl flex items-center justify-center">
-                        <button
-                          onClick={() => handleDelete(sound.id)}
-                          className="text-xs text-red-400 font-bold px-2 py-1"
+                      {/* Drag handle - only in edit mode */}
+                      {editMode && (
+                        <div
+                          data-drag-handle
+                          className="absolute -top-1 -left-1 z-10 w-6 h-6 bg-zinc-700 border border-zinc-500 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing"
+                          style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties}
                         >
-                          Delete?
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                          <svg className="w-3 h-3 text-zinc-300" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="9" cy="6" r="2" />
+                            <circle cx="15" cy="6" r="2" />
+                            <circle cx="9" cy="12" r="2" />
+                            <circle cx="15" cy="12" r="2" />
+                            <circle cx="9" cy="18" r="2" />
+                            <circle cx="15" cy="18" r="2" />
+                          </svg>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => editMode ? openEditForm(sound) : playSound(sound)}
+                        disabled={!editMode && recentlyPlayed === sound.id}
+                        className={`
+                          w-full flex flex-col items-center gap-1 p-2 rounded-xl
+                          border transition-all duration-150 active:scale-95
+                          ${editingSound?.id === sound.id
+                            ? 'bg-orange-500/20 border-orange-500'
+                            : recentlyPlayed === sound.id
+                              ? 'bg-orange-500/20 border-orange-500 scale-95'
+                              : isOverThis
+                                ? 'bg-orange-500/10 border-orange-500/50'
+                                : editMode
+                                  ? 'bg-zinc-900/50 border-zinc-600 hover:bg-zinc-700/50 hover:border-zinc-500'
+                                  : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-700/50 hover:border-zinc-600'
+                          }
+                        `}
+                      >
+                        <img
+                          src={sound.image_url}
+                          alt={sound.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                        <span className="text-[10px] font-medium text-zinc-300 truncate w-full text-center">
+                          {sound.name}
+                        </span>
+                      </button>
+                    </div>
+                  )
+                })}
 
                 {/* Add Sound button — only in edit mode */}
                 {editMode && (
@@ -373,6 +438,13 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                   {error && <p className="text-red-400 text-xs">{error}</p>}
                   <div className="flex gap-2">
                     <button
+                      onClick={() => setDeleteConfirmId(deleteConfirmId === editingSound.id ? null : editingSound.id)}
+                      disabled={uploading}
+                      className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-bold rounded-lg text-sm"
+                    >
+                      {deleteConfirmId === editingSound.id ? 'Confirm?' : 'Delete'}
+                    </button>
+                    <button
                       onClick={closeEditForm}
                       className="flex-1 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
                     >
@@ -386,6 +458,14 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                       {uploading ? 'Saving...' : 'Save'}
                     </button>
                   </div>
+                  {deleteConfirmId === editingSound.id && (
+                    <button
+                      onClick={() => handleDelete(editingSound.id)}
+                      className="w-full py-2 bg-red-900/50 border border-red-700 hover:bg-red-800/50 text-red-400 font-medium rounded-lg text-sm"
+                    >
+                      Yes, permanently delete this sound
+                    </button>
+                  )}
                 </div>
               )}
 

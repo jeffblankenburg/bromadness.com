@@ -19,8 +19,8 @@ export async function GET() {
 
     const { data: sounds, error } = await supabase
       .from('soundboard_items')
-      .select('id, name, audio_url, image_url, created_by')
-      .order('created_at', { ascending: true })
+      .select('id, name, audio_url, image_url, created_by, sort_order')
+      .order('sort_order', { ascending: true })
 
     if (error) {
       console.error('Fetch sounds error:', error)
@@ -170,6 +170,16 @@ export async function POST(request: Request) {
       .from('soundboard')
       .getPublicUrl(imageData.path)
 
+    // Get max sort_order so new item goes to the end
+    const { data: maxRow } = await supabase
+      .from('soundboard_items')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .single()
+
+    const nextSortOrder = (maxRow?.sort_order ?? 0) + 1
+
     // Insert DB record
     const { data: sound, error: dbError } = await supabase
       .from('soundboard_items')
@@ -178,8 +188,9 @@ export async function POST(request: Request) {
         audio_url: audioUrl,
         image_url: imageUrl,
         created_by: activeUserId,
+        sort_order: nextSortOrder,
       })
-      .select('id, name, audio_url, image_url, created_by')
+      .select('id, name, audio_url, image_url, created_by, sort_order')
       .single()
 
     if (dbError) {
@@ -372,7 +383,7 @@ export async function PATCH(request: Request) {
       .from('soundboard_items')
       .update(updates)
       .eq('id', soundId)
-      .select('id, name, audio_url, image_url, created_by')
+      .select('id, name, audio_url, image_url, created_by, sort_order')
       .single()
 
     if (updateError) {
@@ -383,6 +394,64 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ sound })
   } catch (error) {
     console.error('Error updating sound:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const activeUserId = await getActiveUserId(user.id)
+
+    // Check soundboard permission
+    const { data: profile } = await supabase
+      .from('users')
+      .select('can_use_soundboard')
+      .eq('id', activeUserId)
+      .single()
+
+    if (!profile?.can_use_soundboard) {
+      return NextResponse.json({ error: 'Not allowed' }, { status: 403 })
+    }
+
+    const { order } = await request.json()
+
+    if (!Array.isArray(order) || order.length === 0) {
+      return NextResponse.json({ error: 'Order array is required' }, { status: 400 })
+    }
+
+    for (const item of order) {
+      if (!item.id || typeof item.sort_order !== 'number') {
+        return NextResponse.json({ error: 'Invalid order entry' }, { status: 400 })
+      }
+    }
+
+    const adminClient = createAdminClient()
+
+    const updates = order.map((item: { id: string; sort_order: number }) =>
+      adminClient
+        .from('soundboard_items')
+        .update({ sort_order: item.sort_order })
+        .eq('id', item.id)
+    )
+
+    const results = await Promise.all(updates)
+    const failed = results.filter(r => r.error)
+
+    if (failed.length > 0) {
+      console.error('Reorder errors:', failed.map(f => f.error))
+      return NextResponse.json({ error: 'Failed to save order' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error reordering sounds:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
