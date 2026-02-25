@@ -19,7 +19,7 @@ export async function GET() {
 
     const { data: sounds, error } = await supabase
       .from('soundboard_items')
-      .select('id, name, audio_url, image_url, created_by, sort_order')
+      .select('id, name, audio_url, image_url, created_by, sort_order, soundboard_item_categories(category_id)')
       .order('sort_order', { ascending: true })
 
     if (error) {
@@ -27,7 +27,17 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch sounds' }, { status: 500 })
     }
 
-    return NextResponse.json({ sounds: sounds || [] })
+    const soundsWithCategories = (sounds || []).map((s: Record<string, unknown>) => ({
+      id: s.id,
+      name: s.name,
+      audio_url: s.audio_url,
+      image_url: s.image_url,
+      created_by: s.created_by,
+      sort_order: s.sort_order,
+      category_ids: ((s.soundboard_item_categories as { category_id: string }[] | null) || []).map(ic => ic.category_id),
+    }))
+
+    return NextResponse.json({ sounds: soundsWithCategories })
   } catch (error) {
     console.error('Error fetching sounds:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -200,7 +210,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to save sound' }, { status: 500 })
     }
 
-    return NextResponse.json({ sound })
+    // Handle category assignments
+    const categoryIdsRaw = formData.get('categoryIds') as string | null
+    let categoryIds: string[] = []
+    if (categoryIdsRaw) {
+      categoryIds = JSON.parse(categoryIdsRaw) as string[]
+      if (categoryIds.length > 0) {
+        const rows = categoryIds.map(cid => ({ item_id: sound.id, category_id: cid }))
+        await supabase.from('soundboard_item_categories').insert(rows)
+      }
+    }
+
+    return NextResponse.json({ sound: { ...sound, category_ids: categoryIds } })
   } catch (error) {
     console.error('Error creating sound:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -375,23 +396,56 @@ export async function PATCH(request: Request) {
       updates.name = name
     }
 
-    if (Object.keys(updates).length === 0) {
+    // Handle category reassignment
+    const categoryIdsRaw = formData.get('categoryIds') as string | null
+    let categoryIds: string[] | null = null
+    if (categoryIdsRaw !== null) {
+      categoryIds = JSON.parse(categoryIdsRaw) as string[]
+      // Delete all existing associations and insert new ones
+      await adminClient.from('soundboard_item_categories').delete().eq('item_id', soundId)
+      if (categoryIds.length > 0) {
+        const rows = categoryIds.map(cid => ({ item_id: soundId, category_id: cid }))
+        await adminClient.from('soundboard_item_categories').insert(rows)
+      }
+    }
+
+    if (Object.keys(updates).length === 0 && categoryIds === null) {
       return NextResponse.json({ error: 'No changes provided' }, { status: 400 })
     }
 
-    const { data: sound, error: updateError } = await adminClient
-      .from('soundboard_items')
-      .update(updates)
-      .eq('id', soundId)
-      .select('id, name, audio_url, image_url, created_by, sort_order')
-      .single()
+    let sound
+    if (Object.keys(updates).length > 0) {
+      const { data, error: updateError } = await adminClient
+        .from('soundboard_items')
+        .update(updates)
+        .eq('id', soundId)
+        .select('id, name, audio_url, image_url, created_by, sort_order')
+        .single()
 
-    if (updateError) {
-      console.error('Update error:', updateError)
-      return NextResponse.json({ error: 'Failed to update sound' }, { status: 500 })
+      if (updateError) {
+        console.error('Update error:', updateError)
+        return NextResponse.json({ error: 'Failed to update sound' }, { status: 500 })
+      }
+      sound = data
+    } else {
+      // Category-only update, fetch the current sound
+      const { data } = await adminClient
+        .from('soundboard_items')
+        .select('id, name, audio_url, image_url, created_by, sort_order')
+        .eq('id', soundId)
+        .single()
+      sound = data
     }
 
-    return NextResponse.json({ sound })
+    // Fetch final category_ids
+    const { data: catRows } = await adminClient
+      .from('soundboard_item_categories')
+      .select('category_id')
+      .eq('item_id', soundId)
+
+    return NextResponse.json({
+      sound: { ...sound, category_ids: (catRows || []).map(r => r.category_id) },
+    })
   } catch (error) {
     console.error('Error updating sound:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/admin/trip-cost', label: 'Trip Cost' },
   { href: '/admin/payouts', label: 'Payouts' },
   { href: '/admin/menu', label: 'Food Menu' },
+  { href: '/admin/soundboard', label: 'Soundboard' },
   { href: '/admin/chat', label: 'Chat' },
   { href: '/admin/dev', label: 'Dev' },
 ]

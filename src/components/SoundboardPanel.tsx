@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { SoundItem } from '@/lib/sounds'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { SoundItem, SoundCategory } from '@/lib/sounds'
 import { compressImage } from '@/lib/compress-image'
 import { ensureSoundboardSubscribed } from '@/lib/soundboard-channel'
 import { useSortableGrid } from '@/lib/useSortableGrid'
@@ -31,6 +31,48 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
   const [error, setError] = useState('')
   const [savingOrder, setSavingOrder] = useState(false)
 
+  // Broadcast toggle
+  const [broadcastEnabled, setBroadcastEnabled] = useState(true)
+
+  // Categories
+  const [categories, setCategories] = useState<SoundCategory[]>([])
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [deleteCategoryConfirmId, setDeleteCategoryConfirmId] = useState<string | null>(null)
+
+  // Local audio playback (when broadcast is off)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const bufferCache = useRef<Map<string, AudioBuffer>>(new Map())
+
+  const getAudioContext = () => {
+    if (!audioCtxRef.current) {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      audioCtxRef.current = new AudioCtx()
+    }
+    return audioCtxRef.current
+  }
+
+  const playLocalSound = async (sound: SoundItem) => {
+    const ctx = getAudioContext()
+    if (ctx.state === 'suspended') await ctx.resume()
+
+    let audioBuffer = bufferCache.current.get(sound.id)
+    if (!audioBuffer) {
+      const response = await fetch(sound.audio_url)
+      const arrayBuffer = await response.arrayBuffer()
+      audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+      bufferCache.current.set(sound.id, audioBuffer)
+    }
+
+    const source = ctx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(ctx.destination)
+    source.start(0)
+  }
+
   const handleReorder = useCallback(async (reorderedSounds: SoundItem[]) => {
     setSounds(reorderedSounds)
 
@@ -56,7 +98,6 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
           payload: {},
         })
       } else {
-        // Revert on failure
         const refetch = await fetch('/api/soundboard')
         if (refetch.ok) {
           const data = await refetch.json()
@@ -79,6 +120,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
     onReorder: handleReorder,
   })
 
+  // Fetch sounds
   useEffect(() => {
     const fetchSounds = async () => {
       try {
@@ -95,23 +137,52 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
     fetchSounds()
   }, [])
 
+  // Fetch broadcast setting
+  useEffect(() => {
+    const fetchSetting = async () => {
+      try {
+        const res = await fetch('/api/app-settings?key=soundboard_broadcast_enabled')
+        if (res.ok) {
+          const data = await res.json()
+          setBroadcastEnabled(data.value === 'true')
+        }
+      } catch { /* default stays true */ }
+    }
+    fetchSetting()
+  }, [])
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch('/api/soundboard/categories')
+        if (res.ok) {
+          const data = await res.json()
+          setCategories(data.categories || [])
+        }
+      } catch { /* silently fail */ }
+    }
+    fetchCategories()
+  }, [])
+
   const playSound = async (sound: SoundItem) => {
     if (recentlyPlayed === sound.id) return
     setRecentlyPlayed(sound.id)
     setTimeout(() => setRecentlyPlayed(null), 300)
 
-    // Broadcast to all users (including self via self:true on channel)
-    // SoundListener handles all audio playback with a single AudioContext
-    const channel = await ensureSoundboardSubscribed()
-    const result = await channel.send({
-      type: 'broadcast',
-      event: 'play_sound',
-      payload: {
-        sound_id: sound.id,
-        played_by: displayName,
-      },
-    })
-    console.log('[SoundboardPanel] Broadcast result:', result)
+    if (broadcastEnabled) {
+      const channel = await ensureSoundboardSubscribed()
+      await channel.send({
+        type: 'broadcast',
+        event: 'play_sound',
+        payload: {
+          sound_id: sound.id,
+          played_by: displayName,
+        },
+      })
+    } else {
+      await playLocalSound(sound)
+    }
   }
 
   const handleUpload = async () => {
@@ -126,6 +197,9 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       formData.append('audio', audioFile)
       formData.append('image', compressed, 'thumb.jpg')
       formData.append('name', soundName.trim())
+      if (selectedCategoryIds.length > 0) {
+        formData.append('categoryIds', JSON.stringify(selectedCategoryIds))
+      }
 
       const res = await fetch('/api/soundboard', {
         method: 'POST',
@@ -143,7 +217,6 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       const data = await res.json()
       setSounds(prev => [...prev, data.sound])
 
-      // Notify other clients
       const channel = await ensureSoundboardSubscribed()
       await channel.send({
         type: 'broadcast',
@@ -155,6 +228,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       setSoundName('')
       setAudioFile(null)
       setImageFile(null)
+      setSelectedCategoryIds([])
       setError('')
     } catch {
       setError('Upload failed')
@@ -165,7 +239,12 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
 
   const handleEdit = async () => {
     if (!editingSound || uploading) return
-    if (!editName.trim() && !editAudioFile && !editImageFile) return
+
+    const nameChanged = editName.trim() && editName.trim() !== editingSound.name
+    const categoriesChanged = JSON.stringify(selectedCategoryIds.sort()) !== JSON.stringify([...(editingSound.category_ids || [])].sort())
+    const hasChanges = nameChanged || editAudioFile || editImageFile || categoriesChanged
+
+    if (!hasChanges) return
     setUploading(true)
     setError('')
 
@@ -173,7 +252,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       const formData = new FormData()
       formData.append('soundId', editingSound.id)
 
-      if (editName.trim() && editName.trim() !== editingSound.name) {
+      if (nameChanged) {
         formData.append('name', editName.trim())
       }
       if (editAudioFile) {
@@ -182,6 +261,9 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       if (editImageFile) {
         const compressed = await compressImage(editImageFile, 200, 0.7)
         formData.append('image', compressed, 'thumb.jpg')
+      }
+      if (categoriesChanged) {
+        formData.append('categoryIds', JSON.stringify(selectedCategoryIds))
       }
 
       const res = await fetch('/api/soundboard', {
@@ -200,7 +282,6 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       const data = await res.json()
       setSounds(prev => prev.map(s => s.id === data.sound.id ? data.sound : s))
 
-      // Notify other clients
       const channel = await ensureSoundboardSubscribed()
       await channel.send({
         type: 'broadcast',
@@ -221,6 +302,8 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
     setEditName('')
     setEditAudioFile(null)
     setEditImageFile(null)
+    setSelectedCategoryIds([])
+    setDeleteConfirmId(null)
     setError('')
   }
 
@@ -229,6 +312,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
     setEditName(sound.name)
     setEditAudioFile(null)
     setEditImageFile(null)
+    setSelectedCategoryIds(sound.category_ids || [])
     setShowAddForm(false)
     setDeleteConfirmId(null)
     setError('')
@@ -257,6 +341,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
       // Silently fail
     }
     setDeleteConfirmId(null)
+    closeEditForm()
   }
 
   const toggleEditMode = (e: React.MouseEvent) => {
@@ -264,8 +349,77 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
     setEditMode(!editMode)
     setShowAddForm(false)
     setDeleteConfirmId(null)
+    setActiveCategory(null)
     closeEditForm()
   }
+
+  // Category management
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return
+    try {
+      const res = await fetch('/api/soundboard/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(prev => [...prev, data.category])
+        setNewCategoryName('')
+      }
+    } catch { /* silently fail */ }
+  }
+
+  const handleRenameCategory = async (categoryId: string) => {
+    if (!editingCategoryName.trim()) return
+    try {
+      const res = await fetch('/api/soundboard/categories', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId, name: editingCategoryName.trim() }),
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(prev => prev.map(c => c.id === categoryId ? data.category : c))
+      }
+    } catch { /* silently fail */ }
+    setEditingCategoryId(null)
+    setEditingCategoryName('')
+  }
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      const res = await fetch('/api/soundboard/categories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId }),
+        credentials: 'include',
+      })
+      if (res.ok) {
+        setCategories(prev => prev.filter(c => c.id !== categoryId))
+        // Remove this category from all sounds locally
+        setSounds(prev => prev.map(s => ({
+          ...s,
+          category_ids: s.category_ids.filter(id => id !== categoryId),
+        })))
+        if (activeCategory === categoryId) setActiveCategory(null)
+      }
+    } catch { /* silently fail */ }
+    setDeleteCategoryConfirmId(null)
+  }
+
+  const toggleCategorySelection = (catId: string) => {
+    setSelectedCategoryIds(prev =>
+      prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
+    )
+  }
+
+  // Filter sounds by active category (only when not in edit mode)
+  const filteredSounds = !editMode && activeCategory
+    ? sounds.filter(s => s.category_ids.includes(activeCategory))
+    : sounds
 
   return (
     <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
@@ -316,16 +470,48 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
             <p className="text-zinc-500 text-sm text-center py-4">Loading sounds...</p>
           ) : (
             <>
+              {/* Category filter tabs (only when not in edit mode and categories exist) */}
+              {!editMode && categories.length > 0 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                  <button
+                    onClick={() => setActiveCategory(null)}
+                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activeCategory === null
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        activeCategory === cat.id
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Sound grid */}
               <div ref={containerRef} className="grid grid-cols-4 gap-2">
-                {sounds.map((sound, index) => {
-                  const isDraggingThis = dragIndex === index
-                  const isOverThis = overIndex === index && dragIndex !== null && dragIndex !== index
+                {filteredSounds.map((sound, index) => {
+                  // For drag, use the index in the full sounds array
+                  const fullIndex = editMode ? sounds.indexOf(sound) : index
+                  const isDraggingThis = dragIndex === fullIndex
+                  const isOverThis = overIndex === fullIndex && dragIndex !== null && dragIndex !== fullIndex
 
                   return (
                     <div
                       key={sound.id}
                       className="relative"
-                      data-drag-index={editMode ? index : undefined}
+                      data-drag-index={editMode ? fullIndex : undefined}
                       style={{
                         opacity: isDraggingThis ? 0.3 : 1,
                         transform: isOverThis ? 'scale(1.06)' : undefined,
@@ -383,7 +569,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                 {/* Add Sound button — only in edit mode */}
                 {editMode && (
                   <button
-                    onClick={() => { setShowAddForm(true); closeEditForm() }}
+                    onClick={() => { setShowAddForm(true); closeEditForm(); setSelectedCategoryIds([]) }}
                     className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-dashed border-zinc-600 hover:border-zinc-500 hover:bg-zinc-800/50 transition-colors"
                   >
                     <span className="text-2xl text-zinc-500">+</span>
@@ -435,6 +621,28 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                       </span>
                     </label>
                   </div>
+                  {/* Category assignment */}
+                  {categories.length > 0 && (
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Categories</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {categories.map(cat => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => toggleCategorySelection(cat.id)}
+                            className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
+                              selectedCategoryIds.includes(cat.id)
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {error && <p className="text-red-400 text-xs">{error}</p>}
                   <div className="flex gap-2">
                     <button
@@ -452,7 +660,11 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                     </button>
                     <button
                       onClick={handleEdit}
-                      disabled={uploading || (!editAudioFile && !editImageFile && editName.trim() === editingSound.name)}
+                      disabled={uploading || (
+                        !editAudioFile && !editImageFile
+                        && editName.trim() === editingSound.name
+                        && JSON.stringify(selectedCategoryIds.sort()) === JSON.stringify([...(editingSound.category_ids || [])].sort())
+                      )}
                       className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg text-sm"
                     >
                       {uploading ? 'Saving...' : 'Save'}
@@ -504,6 +716,28 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                       </span>
                     </label>
                   </div>
+                  {/* Category assignment */}
+                  {categories.length > 0 && (
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Categories</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {categories.map(cat => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => toggleCategorySelection(cat.id)}
+                            className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
+                              selectedCategoryIds.includes(cat.id)
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {error && <p className="text-red-400 text-xs">{error}</p>}
                   <div className="flex gap-2">
                     <button
@@ -512,6 +746,7 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                         setSoundName('')
                         setAudioFile(null)
                         setImageFile(null)
+                        setSelectedCategoryIds([])
                         setError('')
                       }}
                       className="flex-1 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
@@ -525,6 +760,104 @@ export function SoundboardPanel({ displayName, userId, isAdmin }: Props) {
                     >
                       {uploading ? 'Uploading...' : 'Add Sound'}
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Category Management — only in edit mode */}
+              {editMode && (
+                <div className="mt-4 bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-zinc-700/50 flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5 text-orange-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Categories</span>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {categories.length === 0 && (
+                      <p className="text-xs text-zinc-600 text-center py-2">No categories yet</p>
+                    )}
+                    {categories.map(cat => (
+                      <div key={cat.id} className="flex items-center gap-2 bg-zinc-800/50 rounded-lg px-3 py-2">
+                        {editingCategoryId === cat.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingCategoryName}
+                              onChange={e => setEditingCategoryName(e.target.value)}
+                              maxLength={30}
+                              className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-orange-500"
+                              autoFocus
+                              onKeyDown={e => { if (e.key === 'Enter') handleRenameCategory(cat.id) }}
+                            />
+                            <button
+                              onClick={() => handleRenameCategory(cat.id)}
+                              className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-[10px] font-medium"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => { setEditingCategoryId(null); setEditingCategoryName('') }}
+                              className="px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-400 rounded-md text-[10px] font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-xs text-zinc-200 font-medium text-left">{cat.name}</span>
+                            <button
+                              onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name) }}
+                              className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+                              title="Rename"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                              </svg>
+                            </button>
+                            {deleteCategoryConfirmId === cat.id ? (
+                              <button
+                                onClick={() => handleDeleteCategory(cat.id)}
+                                className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[10px] font-bold"
+                              >
+                                Confirm?
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteCategoryConfirmId(cat.id)}
+                                className="p-1 text-zinc-600 hover:text-red-400 transition-colors"
+                                title="Delete"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                </svg>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-2 pb-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        placeholder="New category name..."
+                        maxLength={30}
+                        className="flex-1 bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 text-xs placeholder-zinc-600 focus:outline-none focus:border-orange-500"
+                        onKeyDown={e => { if (e.key === 'Enter') handleAddCategory() }}
+                      />
+                      <button
+                        onClick={handleAddCategory}
+                        disabled={!newCategoryName.trim()}
+                        className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg text-xs transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

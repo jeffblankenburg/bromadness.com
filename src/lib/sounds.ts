@@ -5,4 +5,12 @@ export interface SoundItem {
   image_url: string
   created_by: string
   sort_order: number
+  category_ids: string[]
+}
+
+export interface SoundCategory {
+  id: string
+  name: string
+  sort_order: number
+  created_by: string
 }
