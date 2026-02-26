@@ -21,6 +21,8 @@ interface Message {
   gif_url: string | null
   image_url: string | null
   created_at: string
+  is_system?: boolean
+  system_name?: string | null
   user: { id: string; display_name: string | null } | null
   reactions?: Reaction[]
 }
@@ -120,6 +122,8 @@ export default function ChatPage() {
               gif_url,
               image_url,
               created_at,
+              is_system,
+              system_name,
               user:users!chat_messages_user_id_fkey(id, display_name)
             `)
             .eq('id', payload.new.id)
@@ -133,6 +137,8 @@ export default function ChatPage() {
               gif_url: newMessage.gif_url,
               image_url: newMessage.image_url,
               created_at: newMessage.created_at,
+              is_system: newMessage.is_system,
+              system_name: newMessage.system_name,
               user: Array.isArray(newMessage.user) ? newMessage.user[0] : newMessage.user,
               reactions: []
             }
@@ -539,6 +545,7 @@ export default function ChatPage() {
             const isOwnMessage = activeUserId && msg.user?.id === activeUserId
             const emojiOnly = isEmojiOnly(msg.content)
             const myReaction = msg.reactions?.find(r => r.user?.id === activeUserId)
+
             return (
             <div key={msg.id} className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
               <div className={`flex items-baseline gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
@@ -546,7 +553,7 @@ export default function ChatPage() {
                   className={`text-sm ${isOwnMessage ? 'text-zinc-400' : 'text-orange-400'}`}
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  {msg.user?.display_name || 'Unknown'}
+                  {msg.is_system ? (msg.system_name || 'System') : (msg.user?.display_name || 'Unknown')}
                 </span>
                 <span className="text-xs text-zinc-500">{formatTime(msg.created_at)}</span>
               </div>
@@ -569,6 +576,9 @@ export default function ChatPage() {
                       ? 'bg-orange-500 rounded-2xl rounded-tr-sm'
                       : 'bg-zinc-800 rounded-2xl rounded-tl-sm'
                   }`}>
+                    {msg.content && (
+                      <p className="text-sm text-white break-words mb-2">{msg.content}</p>
+                    )}
                     <Image
                       src={msg.gif_url || msg.image_url || ''}
                       alt={msg.gif_url ? 'GIF' : 'Photo'}

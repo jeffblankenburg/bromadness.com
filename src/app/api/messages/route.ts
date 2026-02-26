@@ -28,6 +28,8 @@ export async function GET(request: Request) {
         gif_url,
         image_url,
         created_at,
+        is_system,
+        system_name,
         user:users!chat_messages_user_id_fkey(id, display_name)
       `)
       .order('created_at', { ascending: false })
@@ -114,6 +116,8 @@ export async function POST(request: Request) {
         gif_url,
         image_url,
         created_at,
+        is_system,
+        system_name,
         user:users!chat_messages_user_id_fkey(id, display_name)
       `)
       .single()

@@ -25,11 +25,11 @@ export async function GET() {
         .single()
     ])
 
-    // Count unread messages (from others)
+    // Count unread messages (from others + system messages)
     let messageQuery = supabase
       .from('chat_messages')
       .select('id', { count: 'exact', head: true })
-      .neq('user_id', user.id)
+      .or(`user_id.neq.${user.id},user_id.is.null`)
 
     if (messageReadStatus?.last_read_at) {
       messageQuery = messageQuery.gt('created_at', messageReadStatus.last_read_at)
