@@ -97,6 +97,7 @@ export default async function Home() {
   let userAuctionTeamIds: string[] = []
   let userPickemTeamIds: string[] = []
   let userBrocketTeamIds: string[] = []
+  let userParlayTeamIds: string[] = []
   let tripBalance = 0
   let simulatedTime: string | null = null
   let totalWinnings = 0
@@ -267,6 +268,20 @@ export default async function Home() {
             .map(p => p.picked_team_id)
             .filter((id): id is string => id !== null)
         }
+
+        // Get user's parlay picks for current games
+        const { data: parlayPicks } = await supabase
+          .from('parlay_picks')
+          .select('picked_team_id, parlay:parlays!inner(user_id)')
+          .in('game_id', currentGameIds)
+
+        userParlayTeamIds = (parlayPicks || [])
+          .filter(p => {
+            const parlay = p.parlay as unknown as { user_id: string } | null
+            return parlay?.user_id === activeUserId
+          })
+          .map(p => p.picked_team_id)
+          .filter((id): id is string => id !== null)
       }
 
       // Get user's trip cost balance
@@ -394,6 +409,7 @@ export default async function Home() {
                   userAuctionTeamIds={userAuctionTeamIds}
                   userPickemTeamIds={userPickemTeamIds}
                   userBrocketTeamIds={userBrocketTeamIds}
+                  userParlayTeamIds={userParlayTeamIds}
                   simulatedTime={simulatedTime}
                 />
               )}
