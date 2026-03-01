@@ -57,7 +57,7 @@ export async function GET(request: Request) {
         content,
         image_url: imageUrl,
         is_system: true,
-        system_name: 'The Commissioner',
+        system_name: 'Hoops',
         user_id: null,
       })
 
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
         'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       },
       body: JSON.stringify({
-        title: 'The Commissioner',
+        title: 'Hoops',
         body: content,
         data: { type: 'chat_message' },
       }),
