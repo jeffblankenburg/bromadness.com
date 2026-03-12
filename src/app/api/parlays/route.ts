@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSimulatedUserId } from '@/lib/simulation'
+import { getEasternNow } from '@/lib/timezone'
 
 // DELETE - Delete an unpaid parlay
 export async function DELETE(request: Request) {
@@ -116,24 +117,33 @@ export async function POST(request: Request) {
 
     const dbClient = isSimulating ? createAdminClient() : supabase
 
-    // Get current time in Eastern timezone
-    const now = new Date()
-    const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
-
-    // Validate each pick
+    // Validate all picks have required fields
     for (const pick of picks) {
       const { gameId, teamId } = pick as { gameId: string; teamId: string }
-
       if (!gameId || !teamId) {
         return NextResponse.json({ error: 'Each pick must have gameId and teamId' }, { status: 400 })
       }
+    }
 
-      // Fetch game and validate
-      const { data: game } = await supabase
-        .from('games')
-        .select('id, tournament_id, spread, team1_id, team2_id, scheduled_at')
-        .eq('id', gameId)
-        .single()
+    // Batch fetch all games at once instead of one-by-one
+    const { data: allGames } = await supabase
+      .from('games')
+      .select('id, tournament_id, spread, team1_id, team2_id, scheduled_at')
+      .in('id', gameIds)
+
+    if (!allGames || allGames.length !== 4) {
+      return NextResponse.json({ error: 'One or more games not found' }, { status: 404 })
+    }
+
+    const gamesById = new Map(allGames.map(g => [g.id, g]))
+
+    // Get current time in Eastern timezone
+    const easternTime = getEasternNow()
+
+    // Validate all picks before inserting anything
+    for (const pick of picks) {
+      const { gameId, teamId } = pick as { gameId: string; teamId: string }
+      const game = gamesById.get(gameId)
 
       if (!game) {
         return NextResponse.json({ error: `Game not found: ${gameId}` }, { status: 404 })
@@ -147,12 +157,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Game does not have a spread assigned' }, { status: 400 })
       }
 
-      // Validate team belongs to the game
       if (teamId !== game.team1_id && teamId !== game.team2_id) {
         return NextResponse.json({ error: 'Team does not belong to the selected game' }, { status: 400 })
       }
 
-      // Server-side lock enforcement - game must not have started
       if (game.scheduled_at) {
         const gameTime = new Date(game.scheduled_at)
         if (easternTime >= gameTime) {
@@ -161,7 +169,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create the parlay
+    // All validation passed — now create the parlay
     const { data: parlay, error: parlayError } = await dbClient
       .from('parlays')
       .insert({

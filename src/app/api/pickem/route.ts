@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSimulatedUserId } from '@/lib/simulation'
+import { getEasternNow } from '@/lib/timezone'
 
 // POST - Save a pick (handles simulation mode)
 export async function POST(request: Request) {
@@ -69,8 +70,7 @@ export async function POST(request: Request) {
     const lockIndividual = pickemPayouts?.lock_individual ?? false
 
     // Get current time in Eastern timezone
-    const now = new Date()
-    const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const easternTime = getEasternNow()
 
     // Fetch the specific game's scheduled time
     const { data: game } = await supabase

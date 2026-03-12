@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { getEasternNow } from '@/lib/timezone'
 import { CHANNELS } from '@/lib/data/channels'
 
 interface Team {
@@ -78,8 +79,7 @@ export function CurrentGames({ games, userAuctionTeamIds, userPickemTeamIds, use
       return parseTimestamp(simulatedTime)
     }
     // Get current Eastern time
-    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-    return new Date(eastern)
+    return getEasternNow()
   }
 
   // Load saved state from localStorage after mount

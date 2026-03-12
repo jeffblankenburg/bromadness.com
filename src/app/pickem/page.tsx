@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PickemClient } from './PickemClient'
 import { getActiveUserId } from '@/lib/simulation'
+import { getEasternNow } from '@/lib/timezone'
 
 interface PickemPayouts {
   entry_fee: number
@@ -36,7 +37,7 @@ export default async function PickemPage() {
     .select('id, name, year, pickem_payouts, dev_simulated_time')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (
@@ -149,17 +150,18 @@ export default async function PickemPage() {
         .in('entry_id', userEntryIds)
     : { data: [] }
 
-  // Get all users for standings
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, display_name')
-
   // Get all entries for standings
   const { data: allEntries } = dayIds.length > 0
     ? await supabase
         .from('pickem_entries')
         .select('id, user_id, pickem_day_id, has_paid')
         .in('pickem_day_id', dayIds)
+    : { data: [] }
+
+  // Get only users who have entries (not all users)
+  const entryUserIds = [...new Set((allEntries || []).map(e => e.user_id))]
+  const { data: users } = entryUserIds.length > 0
+    ? await supabase.from('users').select('id, display_name').in('id', entryUserIds)
     : { data: [] }
 
   // Get all picks for standings
@@ -175,6 +177,9 @@ export default async function PickemPage() {
   const simulatedTime = tournament.dev_simulated_time as string | null
   const lockIndividual = payouts.lock_individual ?? false
 
+  // Pass server time to client to avoid hydration mismatch on lock state
+  const serverNow = getEasternNow().toISOString()
+
   return (
     <PickemClient
       userId={activeUserId}
@@ -189,6 +194,7 @@ export default async function PickemPage() {
       simulatedTime={simulatedTime}
       enabledDays={enabledDays}
       lockIndividual={lockIndividual}
+      serverNow={serverNow}
     />
   )
 }

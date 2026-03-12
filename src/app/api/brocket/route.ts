@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSimulatedUserId } from '@/lib/simulation'
+import { getEasternNow } from '@/lib/timezone'
 
 // DELETE - Reset all brocket picks for a tournament (admin only)
 export async function DELETE(request: Request) {
@@ -115,8 +116,7 @@ export async function POST(request: Request) {
     const lockIndividual = brocketPayouts?.lock_individual ?? false
 
     // Get current time in Eastern timezone
-    const now = new Date()
-    const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const easternTime = getEasternNow()
 
     // Fetch the specific game's scheduled time and round
     const { data: game } = await supabase

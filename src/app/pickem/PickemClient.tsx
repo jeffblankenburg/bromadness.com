@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { getEasternNow } from '@/lib/timezone'
 import { CHANNELS } from '@/lib/data/channels'
 
 interface Team {
@@ -65,6 +66,7 @@ interface Props {
   simulatedTime: string | null
   enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
   lockIndividual: boolean
+  serverNow?: string  // Server-computed time to avoid hydration mismatch
 }
 
 function findD1Team(teamName: string) {
@@ -127,6 +129,7 @@ export function PickemClient({
   simulatedTime,
   enabledDays,
   lockIndividual,
+  serverNow,
 }: Props) {
   // Parse a timestamp string (stored as Eastern) into a Date object
   const parseTimestamp = (timeStr: string): Date => {
@@ -137,13 +140,20 @@ export function PickemClient({
   }
 
   // Get current time as a Date object (in Eastern time context)
+  // Use serverNow on initial render to match server-computed lock state,
+  // then switch to client time for subsequent checks
+  const [isHydrated, setIsHydrated] = useState(false)
+  useEffect(() => { setIsHydrated(true) }, [])
+
   const getCurrentTime = (): Date => {
     if (simulatedTime) {
       return parseTimestamp(simulatedTime)
     }
-    // Get current Eastern time
-    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-    return new Date(eastern)
+    // Use server time during initial render to avoid hydration mismatch
+    if (!isHydrated && serverNow) {
+      return new Date(serverNow)
+    }
+    return getEasternNow()
   }
 
   const [selectedDayName, setSelectedDayName] = useState(enabledDays[0] || 'Thursday')

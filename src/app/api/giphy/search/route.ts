@@ -18,8 +18,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Giphy API key not configured' }, { status: 500 })
     }
 
-    console.log('Giphy API key found, length:', GIPHY_API_KEY.length)
-
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q')
     const limit = searchParams.get('limit') || '20'
@@ -33,7 +31,7 @@ export async function GET(request: Request) {
 
     if (!res.ok) {
       console.error('Giphy API error:', data)
-      return NextResponse.json({ error: 'Giphy API error', details: data }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch GIFs' }, { status: 500 })
     }
 
     return NextResponse.json({ gifs: data.data || [] })

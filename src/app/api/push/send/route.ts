@@ -26,7 +26,8 @@ export async function POST(request: Request) {
   try {
     // Verify this is an internal request by checking for a secret header
     const internalSecret = request.headers.get('x-internal-secret')
-    if (internalSecret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const expectedSecret = process.env.INTERNAL_API_SECRET
+    if (!expectedSecret || internalSecret !== expectedSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

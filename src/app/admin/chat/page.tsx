@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { extractRelation } from '@/lib/supabase/helpers'
 import { ChatManager } from './ChatManager'
 
 export default async function ChatAdminPage() {
@@ -17,7 +18,7 @@ export default async function ChatAdminPage() {
   // Aggregate message counts by user
   const userCounts = (allMessages || []).reduce((acc, msg) => {
     const userId = msg.user_id
-    const user = msg.user as unknown as { display_name: string } | null
+    const user = extractRelation<{ display_name: string }>(msg.user)
     const displayName = user?.display_name || 'Unknown'
     if (!acc[userId]) {
       acc[userId] = { userId, displayName, count: 0 }

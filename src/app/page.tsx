@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { DevTools } from '@/components/DevTools'
 import { MenuDisplay } from '@/components/MenuDisplay'
 import { AuctionTeamsCard } from '@/components/AuctionTeamsCard'
 import { CurrentGames } from '@/components/CurrentGames'
@@ -11,9 +10,10 @@ import { NotificationPrompt } from '@/components/NotificationPrompt'
 import { ActiveUsers } from '@/components/ActiveUsers'
 import { SoundboardPanel } from '@/components/SoundboardPanel'
 import { getActiveUserId } from '@/lib/simulation'
+import { extractRelation } from '@/lib/supabase/helpers'
+import { getEasternNow } from '@/lib/timezone'
 
 // Toggle to show/hide dev tools on home page
-const SHOW_DEV_TOOLS = false
 
 // Get tournament day based on start_date (Wednesday)
 // Returns Wednesday, Thursday, Friday, Saturday, or Sunday
@@ -53,7 +53,7 @@ export default async function Home() {
       .from('users')
       .select('display_name, is_admin, casino_credits, can_use_soundboard')
       .eq('id', activeUserId)
-      .single()
+      .maybeSingle()
     profile = data
   }
 
@@ -63,7 +63,7 @@ export default async function Home() {
     .select('id, start_date, auction_payouts, pickem_payouts, dev_simulated_time')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let menuItems: Array<{
     id: string
@@ -132,9 +132,7 @@ export default async function Home() {
         nowDate = new Date()
       }
     } else {
-      // Get current time in Eastern timezone
-      const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-      nowDate = new Date(eastern)
+      nowDate = getEasternNow()
     }
 
     const pastCutoff = formatTimestamp(new Date(nowDate.getTime() - 150 * 60 * 1000))
@@ -182,33 +180,37 @@ export default async function Home() {
       team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
     })) as typeof currentGames
 
-    // Get completed games to count wins
-    const { data: games } = await supabase
-      .from('games')
-      .select('winner_id')
-      .eq('tournament_id', tournament.id)
-      .not('winner_id', 'is', null)
+    // Fetch completed games and auction teams in parallel
+    const [{ data: games }, { data: allAuctionData }] = await Promise.all([
+      supabase
+        .from('games')
+        .select('winner_id')
+        .eq('tournament_id', tournament.id)
+        .not('winner_id', 'is', null),
+      supabase
+        .from('auction_teams')
+        .select('user_id, bid_amount, team:teams(id, name, short_name, seed)')
+        .eq('tournament_id', tournament.id),
+    ])
 
-    // Get ALL auction teams to calculate standings
-    const { data: allAuctionData } = await supabase
-      .from('auction_teams')
-      .select('user_id, bid_amount, team:teams(id, name, short_name, seed)')
-      .eq('tournament_id', tournament.id)
+    // Pre-compute wins by team ID in O(n) instead of O(n*m)
+    const winsByTeamId: Record<string, number> = {}
+    for (const g of games || []) {
+      if (g.winner_id) {
+        winsByTeamId[g.winner_id] = (winsByTeamId[g.winner_id] || 0) + 1
+      }
+    }
 
-    // Calculate points per user
+    // Calculate points per user using pre-computed map
     const userPoints: Record<string, number> = {}
     for (const a of allAuctionData || []) {
-      const teamData = a.team as unknown as { id: string; seed: number } | null
+      const teamData = extractRelation<{ id: string; seed: number }>(a.team)
       if (teamData) {
-        const wins = (games || []).filter(g => g.winner_id === teamData.id).length
+        const wins = winsByTeamId[teamData.id] || 0
         const points = teamData.seed * wins
         userPoints[a.user_id] = (userPoints[a.user_id] || 0) + points
       }
     }
-
-    // Sort users by points to get rankings
-    const sortedUsers = Object.entries(userPoints)
-      .sort(([, a], [, b]) => b - a)
 
     // Find current user's points
     if (user) {
@@ -217,8 +219,8 @@ export default async function Home() {
       // Get user's teams
       const userTeams = (allAuctionData || []).filter(a => a.user_id === activeUserId)
       userAuctionTeams = userTeams.map(a => {
-        const teamData = a.team as unknown as { id: string; name: string; short_name: string | null; seed: number } | null
-        const wins = teamData ? (games || []).filter(g => g.winner_id === teamData.id).length : 0
+        const teamData = extractRelation<{ id: string; name: string; short_name: string | null; seed: number }>(a.team)
+        const wins = teamData ? (winsByTeamId[teamData.id] || 0) : 0
         const points = teamData ? teamData.seed * wins : 0
         return {
           team: teamData,
@@ -233,84 +235,76 @@ export default async function Home() {
         .map(a => a.team?.id)
         .filter((id): id is string => id !== undefined && id !== null)
 
-      // Get user's pickem picks for current games
+      // Fetch user-specific data in parallel
       const currentGameIds = currentGames.map(g => g.id)
-      if (currentGameIds.length > 0) {
-        const { data: pickemPicks } = await supabase
-          .from('pickem_picks')
-          .select('picked_team_id, entry:pickem_entries!inner(user_id)')
+
+      const [
+        pickemResult,
+        brocketEntryResult,
+        parlayResult,
+        tripCostResult,
+        payoutsResult,
+      ] = await Promise.all([
+        // Pickem picks
+        currentGameIds.length > 0
+          ? supabase.from('pickem_picks').select('picked_team_id, entry:pickem_entries!inner(user_id)').in('game_id', currentGameIds)
+          : Promise.resolve({ data: null }),
+        // Brocket entry
+        supabase.from('brocket_entries').select('id').eq('user_id', activeUserId).eq('tournament_id', tournament.id).maybeSingle(),
+        // Parlay picks
+        currentGameIds.length > 0
+          ? supabase.from('parlay_picks').select('picked_team_id, parlay:parlays!inner(user_id)').in('game_id', currentGameIds)
+          : Promise.resolve({ data: null }),
+        // Trip cost
+        supabase.from('trip_costs').select('id, amount_owed').eq('tournament_id', tournament.id).eq('user_id', activeUserId).maybeSingle(),
+        // Paid payouts
+        supabase.from('payouts').select('amount').eq('tournament_id', tournament.id).eq('user_id', activeUserId).eq('is_paid', true),
+      ])
+
+      // Process pickem picks
+      userPickemTeamIds = (pickemResult.data || [])
+        .filter(p => {
+          const entry = extractRelation<{ user_id: string }>(p.entry)
+          return entry?.user_id === activeUserId
+        })
+        .map(p => p.picked_team_id)
+        .filter((id): id is string => id !== null)
+
+      // Process brocket picks (needs sequential fetch for entry-based lookup)
+      if (brocketEntryResult.data && currentGameIds.length > 0) {
+        const { data: brocketPicks } = await supabase
+          .from('brocket_picks')
+          .select('picked_team_id')
+          .eq('entry_id', brocketEntryResult.data.id)
           .in('game_id', currentGameIds)
 
-        userPickemTeamIds = (pickemPicks || [])
-          .filter(p => {
-            const entry = p.entry as unknown as { user_id: string } | null
-            return entry?.user_id === activeUserId
-          })
-          .map(p => p.picked_team_id)
-          .filter((id): id is string => id !== null)
-
-        // Get user's brocket picks for current games (Round 1 only)
-        const { data: brocketEntry } = await supabase
-          .from('brocket_entries')
-          .select('id')
-          .eq('user_id', activeUserId)
-          .eq('tournament_id', tournament.id)
-          .single()
-
-        if (brocketEntry) {
-          const { data: brocketPicks } = await supabase
-            .from('brocket_picks')
-            .select('picked_team_id')
-            .eq('entry_id', brocketEntry.id)
-            .in('game_id', currentGameIds)
-
-          userBrocketTeamIds = (brocketPicks || [])
-            .map(p => p.picked_team_id)
-            .filter((id): id is string => id !== null)
-        }
-
-        // Get user's parlay picks for current games
-        const { data: parlayPicks } = await supabase
-          .from('parlay_picks')
-          .select('picked_team_id, parlay:parlays!inner(user_id)')
-          .in('game_id', currentGameIds)
-
-        userParlayTeamIds = (parlayPicks || [])
-          .filter(p => {
-            const parlay = p.parlay as unknown as { user_id: string } | null
-            return parlay?.user_id === activeUserId
-          })
+        userBrocketTeamIds = (brocketPicks || [])
           .map(p => p.picked_team_id)
           .filter((id): id is string => id !== null)
       }
 
-      // Get user's trip cost balance
-      const { data: tripCost } = await supabase
-        .from('trip_costs')
-        .select('id, amount_owed')
-        .eq('tournament_id', tournament.id)
-        .eq('user_id', activeUserId)
-        .single()
+      // Process parlay picks
+      userParlayTeamIds = (parlayResult.data || [])
+        .filter(p => {
+          const parlay = extractRelation<{ user_id: string }>(p.parlay)
+          return parlay?.user_id === activeUserId
+        })
+        .map(p => p.picked_team_id)
+        .filter((id): id is string => id !== null)
 
-      if (tripCost) {
+      // Process trip cost balance
+      if (tripCostResult.data) {
         const { data: tripPayments } = await supabase
           .from('trip_payments')
           .select('amount')
-          .eq('trip_cost_id', tripCost.id)
+          .eq('trip_cost_id', tripCostResult.data.id)
 
         const totalPaid = (tripPayments || []).reduce((sum, p) => sum + p.amount, 0)
-        tripBalance = tripCost.amount_owed - totalPaid
+        tripBalance = tripCostResult.data.amount_owed - totalPaid
       }
 
-      // Get total paid winnings for this user
-      const { data: paidPayouts } = await supabase
-        .from('payouts')
-        .select('amount')
-        .eq('tournament_id', tournament.id)
-        .eq('user_id', activeUserId)
-        .eq('is_paid', true)
-
-      totalWinnings = (paidPayouts || []).reduce((sum, p) => sum + p.amount, 0)
+      // Process winnings
+      totalWinnings = (payoutsResult.data || []).reduce((sum, p) => sum + p.amount, 0)
     }
   }
 
@@ -324,9 +318,6 @@ export default async function Home() {
         paddingTop: 'env(safe-area-inset-top)'
       }}
     >
-      {/* DEV ONLY - Toggle with SHOW_DEV_TOOLS flag */}
-      {SHOW_DEV_TOOLS && user && profile && <DevTools isAdmin={profile.is_admin ?? false} />}
-
       {/* Page Header */}
       <div className="bg-orange-500 -mx-6 px-6 py-2 mb-4 w-screen">
         <h1 className="text-xl font-bold text-white text-center" style={{ fontFamily: 'var(--font-display)' }}>

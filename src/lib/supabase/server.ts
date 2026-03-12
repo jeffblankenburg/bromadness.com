@@ -17,7 +17,7 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, {
                 ...options,
-                maxAge: options?.maxAge ?? 60 * 60 * 24 * 400,
+                maxAge: options?.maxAge ?? 60 * 60 * 24 * 30,
               })
             )
           } catch {

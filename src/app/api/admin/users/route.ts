@@ -1,23 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-async function checkIsAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_admin) return null
-
-  return user
-}
+import { checkIsAdmin } from '@/lib/auth'
 
 export async function PATCH(request: Request) {
   try {
@@ -140,7 +123,7 @@ export async function DELETE(request: Request) {
     }
 
     // Prevent deleting yourself
-    if (userId === admin.id) {
+    if (userId === admin.user.id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 

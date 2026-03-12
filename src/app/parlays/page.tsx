@@ -23,7 +23,7 @@ export default async function ParlaysPage() {
     .select('id, name, year, dev_simulated_time')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (

@@ -1,23 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { setSimulatedUserId, clearSimulatedUserId, getSimulatedUserId } from '@/lib/simulation'
-
-async function checkIsAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_admin) return null
-
-  return user
-}
+import { checkIsAdmin } from '@/lib/auth'
 
 // GET - Get current simulation status
 export async function GET() {
@@ -34,8 +17,7 @@ export async function GET() {
     }
 
     // Get the simulated user's info
-    const supabase = await createClient()
-    const { data: user } = await supabase
+    const { data: user } = await admin.supabase
       .from('users')
       .select('id, display_name, phone')
       .eq('id', simulatedUserId)
@@ -76,8 +58,7 @@ export async function POST(request: Request) {
     }
 
     // Verify the user exists
-    const supabase = await createClient()
-    const { data: user } = await supabase
+    const { data: user } = await admin.supabase
       .from('users')
       .select('id, display_name')
       .eq('id', userId)

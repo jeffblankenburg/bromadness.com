@@ -90,9 +90,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Audio file too large (max 2MB)' }, { status: 400 })
     }
 
-    // Validate image type
-    if (!image.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Thumbnail must be an image' }, { status: 400 })
+    // Validate image type - only allow safe formats (not SVG)
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedImageTypes.includes(image.type)) {
+      return NextResponse.json({ error: 'Thumbnail must be a JPEG, PNG, WebP, or GIF image' }, { status: 400 })
     }
 
     // Validate image size (500KB)
@@ -358,8 +359,9 @@ export async function PATCH(request: Request) {
 
     // Handle image replacement
     if (image) {
-      if (!image.type.startsWith('image/')) {
-        return NextResponse.json({ error: 'Thumbnail must be an image' }, { status: 400 })
+      const allowedImgTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      if (!allowedImgTypes.includes(image.type)) {
+        return NextResponse.json({ error: 'Thumbnail must be a JPEG, PNG, WebP, or GIF image' }, { status: 400 })
       }
       if (image.size > 500 * 1024) {
         return NextResponse.json({ error: 'Image too large (max 500KB)' }, { status: 400 })

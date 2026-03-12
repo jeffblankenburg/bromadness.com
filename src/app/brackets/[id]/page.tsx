@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { BracketDetailClient } from './BracketDetailClient'
 import { getActiveUserId } from '@/lib/simulation'
+import { extractRelation } from '@/lib/supabase/helpers'
 
 const BracketIcon = () => (
   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -63,7 +64,7 @@ export default async function BracketDetailPage({
   // Transform participants to include display_name
   const participantsWithNames = participants?.map(p => ({
     ...p,
-    display_name: (p.users as unknown as { display_name: string } | null)?.display_name || 'Unknown',
+    display_name: extractRelation<{ display_name: string }>(p.users)?.display_name || 'Unknown',
     users: undefined,
   })) || []
 

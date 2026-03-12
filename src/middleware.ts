@@ -1,7 +1,25 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
+const ALLOWED_ORIGINS = [
+  'https://www.bromadness.com',
+  'https://bromadness.com',
+]
+
 export async function middleware(request: NextRequest) {
+  // CSRF protection: validate Origin on mutation requests to API routes
+  const method = request.method
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && request.nextUrl.pathname.startsWith('/api')) {
+    const origin = request.headers.get('origin')
+    if (origin) {
+      const isAllowed = ALLOWED_ORIGINS.some(allowed => origin === allowed) ||
+        (process.env.NODE_ENV === 'development' && origin === 'http://localhost:3000')
+      if (!isAllowed) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+  }
+
   return await updateSession(request)
 }
 

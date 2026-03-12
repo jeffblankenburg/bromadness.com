@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       .single()
 
     if (lookupError || !existingUser) {
-      return NextResponse.json({ error: 'Unable to send verification code. Please contact an administrator.' }, { status: 403 })
+      // Return same response as success to prevent user enumeration
+      return NextResponse.json({ success: true })
     }
 
     // User exists, now send the OTP
@@ -33,7 +34,8 @@ export async function POST(request: Request) {
 
     if (otpError) {
       console.error('OTP error:', otpError)
-      return NextResponse.json({ error: otpError.message }, { status: 500 })
+      // Return generic error to avoid leaking details
+      return NextResponse.json({ error: 'Failed to send verification code' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

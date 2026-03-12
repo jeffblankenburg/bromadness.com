@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { BracketsListClient } from './BracketsListClient'
 import { getActiveUserId } from '@/lib/simulation'
+import { extractRelation } from '@/lib/supabase/helpers'
 
 const BracketIcon = () => (
   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -44,8 +45,14 @@ export default async function BracketsPage() {
     .order('created_at', { ascending: false })
 
   // If user has participant entries, include those brackets too
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (participantBracketIds.length > 0) {
-    bracketsQuery = bracketsQuery.or(`created_by.eq.${activeUserId},id.in.(${participantBracketIds.join(',')})`)
+    const safeIds = participantBracketIds.filter(id => uuidRegex.test(id))
+    if (safeIds.length > 0 && uuidRegex.test(activeUserId)) {
+      bracketsQuery = bracketsQuery.or(`created_by.eq.${activeUserId},id.in.(${safeIds.join(',')})`)
+    } else {
+      bracketsQuery = bracketsQuery.eq('created_by', activeUserId)
+    }
   } else {
     bracketsQuery = bracketsQuery.eq('created_by', activeUserId)
   }
@@ -62,7 +69,7 @@ export default async function BracketsPage() {
     created_at: b.created_at,
     participant_count: b.custom_bracket_participants?.length || 0,
     is_owner: b.created_by === activeUserId,
-    creator_name: (b.creator as unknown as { display_name: string } | null)?.display_name || 'Unknown',
+    creator_name: extractRelation<{ display_name: string }>(b.creator)?.display_name || 'Unknown',
   })) || []
 
   return (

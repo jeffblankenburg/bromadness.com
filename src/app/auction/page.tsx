@@ -107,7 +107,7 @@ export default async function AuctionPage() {
     .select('id, name, year, entry_fee, salary_cap, teams_per_player, auction_payouts, auction_order_seed, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (

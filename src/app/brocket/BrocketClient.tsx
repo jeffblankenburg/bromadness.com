@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { getEasternNow } from '@/lib/timezone'
 
 interface Team {
   id: string
@@ -133,8 +134,7 @@ export function BrocketClient({
     if (simulatedTime) {
       return parseTimestamp(simulatedTime)
     }
-    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-    return new Date(eastern)
+    return getEasternNow()
   }
 
   // Split games by round

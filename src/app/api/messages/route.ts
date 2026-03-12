@@ -84,8 +84,27 @@ export async function POST(request: Request) {
 
     // Must have either content, gif_url, or image_url
     const hasContent = content && typeof content === 'string' && content.trim().length > 0
-    const hasGif = gif_url && typeof gif_url === 'string' && gif_url.startsWith('https://media')
-    const hasImage = image_url && typeof image_url === 'string' && image_url.startsWith('http')
+
+    // Validate GIF URLs against trusted Giphy domains
+    const trustedGifDomains = ['media.giphy.com', 'media0.giphy.com', 'media1.giphy.com', 'media2.giphy.com', 'media3.giphy.com', 'media4.giphy.com']
+    let hasGif = false
+    if (gif_url && typeof gif_url === 'string') {
+      try {
+        const gifHost = new URL(gif_url).hostname
+        hasGif = trustedGifDomains.includes(gifHost)
+      } catch { hasGif = false }
+    }
+
+    // Validate image URLs against Supabase storage domain
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    let hasImage = false
+    if (image_url && typeof image_url === 'string') {
+      try {
+        const imgUrl = new URL(image_url)
+        const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : ''
+        hasImage = imgUrl.hostname === supabaseHost
+      } catch { hasImage = false }
+    }
 
     if (!hasContent && !hasGif && !hasImage) {
       return NextResponse.json({ error: 'Message content, GIF, or image required' }, { status: 400 })
@@ -141,16 +160,13 @@ export async function POST(request: Request) {
     }
 
     // Send push notifications to other users (fire and forget)
-    // Get the host from the request headers for proper URL construction
-    const host = request.headers.get('host') || 'www.bromadness.com'
-    const protocol = host.includes('localhost') ? 'http' : 'https'
-    const baseUrl = `${protocol}://${host}`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.bromadness.com'
 
     fetch(`${baseUrl}/api/push/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
       },
       body: JSON.stringify({
         excludeUserId: activeUserId,
@@ -161,9 +177,15 @@ export async function POST(request: Request) {
           messageId: data.id,
         },
       }),
-    }).catch(err => {
-      console.error('Failed to send push notifications:', err)
     })
+      .then(async (res) => {
+        if (!res.ok) {
+          console.error('Push notification request failed:', res.status)
+        }
+      })
+      .catch(err => {
+        console.error('Failed to send push notifications:', err)
+      })
 
     return NextResponse.json({ message: data })
   } catch (error) {

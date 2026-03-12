@@ -30,7 +30,7 @@ export default async function BrocketPage() {
     .select('id, name, year, brocket_payouts, dev_simulated_time')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   const BrocketIcon = () => (
     <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -71,12 +71,12 @@ export default async function BrocketPage() {
     )
   }
 
-  // Get Round 1 AND Round 2 games (32 + 16 = 48 games)
+  // Get brocket-eligible games using explicit flag
   const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, scheduled_at, team1_score, team2_score, winner_id, region_id,
-      game_number, location, channel, round, next_game_id, is_team1_slot,
+      game_number, location, channel, round, next_game_id, is_team1_slot, is_brocket,
       team1:teams!games_team1_id_fkey(id, name, short_name, seed),
       team2:teams!games_team2_id_fkey(id, name, short_name, seed)
     `)
@@ -92,37 +92,25 @@ export default async function BrocketPage() {
     team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
   }))
 
-  const allR1Games = allFetchedGames.filter(g => g.round === 1)
+  // Use is_brocket flag for eligibility; fall back to all R1 games + linked R2 games
+  const brocketR1Games = allFetchedGames.filter(g => g.round === 1 && g.is_brocket)
+  const hasExplicitFlags = brocketR1Games.length > 0
 
-  // Helper to check if a game is on a specific day of week
-  const getDayOfWeek = (scheduledAt: string | null): number | null => {
-    if (!scheduledAt) return null
-    const dateStr = scheduledAt.split('T')[0]
-    const date = new Date(dateStr + 'T12:00:00')
-    return date.getDay()
+  let games: typeof allFetchedGames
+  if (hasExplicitFlags) {
+    const brocketR1Ids = new Set(brocketR1Games.map(g => g.id))
+    const linkedR2Ids = new Set(
+      brocketR1Games.filter(g => g.next_game_id).map(g => g.next_game_id!)
+    )
+    games = allFetchedGames.filter(g => {
+      if (g.round === 1) return brocketR1Ids.has(g.id)
+      if (g.round === 2) return linkedR2Ids.has(g.id)
+      return false
+    })
+  } else {
+    // Fallback: include all R1 + R2 games if no flags set yet
+    games = allFetchedGames
   }
-
-  // Identify Thursday R1 games (day 4 = Thursday)
-  const thursdayR1GameIds = new Set(
-    allR1Games
-      .filter(g => getDayOfWeek(g.scheduled_at) === 4)
-      .map(g => g.id)
-  )
-
-  // Saturday R2 games = R2 games fed by Thursday R1 games
-  // (Thursday R1 winners play Saturday, Friday R1 winners play Sunday)
-  const saturdayR2GameIds = new Set(
-    allR1Games
-      .filter(g => thursdayR1GameIds.has(g.id) && g.next_game_id)
-      .map(g => g.next_game_id!)
-  )
-
-  // Brocket includes all R1 games + only Saturday R2 games (8 games)
-  const games = allFetchedGames.filter(g => {
-    if (g.round === 1) return true
-    if (g.round === 2) return saturdayR2GameIds.has(g.id)
-    return false
-  })
 
   const r1Games = games.filter(g => g.round === 1)
 

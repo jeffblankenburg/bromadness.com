@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
+import { getEasternNow } from '@/lib/timezone'
 import { CHANNELS } from '@/lib/data/channels'
 
 interface Team {
@@ -98,8 +99,7 @@ export function ParlaysClient({
     if (simulatedTime) {
       return parseTimestamp(simulatedTime)
     }
-    const eastern = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })
-    return new Date(eastern)
+    return getEasternNow()
   }
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list')

@@ -66,7 +66,7 @@ export default async function SchedulePage() {
     .select('id')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (

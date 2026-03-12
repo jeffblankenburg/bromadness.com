@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { COUNTDOWN_MESSAGES } from '@/lib/countdown-messages'
+import { getEasternNow } from '@/lib/timezone'
 
 export async function GET(request: Request) {
   try {
     // Verify the request is from Vercel Cron
+    const cronSecret = process.env.CRON_SECRET
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -17,15 +19,14 @@ export async function GET(request: Request) {
       .from('tournaments')
       .select('id, start_date, name')
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
 
     if (tournamentError || !tournament) {
       return NextResponse.json({ message: 'No active tournament found' }, { status: 200 })
     }
 
     // Calculate days remaining in Eastern time
-    const now = new Date()
-    const eastern = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const eastern = getEasternNow()
     const todayET = new Date(eastern.getFullYear(), eastern.getMonth(), eastern.getDate())
 
     // start_date is the first game day — the trip starts the day before
@@ -67,24 +68,30 @@ export async function GET(request: Request) {
     }
 
     // Send push notification to all users
-    const host = request.headers.get('host') || 'www.bromadness.com'
-    const protocol = host.includes('localhost') ? 'http' : 'https'
-    const baseUrl = `${protocol}://${host}`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.bromadness.com'
 
-    fetch(`${baseUrl}/api/push/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      },
-      body: JSON.stringify({
-        title: 'Hoops',
-        body: content,
-        data: { type: 'chat_message' },
-      }),
-    }).catch(err => {
+    try {
+      const pushRes = await fetch(`${baseUrl}/api/push/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
+        },
+        body: JSON.stringify({
+          title: 'Hoops',
+          body: content,
+          data: { type: 'chat_message' },
+        }),
+      })
+      if (pushRes.ok) {
+        const pushData = await pushRes.json()
+        console.log(`Push notifications sent: ${pushData.sent} success, ${pushData.failed} failed`)
+      } else {
+        console.error('Push notification request failed:', pushRes.status)
+      }
+    } catch (err) {
       console.error('Failed to send countdown push notifications:', err)
-    })
+    }
 
     return NextResponse.json({
       message: `Countdown posted: ${daysRemaining} days remaining`,

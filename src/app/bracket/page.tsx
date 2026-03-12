@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BracketView } from './BracketView'
 import { getActiveUserId } from '@/lib/simulation'
+import { extractRelation } from '@/lib/supabase/helpers'
 
 export default async function BracketPage() {
   const supabase = await createClient()
@@ -18,7 +19,7 @@ export default async function BracketPage() {
     .select('id, name, year')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (
@@ -91,7 +92,7 @@ export default async function BracketPage() {
     .select('id')
     .eq('user_id', activeUserId)
     .eq('tournament_id', tournament.id)
-    .single()
+    .maybeSingle()
 
   if (brocketEntry) {
     const { data: picks } = await supabase
@@ -110,7 +111,7 @@ export default async function BracketPage() {
 
   const teamOwners: Record<string, string> = {}
   for (const at of auctionTeams || []) {
-    const userData = at.user as unknown as { display_name: string } | null
+    const userData = extractRelation<{ display_name: string }>(at.user)
     if (at.team_id && userData?.display_name) {
       teamOwners[at.team_id] = userData.display_name
     }

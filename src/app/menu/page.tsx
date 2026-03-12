@@ -11,7 +11,7 @@ export default async function MenuPage() {
     .select('id, name, start_date')
     .order('year', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (!tournament) {
     return (

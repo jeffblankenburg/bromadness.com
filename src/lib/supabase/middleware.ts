@@ -24,8 +24,8 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, {
               ...options,
-              // Ensure cookies persist across iOS PWA process kills
-              maxAge: options?.maxAge ?? 60 * 60 * 24 * 400,
+              // 30-day session lifetime; Supabase refresh tokens handle renewal
+              maxAge: options?.maxAge ?? 60 * 60 * 24 * 30,
             })
           )
         },
