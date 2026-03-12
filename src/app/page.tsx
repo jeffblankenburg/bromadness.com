@@ -9,6 +9,7 @@ import { InstallPrompt } from '@/components/InstallPrompt'
 import { NotificationPrompt } from '@/components/NotificationPrompt'
 import { ActiveUsers } from '@/components/ActiveUsers'
 import { SoundboardPanel } from '@/components/SoundboardPanel'
+import { ThemeSongButton } from '@/components/ThemeSongButton'
 import { getActiveUserId } from '@/lib/simulation'
 import { extractRelation } from '@/lib/supabase/helpers'
 import { getEasternNow } from '@/lib/timezone'
@@ -326,6 +327,21 @@ export default async function Home() {
       </div>
 
       <div className="text-center space-y-4 w-full max-w-sm">
+        {(() => {
+          if (!tournament?.start_date) return null
+          const start = new Date(tournament.start_date + 'T00:00:00')
+          const now = simulatedTime
+            ? (() => {
+                const match = simulatedTime.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):?(\d{2})?/)
+                if (match) {
+                  const [, y, mo, d, h, mi, s] = match
+                  return new Date(+y, +mo - 1, +d, +h, +mi, +(s || '0'))
+                }
+                return getEasternNow()
+              })()
+            : getEasternNow()
+          return now >= start ? <ThemeSongButton /> : null
+        })()}
         <InstallPrompt />
         <NotificationPrompt />
             <div className="space-y-3">
