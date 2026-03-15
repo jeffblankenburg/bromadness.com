@@ -27,6 +27,7 @@ export default async function TournamentPage() {
     short_name: string | null
     seed: number
     region_id: string
+    record: string | null
   }> = []
 
   let games: Array<{
@@ -51,7 +52,7 @@ export default async function TournamentPage() {
   if (tournament) {
     const { data: teamsData } = await supabase
       .from('teams')
-      .select('id, name, short_name, seed, region_id')
+      .select('id, name, short_name, seed, region_id, record')
       .eq('tournament_id', tournament.id)
       .order('seed')
     teams = teamsData || []

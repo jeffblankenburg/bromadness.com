@@ -21,6 +21,7 @@ interface Team {
   short_name: string | null
   seed: number
   region_id: string
+  record: string | null
 }
 
 interface Game {
@@ -210,6 +211,19 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     } finally {
       setSaving(false)
       setSelectedSlot(null)
+    }
+  }
+
+  const handleRecordChange = async (teamId: string, value: string) => {
+    const record = value.trim() || null
+    const { error } = await supabase
+      .from('teams')
+      .update({ record })
+      .eq('id', teamId)
+    if (error) {
+      console.error('Failed to update record:', error)
+    } else {
+      router.refresh()
     }
   }
 
@@ -670,8 +684,8 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                     </select>
                   </div>
 
-                  {/* Team 1 (favorite/lower seed) with spread input */}
-                  <div className="flex items-center gap-2">
+                  {/* Team 1 (favorite/lower seed) with record + spread input */}
+                  <div className="flex items-center gap-1">
                     {isSelected1 ? (
                       <InlineTeamSearch
                         seed={seed1}
@@ -683,7 +697,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                     ) : (
                       <button
                         onClick={() => setSelectedSlot({ regionId: activeTab, seed: seed1 })}
-                        className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${
+                        className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
                           team1
                             ? 'hover:bg-zinc-600'
                             : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
@@ -694,17 +708,16 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         {team1 && d1Team1 ? (
                           <>
                             <div
-                              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: d1Team1.primaryColor }}
                             >
                               {logo1 ? (
-                                <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                <img src={logo1} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
-                                <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
+                                <span className="text-[8px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
                               )}
                             </div>
                             <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
-                            <span className="text-xs text-zinc-400">{d1Team1.abbreviation}</span>
                           </>
                         ) : (
                           <span className="flex-1 text-zinc-500 italic text-sm">Select team...</span>
@@ -712,31 +725,46 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                       </button>
                     )}
                     {!isSelected1 && (
-                      <div className="w-[72px] flex-shrink-0">
-                        {game?.spread ? (
-                          <input
-                            type="text"
-                            defaultValue={game.spread}
-                            onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
-                            className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
-                          />
-                        ) : team1 ? (
-                          <input
-                            type="text"
-                            defaultValue=""
-                            onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
-                            placeholder="Spread"
-                            className="w-full px-2 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-xs text-zinc-500 placeholder-zinc-600"
-                          />
-                        ) : (
-                          <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
-                        )}
-                      </div>
+                      <>
+                        <div className="w-[52px] flex-shrink-0">
+                          {team1 ? (
+                            <input
+                              type="text"
+                              defaultValue={team1.record || ''}
+                              onBlur={(e) => handleRecordChange(team1.id, e.target.value)}
+                              placeholder="W-L"
+                              className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-400 placeholder-zinc-600"
+                            />
+                          ) : (
+                            <span className="block w-full py-1 text-center text-[10px] text-zinc-600">—</span>
+                          )}
+                        </div>
+                        <div className="w-[52px] flex-shrink-0">
+                          {game?.spread ? (
+                            <input
+                              type="text"
+                              defaultValue={game.spread}
+                              onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
+                              className="w-full px-1 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-[10px] text-zinc-400"
+                            />
+                          ) : team1 ? (
+                            <input
+                              type="text"
+                              defaultValue=""
+                              onBlur={(e) => game && handleSpreadChange(game.id, e.target.value)}
+                              placeholder="Sprd"
+                              className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
+                            />
+                          ) : (
+                            <span className="block w-full py-1 text-center text-[10px] text-zinc-600">—</span>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
 
-                  {/* Team 2 (underdog/higher seed) with datetime */}
-                  <div className="flex items-center gap-2">
+                  {/* Team 2 (underdog/higher seed) */}
+                  <div className="flex items-center gap-1">
                     {isSelected2 ? (
                       <InlineTeamSearch
                         seed={seed2}
@@ -748,7 +776,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                     ) : (
                       <button
                         onClick={() => setSelectedSlot({ regionId: activeTab, seed: seed2 })}
-                        className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${
+                        className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
                           team2
                             ? 'hover:bg-zinc-600'
                             : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
@@ -759,26 +787,40 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         {team2 && d1Team2 ? (
                           <>
                             <div
-                              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: d1Team2.primaryColor }}
                             >
                               {logo2 ? (
-                                <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                <img src={logo2} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
                               ) : (
-                                <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
+                                <span className="text-[8px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
                               )}
                             </div>
                             <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
-                            <span className="text-xs text-zinc-400">{d1Team2.abbreviation}</span>
                           </>
                         ) : (
                           <span className="flex-1 text-zinc-500 italic text-sm">Select team...</span>
                         )}
                       </button>
                     )}
-                    {/* Spacer to match spread width */}
+                    {/* Record + spacer to match spread width */}
                     {!isSelected2 && (
-                      <div className="w-[72px] flex-shrink-0" />
+                      <>
+                        <div className="w-[52px] flex-shrink-0">
+                          {team2 ? (
+                            <input
+                              type="text"
+                              defaultValue={team2.record || ''}
+                              onBlur={(e) => handleRecordChange(team2.id, e.target.value)}
+                              placeholder="W-L"
+                              className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-400 placeholder-zinc-600"
+                            />
+                          ) : (
+                            <span className="block w-full py-1 text-center text-[10px] text-zinc-600">—</span>
+                          )}
+                        </div>
+                        <div className="w-[52px] flex-shrink-0" />
+                      </>
                     )}
                   </div>
                 </div>
