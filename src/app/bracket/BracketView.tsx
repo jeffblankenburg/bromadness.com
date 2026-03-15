@@ -56,7 +56,7 @@ interface Props {
 }
 
 // Constants for layout
-const MATCHUP_WIDTH = 115
+const MATCHUP_WIDTH = 145
 const MATCHUP_HEIGHT = 48
 const CONNECTOR_WIDTH = 24
 const MATCHUP_GAP = 8
@@ -181,11 +181,22 @@ function Matchup({
   // For Round 1 games, check if either slot has a play-in game
   let playInName1: string | null = null
   let playInName2: string | null = null
+  let playInSeed1: number | undefined
+  let playInSeed2: number | undefined
   if (game && game.round === 1) {
     const pi1 = getPlayInGameForSlot(allGames, game.id, true)
     const pi2 = getPlayInGameForSlot(allGames, game.id, false)
-    if (pi1) playInName1 = getPlayInDisplayName(pi1, teams)
-    if (pi2) playInName2 = getPlayInDisplayName(pi2, teams)
+    if (pi1) {
+      playInName1 = getPlayInDisplayName(pi1, teams)
+      // Get seed from either play-in team (they share the same seed)
+      const piTeam = pi1.team1_id ? teams.find(t => t.id === pi1.team1_id) : pi1.team2_id ? teams.find(t => t.id === pi1.team2_id) : null
+      playInSeed1 = piTeam?.seed
+    }
+    if (pi2) {
+      playInName2 = getPlayInDisplayName(pi2, teams)
+      const piTeam = pi2.team1_id ? teams.find(t => t.id === pi2.team1_id) : pi2.team2_id ? teams.find(t => t.id === pi2.team2_id) : null
+      playInSeed2 = piTeam?.seed
+    }
   }
 
   return (
@@ -195,7 +206,7 @@ function Matchup({
     >
       <TeamSlot
         team={team1}
-        seed={showSeeds ? team1?.seed : undefined}
+        seed={showSeeds ? (playInSeed1 ?? team1?.seed) : undefined}
         score={game?.team1_score}
         isWinner={team1IsWinner}
         isLoser={team1IsLoser}
@@ -207,7 +218,7 @@ function Matchup({
       />
       <TeamSlot
         team={team2}
-        seed={showSeeds ? team2?.seed : undefined}
+        seed={showSeeds ? (playInSeed2 ?? team2?.seed) : undefined}
         score={game?.team2_score}
         isWinner={team2IsWinner}
         isLoser={team2IsLoser}
