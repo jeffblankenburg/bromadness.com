@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   tournamentId: string
@@ -9,36 +10,37 @@ interface Props {
 
 export function ParlaysResetAll({ tournamentId }: Props) {
   const [isOpen, setIsOpen] = useState(false)
-  const [resetting, setResetting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const router = useRouter()
+  const supabase = createClient()
 
-  const handleReset = async () => {
-    setResetting(true)
-
+  const handleDelete = async () => {
+    setDeleting(true)
     try {
-      const response = await fetch('/api/admin/parlays', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tournamentId }),
-      })
+      const { error } = await supabase
+        .from('parlays')
+        .delete()
+        .eq('tournament_id', tournamentId)
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete parlays')
+      if (error) {
+        console.error('Error deleting parlays:', error)
+        alert('Failed to delete parlays')
+        setDeleting(false)
+        return
       }
 
       setIsOpen(false)
       router.refresh()
-    } catch (error) {
-      console.error('Failed to delete parlays:', error)
-      alert('Failed to delete parlays')
+    } catch (err) {
+      console.error('Failed to delete parlays:', err)
+      alert('An unexpected error occurred')
+    } finally {
+      setDeleting(false)
     }
-    setResetting(false)
   }
 
   return (
     <>
-      {/* Delete Button */}
       <button
         onClick={() => setIsOpen(true)}
         className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
@@ -46,16 +48,13 @@ export function ParlaysResetAll({ tournamentId }: Props) {
         Delete All Parlays
       </button>
 
-      {/* Confirmation Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/70"
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Modal Content */}
           <div className="relative bg-zinc-900 border border-red-700 rounded-xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-red-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>
@@ -89,11 +88,11 @@ export function ParlaysResetAll({ tournamentId }: Props) {
                   Cancel
                 </button>
                 <button
-                  onClick={handleReset}
-                  disabled={resetting}
+                  onClick={handleDelete}
+                  disabled={deleting}
                   className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 text-white font-medium rounded-lg text-sm"
                 >
-                  {resetting ? 'Deleting...' : 'Delete All Parlays'}
+                  {deleting ? 'Deleting...' : 'Delete All Parlays'}
                 </button>
               </div>
             </div>
