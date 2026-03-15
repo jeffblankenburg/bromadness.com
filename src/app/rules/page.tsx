@@ -150,9 +150,9 @@ function ThreesAndDsRules() {
       <SectionHeader>You Lose (you pay opponent)</SectionHeader>
       <p className="text-xs text-zinc-400 mb-2">When your team executes:</p>
       <PayoutTable rows={[
-        { label: 'Air ball (3pt or FT)', value: '1X' },
+        { label: 'Air ball (backcourt 3pt or FT)', value: '1X' },
         { label: 'Air ball (frontcourt 3pt)', value: '2X' },
-        { label: 'Missed dunk', value: '1X' },
+        { label: 'Missed dunk', value: '2X' },
       ]} />
       <ul className="list-disc list-inside space-y-1 text-xs text-zinc-500">
         <Rule>Air ball = shot that doesn&apos;t hit the rim</Rule>
