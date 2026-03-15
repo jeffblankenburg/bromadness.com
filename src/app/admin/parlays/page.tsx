@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ParlaysAdmin } from './ParlaysAdmin'
+import { ParlaysResetAll } from './ParlaysResetAll'
 
 export default async function AdminParlaysPage() {
   const supabase = await createClient()
@@ -75,12 +76,18 @@ export default async function AdminParlaysPage() {
     .select('id, display_name')
 
   return (
-    <ParlaysAdmin
-      tournamentId={tournament.id}
-      parlays={parlays || []}
-      parlayPicks={parlayPicks || []}
-      games={games}
-      users={users || []}
-    />
+    <div className="space-y-6">
+      <ParlaysAdmin
+        tournamentId={tournament.id}
+        parlays={parlays || []}
+        parlayPicks={parlayPicks || []}
+        games={games}
+        users={users || []}
+      />
+
+      <div className="pt-8 border-t border-zinc-800">
+        <ParlaysResetAll tournamentId={tournament.id} />
+      </div>
+    </div>
   )
 }
