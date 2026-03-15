@@ -11,7 +11,7 @@ export default async function AuctionPage() {
   // Get active tournament with auction settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, bid_increment, teams_per_player, auction_payouts, auction_complete')
+    .select('id, name, year, entry_fee, salary_cap, bid_increment, teams_per_player, auction_payouts, auction_complete, auction_first_participant_id')
     .order('year', { ascending: false })
     .limit(1)
     .single()
@@ -70,10 +70,23 @@ export default async function AuctionPage() {
     teamsPerPlayer: tournament.teams_per_player ?? 3,
   }
 
+  // Build participants list (users who are participating in the auction)
+  const participatingUserIds = new Set(
+    (auctionEntries || []).filter(e => e.is_participating).map(e => e.user_id)
+  )
+  const participants = (users || [])
+    .filter(u => participatingUserIds.has(u.id))
+    .map(u => ({ id: u.id, display_name: u.display_name }))
+
   return (
     <div className="space-y-6">
       <HeaderAction>
-        <AuctionSettings tournamentId={tournament.id} settings={settings} />
+        <AuctionSettings
+          tournamentId={tournament.id}
+          settings={settings}
+          participants={participants}
+          firstParticipantId={tournament.auction_first_participant_id ?? null}
+        />
       </HeaderAction>
 
       <AuctionEditor

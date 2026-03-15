@@ -12,12 +12,19 @@ interface Settings {
   teamsPerPlayer: number
 }
 
+interface Participant {
+  id: string
+  display_name: string
+}
+
 interface Props {
   tournamentId: string
   settings: Settings
+  participants: Participant[]
+  firstParticipantId: string | null
 }
 
-export function AuctionSettings({ tournamentId, settings }: Props) {
+export function AuctionSettings({ tournamentId, settings, participants, firstParticipantId }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [entryFee, setEntryFee] = useState(settings.entryFee)
@@ -157,8 +164,28 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>
 
-              <div className="pt-4 border-t border-zinc-700">
-                <label className="block text-sm text-zinc-400 mb-2">Throwout Order</label>
+              <div className="pt-4 border-t border-zinc-700 space-y-3">
+                <label className="block text-sm text-zinc-400">Throwout Order</label>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1">Goes First</label>
+                  <select
+                    value={firstParticipantId || ''}
+                    onChange={async (e) => {
+                      const value = e.target.value || null
+                      await supabase
+                        .from('tournaments')
+                        .update({ auction_first_participant_id: value })
+                        .eq('id', tournamentId)
+                      router.refresh()
+                    }}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm"
+                  >
+                    <option value="">Random</option>
+                    {participants.map(p => (
+                      <option key={p.id} value={p.id}>{p.display_name}</option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   onClick={async () => {
                     const newSeed = crypto.randomUUID()
@@ -170,9 +197,9 @@ export function AuctionSettings({ tournamentId, settings }: Props) {
                   }}
                   className="w-full py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
                 >
-                  Shuffle Order
+                  Randomize Order
                 </button>
-                <p className="text-xs text-zinc-500 mt-1">Randomizes the throwout order for the draft board</p>
+                <p className="text-xs text-zinc-500">Randomizes the throwout order{firstParticipantId ? ' (positions 2+)' : ''}</p>
               </div>
             </div>
           </div>

@@ -104,7 +104,7 @@ export default async function AuctionPage() {
   // Get active tournament with settings
   const { data: tournament } = await supabase
     .from('tournaments')
-    .select('id, name, year, entry_fee, salary_cap, teams_per_player, auction_payouts, auction_order_seed, auction_complete')
+    .select('id, name, year, entry_fee, salary_cap, teams_per_player, auction_payouts, auction_order_seed, auction_first_participant_id, auction_complete')
     .order('year', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -419,7 +419,18 @@ export default async function AuctionPage() {
 
   const draftBoardUnsorted = getDraftBoardData()
   const orderSeed = tournament.auction_order_seed || tournament.id
-  const draftBoard = seededShuffle(draftBoardUnsorted, orderSeed)
+  const firstParticipantId = tournament.auction_first_participant_id
+
+  // If a first participant is selected, pin them first and shuffle the rest
+  let draftBoard: typeof draftBoardUnsorted
+  if (firstParticipantId) {
+    const firstEntry = draftBoardUnsorted.find(e => e.user.id === firstParticipantId)
+    const rest = draftBoardUnsorted.filter(e => e.user.id !== firstParticipantId)
+    const shuffledRest = seededShuffle(rest, orderSeed)
+    draftBoard = firstEntry ? [firstEntry, ...shuffledRest] : seededShuffle(draftBoardUnsorted, orderSeed)
+  } else {
+    draftBoard = seededShuffle(draftBoardUnsorted, orderSeed)
+  }
 
   // Check if a player has purchased all their required teams (only paid teams count)
   const isPlayerDone = (idx: number) => {
