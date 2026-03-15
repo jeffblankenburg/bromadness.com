@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getPlayInGameForSlot, getPlayInDisplayName } from '@/lib/bracket/play-in'
 
 interface Region {
   id: string
@@ -14,6 +15,7 @@ interface Team {
   short_name: string | null
   seed: number
   region_id: string
+  record?: string | null
 }
 
 interface Game {
@@ -26,6 +28,8 @@ interface Game {
   winner_id: string | null
   team1_score: number | null
   team2_score: number | null
+  next_game_id?: string | null
+  is_team1_slot?: boolean | null
 }
 
 interface Tournament {
@@ -72,6 +76,7 @@ function TeamSlot({
   ownerName,
   viewMode,
   isTop,
+  playInDisplayName,
 }: {
   team: Team | null | undefined
   seed?: number
@@ -82,12 +87,15 @@ function TeamSlot({
   ownerName?: string
   viewMode: ViewMode
   isTop: boolean
+  playInDisplayName?: string | null
 }) {
-  const displayName = team
+  const baseName = team
     ? viewMode === 'auction'
       ? ownerName || team.short_name || team.name
       : team.short_name || team.name
     : ''
+  const recordSuffix = team?.record ? ` ${team.record}` : ''
+  const displayName = playInDisplayName || (baseName + recordSuffix)
 
   const showPickIndicator = isPicked && (viewMode === 'brocket' || viewMode === 'pickem')
 
@@ -132,6 +140,7 @@ function TeamSlot({
 function Matchup({
   game,
   teams,
+  allGames,
   brocketPicks,
   pickemPicks,
   teamOwners,
@@ -140,6 +149,7 @@ function Matchup({
 }: {
   game: Game | undefined
   teams: Team[]
+  allGames: Game[]
   brocketPicks: Pick[]
   pickemPicks: Pick[]
   teamOwners: Record<string, string>
@@ -168,6 +178,16 @@ function Matchup({
   const team1IsLoser = hasWinner && !team1IsWinner
   const team2IsLoser = hasWinner && !team2IsWinner
 
+  // For Round 1 games, check if either slot has a play-in game
+  let playInName1: string | null = null
+  let playInName2: string | null = null
+  if (game && game.round === 1) {
+    const pi1 = getPlayInGameForSlot(allGames, game.id, true)
+    const pi2 = getPlayInGameForSlot(allGames, game.id, false)
+    if (pi1) playInName1 = getPlayInDisplayName(pi1, teams)
+    if (pi2) playInName2 = getPlayInDisplayName(pi2, teams)
+  }
+
   return (
     <div
       className="bg-zinc-900 border border-zinc-700 rounded overflow-hidden flex-shrink-0"
@@ -183,6 +203,7 @@ function Matchup({
         ownerName={game?.team1_id ? teamOwners[game.team1_id] : undefined}
         viewMode={viewMode}
         isTop={true}
+        playInDisplayName={playInName1}
       />
       <TeamSlot
         team={team2}
@@ -194,6 +215,7 @@ function Matchup({
         ownerName={game?.team2_id ? teamOwners[game.team2_id] : undefined}
         viewMode={viewMode}
         isTop={false}
+        playInDisplayName={playInName2}
       />
     </div>
   )
@@ -254,6 +276,7 @@ function RegionBracket({
       <Matchup
         game={game}
         teams={teams}
+        allGames={games}
         brocketPicks={brocketPicks}
         pickemPicks={pickemPicks}
         teamOwners={teamOwners}
@@ -604,6 +627,7 @@ export function BracketView({
                 <Matchup
                   game={finalFourGames[0]}
                   teams={teams}
+                  allGames={games}
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
@@ -626,6 +650,7 @@ export function BracketView({
                 <Matchup
                   game={championshipGame}
                   teams={teams}
+                  allGames={games}
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
@@ -654,6 +679,7 @@ export function BracketView({
                 <Matchup
                   game={finalFourGames[1]}
                   teams={teams}
+                  allGames={games}
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}

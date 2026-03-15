@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { InlineTeamSearch } from './InlineTeamSearch'
 import { ROUND1_MATCHUPS } from '@/lib/bracket/generate'
+import { getPlayInGameForSlot, getPlayInDisplayName } from '@/lib/bracket/play-in'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
 import { CHANNELS } from '@/lib/data/channels'
 import { VENUES, getVenuesForRound, formatVenue } from '@/lib/data/venues'
@@ -45,6 +46,7 @@ interface Game {
 
 
 const ROUND_NAMES: Record<number, string> = {
+  0: 'First Four',
   1: 'Round of 64',
   2: 'Round of 32',
   3: 'Sweet 16',
@@ -102,6 +104,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
   }
 
   // Special tab IDs for final rounds
+  const FIRST_FOUR_TAB = 'first-four'
   const FINAL_FOUR_TAB = 'final-four'
   const CHAMPIONSHIP_TAB = 'championship'
 
@@ -341,11 +344,158 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     return game.team1_id || game.team2_id
   }
 
+  // Create a new play-in game
+  const handleCreatePlayInGame = async (regionId: string, seed: number, round1GameId: string, isTeam1Slot: boolean) => {
+    setSaving(true)
+    try {
+      // Find next game_number for round 0
+      const existingPlayIns = games.filter(g => g.round === 0)
+      const nextGameNumber = existingPlayIns.length > 0
+        ? Math.max(...existingPlayIns.map(g => g.game_number)) + 1
+        : 1
+
+      await supabase
+        .from('games')
+        .insert({
+          tournament_id: tournament.id,
+          round: 0,
+          region_id: regionId,
+          game_number: nextGameNumber,
+          next_game_id: round1GameId,
+          is_team1_slot: isTeam1Slot,
+        })
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to create play-in game:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Delete a play-in game and its teams
+  const handleDeletePlayInGame = async (gameId: string) => {
+    setSaving(true)
+    try {
+      const game = games.find(g => g.id === gameId)
+      if (!game) return
+
+      // Clear team references from game first
+      await supabase
+        .from('games')
+        .update({ team1_id: null, team2_id: null })
+        .eq('id', gameId)
+
+      // Delete the teams
+      if (game.team1_id) await supabase.from('teams').delete().eq('id', game.team1_id)
+      if (game.team2_id) await supabase.from('teams').delete().eq('id', game.team2_id)
+
+      // Clear from the Round 1 game slot if winner was propagated
+      if (game.next_game_id) {
+        const updateField = game.is_team1_slot ? 'team1_id' : 'team2_id'
+        await supabase
+          .from('games')
+          .update({ [updateField]: null })
+          .eq('id', game.next_game_id)
+      }
+
+      // Delete the game
+      await supabase.from('games').delete().eq('id', gameId)
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to delete play-in game:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Select a team for a play-in game slot
+  const handlePlayInTeamSelect = async (gameId: string, slot: 'team1' | 'team2', regionId: string, seed: number, teamName: string, shortName: string) => {
+    setSaving(true)
+    try {
+      const game = games.find(g => g.id === gameId)
+      if (!game) return
+
+      const existingTeamId = slot === 'team1' ? game.team1_id : game.team2_id
+      const existingTeam = existingTeamId ? teams.find(t => t.id === existingTeamId) : null
+
+      let teamId: string
+      if (existingTeam) {
+        await supabase
+          .from('teams')
+          .update({ name: teamName, short_name: shortName })
+          .eq('id', existingTeam.id)
+        teamId = existingTeam.id
+      } else {
+        const { data: newTeam } = await supabase
+          .from('teams')
+          .insert({
+            tournament_id: tournament.id,
+            region_id: regionId,
+            name: teamName,
+            short_name: shortName,
+            seed: seed,
+          })
+          .select()
+          .single()
+        teamId = newTeam?.id
+      }
+
+      const updateField = slot === 'team1' ? 'team1_id' : 'team2_id'
+      await supabase
+        .from('games')
+        .update({ [updateField]: teamId })
+        .eq('id', gameId)
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to save play-in team:', err)
+    } finally {
+      setSaving(false)
+      setSelectedSlot(null)
+    }
+  }
+
+  // Clear a team from a play-in game slot
+  const handleClearPlayInTeam = async (gameId: string, slot: 'team1' | 'team2') => {
+    setSaving(true)
+    try {
+      const game = games.find(g => g.id === gameId)
+      if (!game) return
+
+      const teamId = slot === 'team1' ? game.team1_id : game.team2_id
+      const updateField = slot === 'team1' ? 'team1_id' : 'team2_id'
+
+      // Clear from game
+      await supabase
+        .from('games')
+        .update({ [updateField]: null })
+        .eq('id', gameId)
+
+      // Delete team
+      if (teamId) {
+        await supabase.from('teams').delete().eq('id', teamId)
+      }
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to clear play-in team:', err)
+    } finally {
+      setSaving(false)
+      setSelectedSlot(null)
+    }
+  }
+
   const currentRegion = sortedRegions.find(r => r.id === activeTab)
   const regionTeamCount = teams.filter(t => t.region_id === activeTab).length
+  const isFirstFourTab = activeTab === FIRST_FOUR_TAB
   const isRegionTab = currentRegion !== undefined
   const isFinalFourTab = activeTab === FINAL_FOUR_TAB
   const isChampionshipTab = activeTab === CHAMPIONSHIP_TAB
+
+  // Play-in (First Four) games - round 0
+  const playInGames = games.filter(g => g.round === 0)
 
   // Get Final Four games (round 5)
   const finalFourGames = games.filter(g => g.round === 5).sort((a, b) => a.game_number - b.game_number)
@@ -381,8 +531,21 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
         })}
       </div>
 
-      {/* Final Rounds Tabs */}
+      {/* Special Rounds Tabs */}
       <div className="flex gap-1 bg-zinc-800/50 p-1 rounded-xl">
+        <button
+          onClick={() => setActiveTab(FIRST_FOUR_TAB)}
+          className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${
+            isFirstFourTab
+              ? 'bg-orange-500 text-white'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+          }`}
+        >
+          <div>First Four</div>
+          <div className={`text-xs ${isFirstFourTab ? 'text-orange-200' : 'text-zinc-500'}`}>
+            {playInGames.length} game{playInGames.length !== 1 ? 's' : ''}
+          </div>
+        </button>
         <button
           onClick={() => setActiveTab(FINAL_FOUR_TAB)}
           className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${
@@ -410,6 +573,246 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
           </div>
         </button>
       </div>
+
+      {/* First Four Content */}
+      {isFirstFourTab && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>First Four</h3>
+          </div>
+
+          {playInGames.map(game => {
+            const team1 = getTeamById(game.team1_id)
+            const team2 = getTeamById(game.team2_id)
+            const d1Team1 = team1 ? getD1TeamData(team1.name) : null
+            const d1Team2 = team2 ? getD1TeamData(team2.name) : null
+            const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
+            const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
+            const targetRegion = sortedRegions.find(r => r.id === game.region_id)
+            const isSelectedT1 = selectedSlot?.regionId === `pi-${game.id}-t1` && selectedSlot?.seed === (team1?.seed || 0)
+            const isSelectedT2 = selectedSlot?.regionId === `pi-${game.id}-t2` && selectedSlot?.seed === (team2?.seed || 0)
+
+            return (
+              <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
+                {/* Header: Region, Seed, Schedule */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-zinc-400">
+                    {targetRegion?.name || '?'} #{team1?.seed || team2?.seed || '?'}
+                  </span>
+                  <div className="flex-1" />
+                  <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                    game.scheduled_at
+                      ? 'bg-zinc-800 border border-zinc-600'
+                      : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                  }`}>
+                    <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
+                      {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                      onChange={(e) => handleScheduleChange(game.id, e.target.value)}
+                      className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
+                    />
+                  </div>
+                  <select
+                    value={game.channel || ''}
+                    onChange={(e) => handleChannelChange(game.id, e.target.value)}
+                    className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
+                      game.channel
+                        ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                        : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
+                    }`}
+                  >
+                    <option value="">Ch</option>
+                    {CHANNELS.map(ch => (
+                      <option key={ch.name} value={ch.name}>{ch.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleDeletePlayInGame(game.id)}
+                    disabled={saving}
+                    className="text-red-400 hover:text-red-300 p-1"
+                    title="Delete play-in game"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Team 1 */}
+                <div className="flex items-center gap-1">
+                  {isSelectedT1 ? (
+                    <InlineTeamSearch
+                      seed={team1?.seed || 0}
+                      currentTeamName={team1?.name}
+                      onSelect={(name, shortName) => handlePlayInTeamSelect(game.id, 'team1', game.region_id!, team1?.seed || 16, name, shortName)}
+                      onClear={() => handleClearPlayInTeam(game.id, 'team1')}
+                      onCancel={() => setSelectedSlot(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedSlot({ regionId: `pi-${game.id}-t1`, seed: team1?.seed || 0 })}
+                      className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
+                        team1
+                          ? 'hover:bg-zinc-600'
+                          : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
+                      }`}
+                      style={team1 && d1Team1 ? { backgroundColor: d1Team1.primaryColor + '40' } : undefined}
+                    >
+                      <span className="w-5 text-xs font-mono text-zinc-400">{team1?.seed || '?'}</span>
+                      {team1 && d1Team1 ? (
+                        <>
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: d1Team1.primaryColor }}
+                          >
+                            {logo1 ? (
+                              <img src={logo1} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                            ) : (
+                              <span className="text-[8px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
+                            )}
+                          </div>
+                          <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
+                        </>
+                      ) : (
+                        <span className="flex-1 text-zinc-500 italic text-sm">Select team...</span>
+                      )}
+                    </button>
+                  )}
+                  {!isSelectedT1 && (
+                    <div className="w-[52px] flex-shrink-0">
+                      {team1 ? (
+                        <input
+                          type="text"
+                          defaultValue={team1.record || ''}
+                          onBlur={(e) => handleRecordChange(team1.id, e.target.value)}
+                          placeholder="W-L"
+                          className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-400 placeholder-zinc-600"
+                        />
+                      ) : (
+                        <span className="block w-full py-1 text-center text-[10px] text-zinc-600">-</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Team 2 */}
+                <div className="flex items-center gap-1">
+                  {isSelectedT2 ? (
+                    <InlineTeamSearch
+                      seed={team2?.seed || 0}
+                      currentTeamName={team2?.name}
+                      onSelect={(name, shortName) => handlePlayInTeamSelect(game.id, 'team2', game.region_id!, team2?.seed || 16, name, shortName)}
+                      onClear={() => handleClearPlayInTeam(game.id, 'team2')}
+                      onCancel={() => setSelectedSlot(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedSlot({ regionId: `pi-${game.id}-t2`, seed: team2?.seed || 0 })}
+                      className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
+                        team2
+                          ? 'hover:bg-zinc-600'
+                          : 'bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700'
+                      }`}
+                      style={team2 && d1Team2 ? { backgroundColor: d1Team2.primaryColor + '40' } : undefined}
+                    >
+                      <span className="w-5 text-xs font-mono text-zinc-400">{team2?.seed || '?'}</span>
+                      {team2 && d1Team2 ? (
+                        <>
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: d1Team2.primaryColor }}
+                          >
+                            {logo2 ? (
+                              <img src={logo2} alt="" className="w-4 h-4 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                            ) : (
+                              <span className="text-[8px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
+                            )}
+                          </div>
+                          <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
+                        </>
+                      ) : (
+                        <span className="flex-1 text-zinc-500 italic text-sm">Select team...</span>
+                      )}
+                    </button>
+                  )}
+                  {!isSelectedT2 && (
+                    <div className="w-[52px] flex-shrink-0">
+                      {team2 ? (
+                        <input
+                          type="text"
+                          defaultValue={team2.record || ''}
+                          onBlur={(e) => handleRecordChange(team2.id, e.target.value)}
+                          placeholder="W-L"
+                          className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-400 placeholder-zinc-600"
+                        />
+                      ) : (
+                        <span className="block w-full py-1 text-center text-[10px] text-zinc-600">-</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Add Play-In Game */}
+          {playInGames.length < 4 && (
+            <div className="bg-zinc-800/50 rounded-xl p-3 space-y-3">
+              <h4 className="text-sm text-zinc-400">Add Play-In Game</h4>
+              <div className="flex gap-2">
+                <select
+                  id="playin-region"
+                  className="flex-1 px-2 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm"
+                  defaultValue=""
+                >
+                  <option value="" disabled>Region</option>
+                  {sortedRegions.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <select
+                  id="playin-seed"
+                  className="w-20 px-2 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm"
+                  defaultValue=""
+                >
+                  <option value="" disabled>Seed</option>
+                  {[11, 12, 16].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const regionSelect = document.getElementById('playin-region') as HTMLSelectElement
+                    const seedSelect = document.getElementById('playin-seed') as HTMLSelectElement
+                    const regionId = regionSelect.value
+                    const seed = parseInt(seedSelect.value)
+                    if (!regionId || isNaN(seed)) return
+
+                    // Find the Round 1 game this seed feeds into
+                    const gameInfo = getGameInfoForSeed(seed)
+                    if (!gameInfo) return
+
+                    const round1Game = getGameForMatchup(regionId, gameInfo.gameNumber)
+                    if (!round1Game) {
+                      alert('Round 1 game not found for this region/seed combination')
+                      return
+                    }
+
+                    handleCreatePlayInGame(regionId, seed, round1Game.id, gameInfo.isTeam1)
+                  }}
+                  disabled={saving}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Current Region */}
       {/* Region Content */}
@@ -629,6 +1032,12 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
               const isSelected1 = selectedSlot?.regionId === activeTab && selectedSlot?.seed === seed1
               const isSelected2 = selectedSlot?.regionId === activeTab && selectedSlot?.seed === seed2
 
+              // Check if this slot has a play-in game feeding into it
+              const playIn1 = game ? getPlayInGameForSlot(games, game.id, true) : undefined
+              const playIn2 = game ? getPlayInGameForSlot(games, game.id, false) : undefined
+              const playInName1 = playIn1 ? getPlayInDisplayName(playIn1, teams) : null
+              const playInName2 = playIn2 ? getPlayInDisplayName(playIn2, teams) : null
+
               return (
                 <div key={`${activeTab}-${idx}`} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
                   {/* Header: DateTime, Location, Channel */}
@@ -686,7 +1095,13 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
                   {/* Team 1 (favorite/lower seed) with record + spread input */}
                   <div className="flex items-center gap-1">
-                    {isSelected1 ? (
+                    {playInName1 ? (
+                      <div className="flex-1 flex items-center gap-2 px-2 py-1 rounded-lg bg-zinc-900/50 border border-zinc-700">
+                        <span className="w-5 text-xs font-mono text-zinc-400">{seed1}</span>
+                        <span className="flex-1 truncate text-sm text-amber-400">{playInName1}</span>
+                        <span className="text-[10px] text-zinc-500">Play-in</span>
+                      </div>
+                    ) : isSelected1 ? (
                       <InlineTeamSearch
                         seed={seed1}
                         currentTeamName={team1?.name}
@@ -765,7 +1180,13 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
 
                   {/* Team 2 (underdog/higher seed) */}
                   <div className="flex items-center gap-1">
-                    {isSelected2 ? (
+                    {playInName2 ? (
+                      <div className="flex-1 flex items-center gap-2 px-2 py-1 rounded-lg bg-zinc-900/50 border border-zinc-700">
+                        <span className="w-5 text-xs font-mono text-zinc-400">{seed2}</span>
+                        <span className="flex-1 truncate text-sm text-amber-400">{playInName2}</span>
+                        <span className="text-[10px] text-zinc-500">Play-in</span>
+                      </div>
+                    ) : isSelected2 ? (
                       <InlineTeamSearch
                         seed={seed2}
                         currentTeamName={team2?.name}

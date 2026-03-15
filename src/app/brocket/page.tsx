@@ -71,17 +71,17 @@ export default async function BrocketPage() {
     )
   }
 
-  // Get brocket-eligible games using explicit flag
+  // Get brocket-eligible games using explicit flag (include round 0 for play-in display)
   const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, scheduled_at, team1_score, team2_score, winner_id, region_id,
       game_number, location, channel, round, next_game_id, is_team1_slot, is_brocket,
-      team1:teams!games_team1_id_fkey(id, name, short_name, seed),
-      team2:teams!games_team2_id_fkey(id, name, short_name, seed)
+      team1:teams!games_team1_id_fkey(id, name, short_name, seed, record),
+      team2:teams!games_team2_id_fkey(id, name, short_name, seed, record)
     `)
     .eq('tournament_id', tournament.id)
-    .in('round', [1, 2])
+    .in('round', [0, 1, 2])
     .order('round')
     .order('game_number')
 

@@ -10,6 +10,7 @@ interface Team {
   name: string
   short_name: string | null
   seed: number
+  record?: string | null
 }
 
 interface Game {
@@ -468,6 +469,7 @@ export function BrocketClient({
           </div>
           <span className={`flex-1 truncate text-sm text-left ${isWinner ? 'text-white font-bold' : 'text-white'}`}>
             {d1Team?.shortName || team.short_name || team.name}
+            {team.record && <span className="text-zinc-400 text-xs ml-1">{team.record}</span>}
           </span>
           {isComplete && (
             <span className={`w-8 text-right text-sm text-zinc-300 ${isWinner ? 'font-bold' : 'font-normal'}`}>

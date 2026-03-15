@@ -12,6 +12,7 @@ interface Team {
   short_name: string | null
   seed: number
   region_id: string
+  record?: string | null
 }
 
 interface Game {
@@ -46,6 +47,7 @@ interface Props {
 }
 
 const ROUND_NAMES: Record<number, string> = {
+  0: 'First 4',
   1: 'Rd of 64',
   2: 'Rd of 32',
   3: 'Sweet 16',
@@ -425,6 +427,16 @@ export function GameResults({ tournament, teams, games }: Props) {
         .eq('tournament_id', tournament.id)
         .gt('round', 1)
 
+      // 2b. Clear Round 1 slots that were filled by play-in winners
+      const playInGames = games.filter(g => g.round === 0 && g.next_game_id)
+      for (const pg of playInGames) {
+        const updateField = pg.is_team1_slot ? 'team1_id' : 'team2_id'
+        await supabase
+          .from('games')
+          .update({ [updateField]: null })
+          .eq('id', pg.next_game_id!)
+      }
+
       // 3. Reset is_eliminated for all teams
       await supabase
         .from('teams')
@@ -513,7 +525,7 @@ export function GameResults({ tournament, teams, games }: Props) {
     <div className="space-y-4">
       {/* Round Tabs */}
       <div className="flex gap-1 bg-zinc-800/50 p-1 rounded-xl overflow-x-auto">
-        {[1, 2, 3, 4, 5, 6].map((round) => {
+        {[0, 1, 2, 3, 4, 5, 6].map((round) => {
           const roundGameCount = games.filter(g => g.round === round).length
           const completedCount = games.filter(g => g.round === round && g.winner_id).length
           const isActive = round === activeRound
@@ -704,6 +716,7 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
         </div>
         <span className="flex-1 truncate text-sm text-white">
           {d1Team1?.shortName || team1?.short_name || team1?.name || 'TBD'}
+          {team1?.record && <span className="text-zinc-400 text-xs ml-0.5">{team1.record}</span>}
           {hasSpread && team1 && team2 && (
             <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team1, team2)}</span>
           )}
@@ -744,6 +757,7 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
         </div>
         <span className="flex-1 truncate text-sm text-white">
           {d1Team2?.shortName || team2?.short_name || team2?.name || 'TBD'}
+          {team2?.record && <span className="text-zinc-400 text-xs ml-0.5">{team2.record}</span>}
           {hasSpread && team1 && team2 && (
             <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team2, team1)}</span>
           )}

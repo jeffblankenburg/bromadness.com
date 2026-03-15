@@ -54,19 +54,19 @@ export default async function PickemPage() {
   const payouts = (tournament.pickem_payouts as PickemPayouts) || { entry_fee: 10 }
   const enabledDays = payouts.enabled_days || ['Thursday', 'Friday']
 
-  // Get Round 1 & 2 games with team info and spreads
+  // Get Round 0-2 games with team info and spreads (round 0 = play-in display)
   // Round 1 = Thursday/Friday (Round of 64)
   // Round 2 = Saturday/Sunday (Round of 32)
   const { data: gamesRaw } = await supabase
     .from('games')
     .select(`
       id, scheduled_at, team1_score, team2_score, winner_id,
-      spread, favorite_team_id, location, channel,
-      team1:teams!games_team1_id_fkey(id, name, short_name, seed),
-      team2:teams!games_team2_id_fkey(id, name, short_name, seed)
+      spread, favorite_team_id, location, channel, round, next_game_id, is_team1_slot,
+      team1:teams!games_team1_id_fkey(id, name, short_name, seed, record),
+      team2:teams!games_team2_id_fkey(id, name, short_name, seed, record)
     `)
     .eq('tournament_id', tournament.id)
-    .in('round', [1, 2])
+    .in('round', [0, 1, 2])
     .order('scheduled_at')
 
   // Transform games to extract team objects from arrays, filter by enabled days

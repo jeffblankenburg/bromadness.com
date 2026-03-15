@@ -40,13 +40,13 @@ export default async function BracketPage() {
   // Get all teams
   const { data: teams } = await supabase
     .from('teams')
-    .select('id, name, short_name, seed, region_id')
+    .select('id, name, short_name, seed, region_id, record')
     .eq('tournament_id', tournament.id)
 
   // Get all games
   const { data: games } = await supabase
     .from('games')
-    .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score')
+    .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, next_game_id, is_team1_slot')
     .eq('tournament_id', tournament.id)
     .order('round')
     .order('game_number')

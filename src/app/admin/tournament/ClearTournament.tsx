@@ -35,7 +35,21 @@ export function ClearTournament({ tournamentId }: Props) {
         return
       }
 
-      // 2. Clear game metadata (keep game structure)
+      // 2. Delete play-in games (round 0) - these vary by year
+      const { error: playInError } = await supabase
+        .from('games')
+        .delete()
+        .eq('tournament_id', tournamentId)
+        .eq('round', 0)
+
+      if (playInError) {
+        console.error('Error deleting play-in games:', playInError)
+        setError(`Failed to delete play-in games: ${playInError.message}`)
+        setClearing(false)
+        return
+      }
+
+      // 3. Clear game metadata (keep game structure for rounds 1-6)
       const { error: gamesError } = await supabase
         .from('games')
         .update({
@@ -59,7 +73,7 @@ export function ClearTournament({ tournamentId }: Props) {
         return
       }
 
-      // 3. Delete all teams
+      // 4. Delete all teams
       const { error: teamsError } = await supabase
         .from('teams')
         .delete()
@@ -117,7 +131,8 @@ export function ClearTournament({ tournamentId }: Props) {
                 This will clear all tournament data to prepare for the next year:
               </p>
               <ul className="text-zinc-400 list-disc list-inside space-y-1">
-                <li>Delete all 64 teams</li>
+                <li>Delete all 68 teams (including First Four)</li>
+                <li>Delete all First Four play-in games</li>
                 <li>Clear all game assignments and scores</li>
                 <li>Delete all auction team assignments</li>
               </ul>

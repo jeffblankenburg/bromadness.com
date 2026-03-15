@@ -30,7 +30,7 @@ export default async function ResultsPage() {
   // Get all teams
   const { data: teams } = await supabase
     .from('teams')
-    .select('id, name, short_name, seed, region_id')
+    .select('id, name, short_name, seed, region_id, record')
     .eq('tournament_id', tournament.id)
 
   // Get all games with next_game info and spread

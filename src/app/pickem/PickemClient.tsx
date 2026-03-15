@@ -12,6 +12,7 @@ interface Team {
   name: string
   short_name: string | null
   seed: number
+  record?: string | null
 }
 
 interface Game {
@@ -467,6 +468,7 @@ export function PickemClient({
           </div>
           <span className="flex-1 truncate text-sm text-white text-left">
             {d1Team?.shortName || team.short_name || team.name}
+            {team.record && <span className="text-zinc-400 text-xs ml-0.5">{team.record}</span>}
             {spreadDisplay && <span className="text-xs text-zinc-400 ml-1">{spreadDisplay}</span>}
           </span>
           {isComplete && (
