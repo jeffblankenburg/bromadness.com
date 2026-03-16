@@ -32,6 +32,7 @@ export function AuctionSettings({ tournamentId, settings, participants, firstPar
   const [bidIncrement, setBidIncrement] = useState(settings.bidIncrement)
   const [teamsPerPlayer, setTeamsPerPlayer] = useState(settings.teamsPerPlayer)
   const [saving, setSaving] = useState(false)
+  const [randomized, setRandomized] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -193,11 +194,17 @@ export function AuctionSettings({ tournamentId, settings, participants, firstPar
                       .from('tournaments')
                       .update({ auction_order_seed: newSeed })
                       .eq('id', tournamentId)
+                    setRandomized(true)
+                    setTimeout(() => setRandomized(false), 2000)
                     router.refresh()
                   }}
-                  className="w-full py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-lg text-sm"
+                  className={`w-full py-2 font-medium rounded-lg text-sm transition-colors ${
+                    randomized
+                      ? 'bg-green-600 text-white'
+                      : 'bg-zinc-700 hover:bg-zinc-600 text-white'
+                  }`}
                 >
-                  Randomize Order
+                  {randomized ? 'Randomized!' : 'Randomize Order'}
                 </button>
                 <p className="text-xs text-zinc-500">Randomizes the throwout order{firstParticipantId ? ' (positions 2+)' : ''}</p>
               </div>

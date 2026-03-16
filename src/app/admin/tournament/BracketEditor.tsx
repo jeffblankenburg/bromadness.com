@@ -344,6 +344,21 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     return game.team1_id || game.team2_id
   }
 
+  // Get feeder game description for an empty slot in a later-round game
+  const getFeederLabel = (gameId: string, isTeam1Slot: boolean): string | null => {
+    const feeder = games.find(g => g.next_game_id === gameId && g.is_team1_slot === isTeam1Slot)
+    if (!feeder) return null
+    const t1 = (feeder.team1_id ? getTeamById(feeder.team1_id) : null) ?? null
+    const t2 = (feeder.team2_id ? getTeamById(feeder.team2_id) : null) ?? null
+    const name = (t: Team | null) => {
+      if (!t) return 'TBD'
+      const d1 = getD1TeamData(t.name)
+      return `${t.seed} ${d1?.shortName || t.short_name || t.name}`
+    }
+    if (!t1 && !t2) return null
+    return `${name(t1)} vs ${name(t2)}`
+  }
+
   // Create a new play-in game
   const handleCreatePlayInGame = async (regionId: string, seed: number, round1GameId: string, isTeam1Slot: boolean) => {
     setSaving(true)
@@ -823,183 +838,21 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
             <span className="text-sm text-zinc-400">{regionTeamCount}/16 teams</span>
           </div>
 
-          {/* Later Rounds (4, 3, 2) - shown first, in reverse order */}
-          {[4, 3, 2].map(round => {
-            const roundGames = getGamesForRound(activeTab, round)
-            const readyGames = roundGames.filter(g => isGamePartiallyReady(g))
-
-            if (readyGames.length === 0) return null
-
-            const isExpanded = expandedRounds.has(round)
-
-            return (
-              <div key={round} className="bg-zinc-800/50 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => toggleRound(round)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
-                >
-                  <span className="text-sm font-medium text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{ROUND_NAMES[round]}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">{readyGames.length} game{readyGames.length !== 1 ? 's' : ''}</span>
-                    <svg
-                      className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-                {isExpanded && (
-                  <div className="px-3 pb-3 space-y-3">
-                    {readyGames.map(game => {
-                      const team1 = getTeamById(game.team1_id)
-                      const team2 = getTeamById(game.team2_id)
-                      const d1Team1 = team1 ? getD1TeamData(team1.name) : null
-                      const d1Team2 = team2 ? getD1TeamData(team2.name) : null
-                      const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
-                      const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
-
-                      return (
-                        <div key={game.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
-                          {/* Header: DateTime, Location, Channel */}
-                          <div className="flex items-center gap-1">
-                            <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
-                              game.scheduled_at
-                                ? 'bg-zinc-800 border border-zinc-600'
-                                : 'bg-zinc-800/50 border border-dashed border-zinc-600'
-                            }`}>
-                              <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
-                                {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
-                              </span>
-                              <input
-                                type="datetime-local"
-                                value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
-                                onChange={(e) => handleScheduleChange(game.id, e.target.value)}
-                                className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
-                              />
-                            </div>
-                            <select
-                              value={game.location || ''}
-                              onChange={(e) => handleLocationChange(game.id, e.target.value)}
-                              className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] cursor-pointer ${
-                                game.location
-                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
-                              }`}
-                            >
-                              <option value="">Location</option>
-                              {getVenuesForRound(round).map(v => (
-                                <option key={formatVenue(v)} value={formatVenue(v)}>{formatVenue(v)}</option>
-                              ))}
-                            </select>
-                            <select
-                              value={game.channel || ''}
-                              onChange={(e) => handleChannelChange(game.id, e.target.value)}
-                              className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
-                                game.channel
-                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
-                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
-                              }`}
-                            >
-                              <option value="">Ch</option>
-                              {CHANNELS.map(ch => (
-                                <option key={ch.name} value={ch.name}>{ch.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Team 1 */}
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
-                                team1 && d1Team1 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
-                              }`}
-                              style={team1 && d1Team1 ? { backgroundColor: d1Team1.primaryColor + '40' } : undefined}
-                            >
-                              {team1 && d1Team1 ? (
-                                <>
-                                  <span className="w-5 text-xs font-mono text-zinc-400">{team1.seed}</span>
-                                  <div
-                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: d1Team1.primaryColor }}
-                                  >
-                                    {logo1 ? (
-                                      <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
-                                    ) : (
-                                      <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
-                                    )}
-                                  </div>
-                                  <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
-                                </>
-                              ) : (
-                                <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
-                              )}
-                            </div>
-                            <div className="w-[72px] flex-shrink-0">
-                              {game.spread ? (
-                                <input
-                                  type="text"
-                                  defaultValue={game.spread}
-                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
-                                  className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
-                                />
-                              ) : team1 ? (
-                                <input
-                                  type="text"
-                                  defaultValue=""
-                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
-                                  placeholder="Sprd"
-                                  className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
-                                />
-                              ) : (
-                                <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Team 2 */}
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
-                                team2 && d1Team2 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
-                              }`}
-                              style={team2 && d1Team2 ? { backgroundColor: d1Team2.primaryColor + '40' } : undefined}
-                            >
-                              {team2 && d1Team2 ? (
-                                <>
-                                  <span className="w-5 text-xs font-mono text-zinc-400">{team2.seed}</span>
-                                  <div
-                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: d1Team2.primaryColor }}
-                                  >
-                                    {logo2 ? (
-                                      <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
-                                    ) : (
-                                      <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
-                                    )}
-                                  </div>
-                                  <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
-                                </>
-                              ) : (
-                                <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
-                              )}
-                            </div>
-                            <div className="w-[72px] flex-shrink-0" />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Round 1 Matchups - collapsible */}
-          <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+          {/* All Rounds (1-4) - sorted: lower round first, completed rounds sink to bottom */}
+          {[1, 2, 3, 4].sort((a, b) => {
+            const gamesA = getGamesForRound(activeTab, a)
+            const gamesB = getGamesForRound(activeTab, b)
+            const statusOf = (rGames: typeof gamesA) => {
+              const allDone = rGames.length > 0 && rGames.every(g => g.winner_id)
+              return allDone ? 1 : 0 // complete → bottom, active/future → top
+            }
+            const diff = statusOf(gamesA) - statusOf(gamesB)
+            return diff !== 0 ? diff : a - b // within same status, lower round first
+          }).map(round => {
+            // Round 1 has special rendering with team selection, play-in handling, etc.
+            if (round === 1) {
+              return (
+          <div key={1} className="bg-zinc-800/50 rounded-xl overflow-hidden">
             <button
               onClick={() => toggleRound(1)}
               className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
@@ -1250,6 +1103,186 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
               </div>
             )}
           </div>
+              )
+            }
+
+            // Rounds 2-4
+            const roundGames = getGamesForRound(activeTab, round)
+
+            if (roundGames.length === 0) return null
+
+            const isExpanded = expandedRounds.has(round)
+
+            return (
+              <div key={round} className="bg-zinc-800/50 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleRound(round)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-zinc-700/30 transition-colors"
+                >
+                  <span className="text-sm font-medium text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>{ROUND_NAMES[round]}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">{roundGames.length} game{roundGames.length !== 1 ? 's' : ''}</span>
+                    <svg
+                      className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="px-3 pb-3 space-y-3">
+                    {roundGames.map(game => {
+                      const team1 = getTeamById(game.team1_id)
+                      const team2 = getTeamById(game.team2_id)
+                      const d1Team1 = team1 ? getD1TeamData(team1.name) : null
+                      const d1Team2 = team2 ? getD1TeamData(team2.name) : null
+                      const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
+                      const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
+
+                      return (
+                        <div key={game.id} className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
+                          {/* Header: DateTime, Location, Channel */}
+                          <div className="flex items-center gap-1">
+                            <div className={`flex items-center gap-1 px-1 py-1 rounded text-[10px] ${
+                              game.scheduled_at
+                                ? 'bg-zinc-800 border border-zinc-600'
+                                : 'bg-zinc-800/50 border border-dashed border-zinc-600'
+                            }`}>
+                              <span className={game.scheduled_at ? 'text-zinc-300' : 'text-zinc-500'}>
+                                {game.scheduled_at ? formatGameTime(game.scheduled_at) : 'Time'}
+                              </span>
+                              <input
+                                type="datetime-local"
+                                value={game.scheduled_at ? game.scheduled_at.slice(0, 16) : ''}
+                                onChange={(e) => handleScheduleChange(game.id, e.target.value)}
+                                className="w-4 h-4 cursor-pointer text-transparent bg-transparent border-0 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-datetime-edit]:hidden"
+                              />
+                            </div>
+                            <select
+                              value={game.location || ''}
+                              onChange={(e) => handleLocationChange(game.id, e.target.value)}
+                              className={`flex-1 min-w-0 px-1 py-1 rounded text-[10px] cursor-pointer ${
+                                game.location
+                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
+                              }`}
+                            >
+                              <option value="">Location</option>
+                              {getVenuesForRound(round).map(v => (
+                                <option key={formatVenue(v)} value={formatVenue(v)}>{formatVenue(v)}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={game.channel || ''}
+                              onChange={(e) => handleChannelChange(game.id, e.target.value)}
+                              className={`w-[72px] px-1 py-1 rounded text-[10px] text-center cursor-pointer ${
+                                game.channel
+                                  ? 'bg-zinc-800 border border-zinc-600 text-zinc-300'
+                                  : 'bg-zinc-800/50 border border-dashed border-zinc-600 text-zinc-400'
+                              }`}
+                            >
+                              <option value="">Ch</option>
+                              {CHANNELS.map(ch => (
+                                <option key={ch.name} value={ch.name}>{ch.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Team 1 */}
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
+                                team1 && d1Team1 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
+                              }`}
+                              style={team1 && d1Team1 ? { backgroundColor: d1Team1.primaryColor + '40' } : undefined}
+                            >
+                              {team1 && d1Team1 ? (
+                                <>
+                                  <span className="w-5 text-xs font-mono text-zinc-400">{team1.seed}</span>
+                                  <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: d1Team1.primaryColor }}
+                                  >
+                                    {logo1 ? (
+                                      <img src={logo1} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-white">{d1Team1.abbreviation.slice(0, 2)}</span>
+                                    )}
+                                  </div>
+                                  <span className="flex-1 truncate text-sm">{d1Team1.shortName}</span>
+                                </>
+                              ) : (
+                                <span className="flex-1 text-zinc-600 italic text-xs text-center truncate">
+                                  {getFeederLabel(game.id, true) ? `W: ${getFeederLabel(game.id, true)}` : 'TBD'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="w-[72px] flex-shrink-0">
+                              {game.spread ? (
+                                <input
+                                  type="text"
+                                  defaultValue={game.spread}
+                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
+                                  className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
+                                />
+                              ) : team1 ? (
+                                <input
+                                  type="text"
+                                  defaultValue=""
+                                  onBlur={(e) => handleSpreadChange(game.id, e.target.value)}
+                                  placeholder="Sprd"
+                                  className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
+                                />
+                              ) : (
+                                <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Team 2 */}
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg ${
+                                team2 && d1Team2 ? '' : 'bg-zinc-900/50 border border-dashed border-zinc-700'
+                              }`}
+                              style={team2 && d1Team2 ? { backgroundColor: d1Team2.primaryColor + '40' } : undefined}
+                            >
+                              {team2 && d1Team2 ? (
+                                <>
+                                  <span className="w-5 text-xs font-mono text-zinc-400">{team2.seed}</span>
+                                  <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: d1Team2.primaryColor }}
+                                  >
+                                    {logo2 ? (
+                                      <img src={logo2} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-white">{d1Team2.abbreviation.slice(0, 2)}</span>
+                                    )}
+                                  </div>
+                                  <span className="flex-1 truncate text-sm">{d1Team2.shortName}</span>
+                                </>
+                              ) : (
+                                <span className="flex-1 text-zinc-600 italic text-xs text-center truncate">
+                                  {getFeederLabel(game.id, false) ? `W: ${getFeederLabel(game.id, false)}` : 'TBD'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="w-[72px] flex-shrink-0" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
         </div>
       )}
 
