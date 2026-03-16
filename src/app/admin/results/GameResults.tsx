@@ -127,6 +127,22 @@ export function GameResults({ tournament, teams, games }: Props) {
           .eq('id', loserId)
       }
 
+      // If this is a play-in game (round 0), auto-update brocket and pickem picks
+      // so picks for the play-in slot use the actual winner's team_id
+      if (game.round === 0 && game.next_game_id && loserId) {
+        await supabase
+          .from('brocket_picks')
+          .update({ picked_team_id: winnerId })
+          .eq('game_id', game.next_game_id)
+          .eq('picked_team_id', loserId)
+
+        await supabase
+          .from('pickem_picks')
+          .update({ picked_team_id: winnerId })
+          .eq('game_id', game.next_game_id)
+          .eq('picked_team_id', loserId)
+      }
+
       // Update pick'em results
       await updatePickemResults(game, team1Score, team2Score)
 

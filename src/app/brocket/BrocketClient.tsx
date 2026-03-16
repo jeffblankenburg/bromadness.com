@@ -139,8 +139,41 @@ export function BrocketClient({
   }
 
   // Split games by round
+  const r0Games = games.filter(g => g.round === 0)
   const r1Games = games.filter(g => g.round === 1)
   const r2Games = games.filter(g => g.round === 2)
+
+  // Helper: find play-in game for an R1 game slot
+  const getPlayInForSlot = (r1GameId: string, isTeam1Slot: boolean): Game | undefined => {
+    return r0Games.find(g => g.next_game_id === r1GameId && g.is_team1_slot === isTeam1Slot)
+  }
+
+  // Helper: resolve a play-in slot for an R1 game
+  // Returns the synthetic combined team (if unresolved) or actual winner (if resolved)
+  const resolvePlayInSlot = (r1GameId: string, isTeam1Slot: boolean): { team: Team | null; isPlayIn: boolean } => {
+    const playIn = getPlayInForSlot(r1GameId, isTeam1Slot)
+    if (!playIn) return { team: null, isPlayIn: false }
+
+    // If play-in already resolved, use the winner directly
+    if (playIn.winner_id) {
+      const winner = playIn.team1?.id === playIn.winner_id ? playIn.team1 : playIn.team2
+      return { team: winner || null, isPlayIn: false }
+    }
+
+    // Play-in not resolved - create combined display
+    if (!playIn.team1 || !playIn.team2) return { team: null, isPlayIn: false }
+    const name1 = playIn.team1.short_name || playIn.team1.name
+    const name2 = playIn.team2.short_name || playIn.team2.name
+    return {
+      team: {
+        id: playIn.team1.id, // proxy ID for storage
+        name: `${name1}/${name2}`,
+        short_name: `${name1}/${name2}`,
+        seed: playIn.team1.seed,
+      },
+      isPlayIn: true,
+    }
+  }
 
   const [selectedRound, setSelectedRound] = useState<1 | 2>(1)
   const [selectedRegionId, setSelectedRegionId] = useState<string>(regions[0]?.id || '')
@@ -206,14 +239,15 @@ export function BrocketClient({
     let projectedTeam2: Team | null = null
 
     for (const feeder of feederGames) {
+      // Resolve teams including play-in synthetic teams for empty slots
+      const resolvedTeam1 = feeder.team1 || resolvePlayInSlot(feeder.id, true).team
+      const resolvedTeam2 = feeder.team2 || resolvePlayInSlot(feeder.id, false).team
+
       // Find user's pick for this feeder game
-      const pick = localPicks[feeder.id]
-        ? (feeder.team1?.id === localPicks[feeder.id] ? feeder.team1 : feeder.team2)
-        : (() => {
-            const userPick = userPicks.find(p => p.game_id === feeder.id)
-            if (!userPick) return null
-            return feeder.team1?.id === userPick.picked_team_id ? feeder.team1 : feeder.team2
-          })()
+      const pickTeamId = localPicks[feeder.id] || userPicks.find(p => p.game_id === feeder.id)?.picked_team_id
+      const pick = pickTeamId
+        ? (resolvedTeam1?.id === pickTeamId ? resolvedTeam1 : resolvedTeam2?.id === pickTeamId ? resolvedTeam2 : null)
+        : null
 
       if (feeder.is_team1_slot === true) {
         projectedTeam1 = pick
@@ -401,6 +435,20 @@ export function BrocketClient({
   const renderGame = (game: Game) => {
     let team1 = game.team1
     let team2 = game.team2
+    let team1IsPlayIn = false
+    let team2IsPlayIn = false
+
+    // For Round 1, fill in play-in game info for empty slots
+    if (game.round === 1) {
+      if (!team1) {
+        const resolved = resolvePlayInSlot(game.id, true)
+        if (resolved.team) { team1 = resolved.team; team1IsPlayIn = resolved.isPlayIn }
+      }
+      if (!team2) {
+        const resolved = resolvePlayInSlot(game.id, false)
+        if (resolved.team) { team2 = resolved.team; team2IsPlayIn = resolved.isPlayIn }
+      }
+    }
 
     // For Round 2, derive projected teams from user's R1 picks
     if (game.round === 2) {
@@ -422,7 +470,7 @@ export function BrocketClient({
     const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
     const gameLocked = isGameLocked(game)
 
-    const renderTeamRow = (team: Team | null, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null) => {
+    const renderTeamRow = (team: Team | null, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isPlayIn = false) => {
       if (!team) {
         return (
           <div className="w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-zinc-700/30">
@@ -454,22 +502,28 @@ export function BrocketClient({
           className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
             gameLocked || !hasBothTeams ? 'cursor-default' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
-          style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
+          style={{ backgroundColor: isPlayIn ? '#78350f40' : d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
-          <span className="w-5 text-xs font-mono text-zinc-400">{team.seed}</span>
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
-          >
-            {logo ? (
-              <img src={logo} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
-            ) : (
-              <span className="text-[10px] font-bold text-white">{d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2) || '?'}</span>
-            )}
-          </div>
-          <span className={`flex-1 truncate text-sm text-left ${isWinner ? 'text-white font-bold' : 'text-white'}`}>
-            {d1Team?.shortName || team.short_name || team.name}
-            {team.record && <span className="text-zinc-400 text-xs ml-1">{team.record}</span>}
+          <span className={`w-5 text-xs font-mono ${isPlayIn ? 'text-amber-400' : 'text-zinc-400'}`}>{team.seed}</span>
+          {isPlayIn ? (
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-800">
+              <span className="text-[9px] font-bold text-amber-300">VS</span>
+            </div>
+          ) : (
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
+            >
+              {logo ? (
+                <img src={logo} alt="" className="w-5 h-5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white) drop-shadow(0 0 1px rgba(0,0,0,0.5))' }} />
+              ) : (
+                <span className="text-[10px] font-bold text-white">{d1Team?.abbreviation?.slice(0, 2) || team.short_name?.slice(0, 2) || '?'}</span>
+              )}
+            </div>
+          )}
+          <span className={`flex-1 truncate text-sm text-left ${isPlayIn ? 'text-amber-200 italic' : isWinner ? 'text-white font-bold' : 'text-white'}`}>
+            {isPlayIn ? (team.short_name || team.name) : (d1Team?.shortName || team.short_name || team.name)}
+            {!isPlayIn && team.record && <span className="text-zinc-400 text-xs ml-1">{team.record}</span>}
           </span>
           {isComplete && (
             <span className={`w-8 text-right text-sm text-zinc-300 ${isWinner ? 'font-bold' : 'font-normal'}`}>
@@ -503,8 +557,8 @@ export function BrocketClient({
             <span className="px-1 py-0.5 bg-zinc-800 rounded">{game.channel}</span>
           )}
         </div>
-        {renderTeamRow(team1, d1Top, logoTop)}
-        {renderTeamRow(team2, d1Bottom, logoBottom)}
+        {renderTeamRow(team1, d1Top, logoTop, team1IsPlayIn)}
+        {renderTeamRow(team2, d1Bottom, logoBottom, team2IsPlayIn)}
       </div>
     )
   }

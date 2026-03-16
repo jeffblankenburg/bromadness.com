@@ -104,7 +104,10 @@ export default async function BrocketPage() {
   }
 
   const games = allFetchedGames.filter(g => {
-    if (!g.scheduled_at) return false
+    // Always include play-in games (round 0) for reference
+    if (g.round === 0) return true
+    // Include games without scheduled time (e.g., R2 games not yet scheduled)
+    if (!g.scheduled_at) return true
     return brocketDays.has(getEasternDay(g.scheduled_at))
   })
 
