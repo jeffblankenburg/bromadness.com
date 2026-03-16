@@ -176,6 +176,7 @@ export default async function PickemPage() {
   const entryFee = payouts.entry_fee || 10
   const simulatedTime = tournament.dev_simulated_time as string | null
   const lockIndividual = payouts.lock_individual ?? false
+  const dayPrizes = ((payouts as unknown as Record<string, unknown>).day_prizes as Record<string, { first: number; second: number; third: number }>) || {}
 
   // Pass server time to client to avoid hydration mismatch on lock state
   const serverNow = getEasternNow().toISOString()
@@ -195,6 +196,7 @@ export default async function PickemPage() {
       enabledDays={enabledDays}
       lockIndividual={lockIndividual}
       serverNow={serverNow}
+      dayPrizes={dayPrizes}
     />
   )
 }

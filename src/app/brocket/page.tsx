@@ -92,25 +92,21 @@ export default async function BrocketPage() {
     team2: Array.isArray(g.team2) ? g.team2[0] || null : g.team2,
   }))
 
-  // Use is_brocket flag for eligibility; fall back to all R1 games + linked R2 games
-  const brocketR1Games = allFetchedGames.filter(g => g.round === 1 && g.is_brocket)
-  const hasExplicitFlags = brocketR1Games.length > 0
-
-  let games: typeof allFetchedGames
-  if (hasExplicitFlags) {
-    const brocketR1Ids = new Set(brocketR1Games.map(g => g.id))
-    const linkedR2Ids = new Set(
-      brocketR1Games.filter(g => g.next_game_id).map(g => g.next_game_id!)
-    )
-    games = allFetchedGames.filter(g => {
-      if (g.round === 1) return brocketR1Ids.has(g.id)
-      if (g.round === 2) return linkedR2Ids.has(g.id)
-      return false
-    })
-  } else {
-    // Fallback: include all R1 + R2 games if no flags set yet
-    games = allFetchedGames
+  // Include games scheduled on Thursday, Friday, or Saturday (Eastern time)
+  const brocketDays = new Set([4, 5, 6]) // Thu, Fri, Sat
+  const getEasternDay = (dateStr: string): number => {
+    const dayStr = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+    }).format(new Date(dateStr))
+    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    return dayMap[dayStr] ?? -1
   }
+
+  const games = allFetchedGames.filter(g => {
+    if (!g.scheduled_at) return false
+    return brocketDays.has(getEasternDay(g.scheduled_at))
+  })
 
   const r1Games = games.filter(g => g.round === 1)
 

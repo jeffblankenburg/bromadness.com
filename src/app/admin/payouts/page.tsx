@@ -10,10 +10,16 @@ interface AuctionPayouts {
   points_4th?: number
 }
 
+interface DayPrize {
+  first: number
+  second: number
+  third: number
+}
+
 interface PickemPayouts {
-  session_1st?: number
-  session_2nd?: number
-  session_3rd?: number
+  entry_fee?: number
+  enabled_days?: string[]
+  day_prizes?: Record<string, DayPrize>
 }
 
 interface Winner {
@@ -235,39 +241,8 @@ export default async function PayoutsPage() {
     return acc
   }, {} as Record<string, typeof pickemRoundGames>)
 
-  // Calculate session payouts dynamically (same as PickemClient)
-  const entryFee = (pickemPayouts as { entry_fee?: number })?.entry_fee || 10
-
-  const calculateSessionPayouts = (pot: number) => {
-    const percentages = { first: 0.6, second: 0.3, third: 0.1 }
-    const entries = Object.entries(percentages).map(([key, pct]) => {
-      const raw = pot * pct
-      const rounded = Math.round(raw / 5) * 5
-      const diff = raw - rounded
-      return { key, raw, rounded, diff }
-    })
-
-    let total = entries.reduce((sum, e) => sum + e.rounded, 0)
-    let adjustment = pot - total
-
-    while (adjustment !== 0) {
-      if (adjustment > 0) {
-        entries.sort((a, b) => b.diff - a.diff)
-        entries[0].rounded += 5
-        entries[0].diff -= 5
-        adjustment -= 5
-      } else {
-        entries.sort((a, b) => a.diff - b.diff)
-        entries[0].rounded -= 5
-        entries[0].diff += 5
-        adjustment += 5
-      }
-    }
-
-    const result: Record<string, number> = {}
-    entries.forEach(e => { result[e.key] = e.rounded })
-    return result as { first: number; second: number; third: number }
-  }
+  // Get manual day prizes from settings
+  const dayPrizes = pickemPayouts?.day_prizes || {}
 
   // Format date for tabs - just weekday abbreviated (THU, FRI, SAT, SUN)
   const formatDateShort = (dateStr: string) => {
@@ -288,11 +263,9 @@ export default async function PayoutsPage() {
     const dateShort = formatDateShort(day.contest_date)
     const dateLong = formatDateLong(day.contest_date)
 
-    // Calculate day pot from paid entries (same as PickemClient)
     const dayEntries = pickemEntries.filter(e => e.pickem_day_id === day.id)
-    const dayPot = dayEntries.length * entryFee
-    const sessionPot = Math.round((dayPot / 2) / 5) * 5  // Round session pot to $5
-    const sessionPayouts = calculateSessionPayouts(sessionPot)
+    const dayName = getDayName(day.contest_date)
+    const sessionPayouts = dayPrizes[dayName] || { first: 0, second: 0, third: 0 }
 
     // Split games by position: first half = early (session 1), second half = late (session 2)
     const midpoint = Math.ceil(dayGames.length / 2)

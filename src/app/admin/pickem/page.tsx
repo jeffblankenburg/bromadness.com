@@ -171,6 +171,7 @@ export default async function AdminPickemPage() {
           entryFee={payouts.entry_fee}
           enabledDays={enabledDays}
           lockIndividual={payouts.lock_individual ?? false}
+          dayPrizes={((payouts as unknown as Record<string, unknown>).day_prizes as Record<string, { first: number; second: number; third: number }>) || {}}
         />
       </div>
 

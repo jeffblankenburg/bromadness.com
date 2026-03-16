@@ -54,6 +54,12 @@ interface PickemPick {
   is_correct: boolean | null
 }
 
+interface DayPrize {
+  first: number
+  second: number
+  third: number
+}
+
 interface Props {
   userId: string
   pickemDays: PickemDay[]
@@ -68,6 +74,7 @@ interface Props {
   enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
   lockIndividual: boolean
   serverNow?: string  // Server-computed time to avoid hydration mismatch
+  dayPrizes: Record<string, DayPrize>
 }
 
 function findD1Team(teamName: string) {
@@ -131,6 +138,7 @@ export function PickemClient({
   enabledDays,
   lockIndividual,
   serverNow,
+  dayPrizes,
 }: Props) {
   // Parse a timestamp string (stored as Eastern) into a Date object
   const parseTimestamp = (timeStr: string): Date => {
@@ -213,46 +221,8 @@ export function PickemClient({
   const session1Games = dayGames.slice(0, midpoint)
   const session2Games = dayGames.slice(midpoint)
 
-  // Calculate session payouts with $5 rounding
-  const paidEntriesForDay = currentDay
-    ? allEntries.filter(e => e.pickem_day_id === currentDay.id && e.has_paid === true).length
-    : 0
-  const dayPot = paidEntriesForDay * entryFee
-  const sessionPot = Math.round((dayPot / 2) / 5) * 5 // Round session pot to $5
-
-  // Calculate payouts rounded to $5, ensuring total equals session pot
-  const calculateSessionPayouts = (pot: number) => {
-    const percentages = { first: 0.6, second: 0.3, third: 0.1 }
-    const entries = Object.entries(percentages).map(([key, pct]) => {
-      const raw = pot * pct
-      const rounded = Math.round(raw / 5) * 5
-      const diff = raw - rounded
-      return { key, raw, rounded, diff }
-    })
-
-    let total = entries.reduce((sum, e) => sum + e.rounded, 0)
-    let adjustment = pot - total
-
-    while (adjustment !== 0) {
-      if (adjustment > 0) {
-        entries.sort((a, b) => b.diff - a.diff)
-        entries[0].rounded += 5
-        entries[0].diff -= 5
-        adjustment -= 5
-      } else {
-        entries.sort((a, b) => a.diff - b.diff)
-        entries[0].rounded -= 5
-        entries[0].diff += 5
-        adjustment += 5
-      }
-    }
-
-    const result: Record<string, number> = {}
-    entries.forEach(e => { result[e.key] = e.rounded })
-    return result as { first: number; second: number; third: number }
-  }
-
-  const sessionPayouts = calculateSessionPayouts(sessionPot)
+  // Get session payouts from manual day prizes
+  const sessionPayouts = dayPrizes[selectedDayName] || { first: 0, second: 0, third: 0 }
 
   // Check if day is locked
   // When lockIndividual is false (default): all picks lock when first game of day starts

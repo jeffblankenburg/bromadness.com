@@ -4,20 +4,28 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+interface DayPrize {
+  first: number
+  second: number
+  third: number
+}
+
 interface Props {
   tournamentId: string
   entryFee: number
   enabledDays: string[]  // Day names like "Thursday", "Friday", etc.
   lockIndividual: boolean
+  dayPrizes: Record<string, DayPrize>
 }
 
 const PICKEM_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday']
 
-export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enabledDays: initialEnabledDays, lockIndividual: initialLockIndividual }: Props) {
+export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enabledDays: initialEnabledDays, lockIndividual: initialLockIndividual, dayPrizes: initialDayPrizes }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [entryFee, setEntryFee] = useState(initialEntryFee)
   const [enabledDays, setEnabledDays] = useState<string[]>(initialEnabledDays)
   const [lockIndividual, setLockIndividual] = useState(initialLockIndividual)
+  const [dayPrizes, setDayPrizes] = useState<Record<string, DayPrize>>(initialDayPrizes)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -28,6 +36,18 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
         ? prev.filter(d => d !== day)
         : [...prev, day]
     )
+  }
+
+  const updateDayPrize = (day: string, place: keyof DayPrize, value: number) => {
+    setDayPrizes(prev => ({
+      ...prev,
+      [day]: {
+        first: prev[day]?.first ?? 0,
+        second: prev[day]?.second ?? 0,
+        third: prev[day]?.third ?? 0,
+        [place]: value,
+      },
+    }))
   }
 
   const handleSave = async () => {
@@ -41,6 +61,7 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
             entry_fee: entryFee,
             enabled_days: enabledDays,
             lock_individual: lockIndividual,
+            day_prizes: dayPrizes,
           },
         })
         .eq('id', tournamentId)
@@ -80,7 +101,7 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
           />
 
           {/* Modal Content */}
-          <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm space-y-4">
+          <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Pick&apos;em Settings</h3>
               <button
@@ -125,6 +146,65 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
                 </div>
               </div>
 
+              {/* Per-day prizes */}
+              {enabledDays.length > 0 && (
+                <div className="pt-2 border-t border-zinc-700">
+                  <label className="block text-sm text-zinc-400 mb-3">Session Prizes</label>
+                  <div className="space-y-3">
+                    {PICKEM_DAYS.filter(day => enabledDays.includes(day)).map(day => {
+                      const prizes = dayPrizes[day] || { first: 0, second: 0, third: 0 }
+                      return (
+                        <div key={day}>
+                          <div className="text-xs text-zinc-500 mb-1">{day}</div>
+                          <div className="flex gap-2">
+                            <div className="flex-1 text-center">
+                              <div className="text-zinc-500 text-xs mb-1">1st</div>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={prizes.first}
+                                  onChange={(e) => updateDayPrize(day, 'first', parseInt(e.target.value) || 0)}
+                                  className="w-full pl-5 pr-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-center"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <div className="text-zinc-500 text-xs mb-1">2nd</div>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={prizes.second}
+                                  onChange={(e) => updateDayPrize(day, 'second', parseInt(e.target.value) || 0)}
+                                  className="w-full pl-5 pr-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-center"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <div className="text-zinc-500 text-xs mb-1">3rd</div>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={prizes.third}
+                                  onChange={(e) => updateDayPrize(day, 'third', parseInt(e.target.value) || 0)}
+                                  className="w-full pl-5 pr-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-center"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-2">Same prizes for both sessions (early &amp; late)</p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm text-zinc-400 mb-2">Lock Mode</label>
                 <div className="space-y-2">
@@ -149,10 +229,6 @@ export function PickemSettings({ tournamentId, entryFee: initialEntryFee, enable
                     <span className="text-sm text-zinc-300">Lock each pick at game start</span>
                   </label>
                 </div>
-              </div>
-
-              <div className="text-xs text-zinc-500">
-                Payouts are calculated automatically: 60% / 30% / 10% per session, rounded to nearest $5
               </div>
 
               <button
