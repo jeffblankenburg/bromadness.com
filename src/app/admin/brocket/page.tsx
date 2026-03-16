@@ -48,13 +48,28 @@ export default async function AdminBrocketPage() {
     .eq('is_active', true)
     .order('display_name')
 
-  // Get Round 1 games (Brocket games - 32 total)
-  const { data: games } = await supabase
+  // Get Brocket-eligible games (R1 + R2 on Thu/Fri/Sat)
+  const { data: gamesRaw } = await supabase
     .from('games')
-    .select('id, scheduled_at, winner_id, region_id')
+    .select('id, scheduled_at, winner_id, region_id, round')
     .eq('tournament_id', tournament.id)
-    .eq('round', 1)
+    .in('round', [1, 2])
     .order('scheduled_at')
+
+  // Filter to brocket days (Thu=4, Fri=5, Sat=6) in Eastern time
+  const brocketDays = new Set([4, 5, 6])
+  const getEasternDay = (dateStr: string): number => {
+    const dayStr = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+    }).format(new Date(dateStr))
+    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    return dayMap[dayStr] ?? -1
+  }
+  const games = (gamesRaw || []).filter(g => {
+    if (!g.scheduled_at) return false
+    return brocketDays.has(getEasternDay(g.scheduled_at))
+  })
 
   // Get brocket entries
   const { data: brocketEntries } = await supabase
@@ -63,7 +78,7 @@ export default async function AdminBrocketPage() {
     .eq('tournament_id', tournament.id)
 
   // Get brocket picks
-  const gameIds = (games || []).map(g => g.id)
+  const gameIds = games.map(g => g.id)
   const entryIds = (brocketEntries || []).map(e => e.id)
   const { data: brocketPicks } = entryIds.length > 0 && gameIds.length > 0
     ? await supabase
