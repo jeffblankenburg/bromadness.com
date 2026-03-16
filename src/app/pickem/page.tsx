@@ -72,10 +72,7 @@ export default async function PickemPage() {
   // Transform games to extract team objects from arrays, filter by enabled days
   const games = (gamesRaw || [])
     .filter(g => {
-      // Always include play-in games (round 0) for reference
-      if (g.round === 0) return true
-      // Include games without scheduled time
-      if (!g.scheduled_at) return true
+      if (!g.scheduled_at) return false
       const dayName = getDayName(g.scheduled_at.split('T')[0])
       return enabledDays.includes(dayName)
     })
