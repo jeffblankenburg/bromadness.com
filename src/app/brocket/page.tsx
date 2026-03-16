@@ -76,7 +76,7 @@ export default async function BrocketPage() {
     .from('games')
     .select(`
       id, scheduled_at, team1_score, team2_score, winner_id, region_id,
-      game_number, location, channel, round, next_game_id, is_team1_slot, is_brocket,
+      game_number, location, channel, round, next_game_id, is_team1_slot,
       team1:teams!games_team1_id_fkey(id, name, short_name, seed, record),
       team2:teams!games_team2_id_fkey(id, name, short_name, seed, record)
     `)
