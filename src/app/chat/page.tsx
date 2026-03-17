@@ -354,7 +354,10 @@ export default function ChatPage() {
 
       if (res.ok) {
         const data = await res.json()
-        setMessages(prev => [...prev, data.message])
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message.id)) return prev
+          return [...prev, data.message]
+        })
       }
     } catch (error) {
       console.error('Failed to send message:', error)
@@ -378,7 +381,10 @@ export default function ChatPage() {
 
       if (res.ok) {
         const data = await res.json()
-        setMessages(prev => [...prev, data.message])
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message.id)) return prev
+          return [...prev, data.message]
+        })
       }
     } catch (error) {
       console.error('Failed to send GIF:', error)
@@ -427,7 +433,10 @@ export default function ChatPage() {
 
       if (res.ok) {
         const data = await res.json()
-        setMessages(prev => [...prev, data.message])
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message.id)) return prev
+          return [...prev, data.message]
+        })
       }
     } catch (error) {
       console.error('Failed to send photo:', error)
