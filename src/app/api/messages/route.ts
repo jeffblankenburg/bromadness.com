@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server'
+import webpush from 'web-push'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActiveUserId, getSimulatedUserId } from '@/lib/simulation'
+
+// Configure web-push with VAPID keys
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    'mailto:notifications@bromadness.com',
+    vapidPublicKey,
+    vapidPrivateKey
+  )
+}
 
 // GET - Fetch messages with sender info
 export async function GET(request: Request) {
@@ -146,7 +159,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
     }
 
-    // Send push notifications to other users (fire and forget)
+    // Send push notifications to other users directly (not via HTTP round-trip)
     const senderName = (data.user as { display_name?: string })?.display_name || 'Someone'
     let notificationBody = 'Sent a message'
     if (hasContent) {
@@ -159,33 +172,43 @@ export async function POST(request: Request) {
       notificationBody = 'Sent an image'
     }
 
-    // Send push notifications to other users (fire and forget)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.bromadness.com'
+    if (vapidPublicKey && vapidPrivateKey) {
+      try {
+        const adminClient = createAdminClient()
+        const { data: subscriptions } = await adminClient
+          .from('push_subscriptions')
+          .select('*')
+          .neq('user_id', activeUserId)
 
-    fetch(`${baseUrl}/api/push/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
-      },
-      body: JSON.stringify({
-        excludeUserId: activeUserId,
-        title: senderName,
-        body: notificationBody,
-        data: {
-          type: 'chat_message',
-          messageId: data.id,
-        },
-      }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          console.error('Push notification request failed:', res.status)
+        if (subscriptions && subscriptions.length > 0) {
+          const payload = JSON.stringify({
+            title: senderName,
+            body: notificationBody,
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-192x192.png',
+            data: { type: 'chat_message', messageId: data.id },
+          })
+
+          await Promise.allSettled(
+            subscriptions.map(async (sub) => {
+              try {
+                await webpush.sendNotification(
+                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                  payload
+                )
+              } catch (err: unknown) {
+                const pushErr = err as { statusCode?: number }
+                if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+                  await adminClient.from('push_subscriptions').delete().eq('id', sub.id)
+                }
+              }
+            })
+          )
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to send push notifications:', err)
-      })
+      }
+    }
 
     return NextResponse.json({ message: data })
   } catch (error) {
