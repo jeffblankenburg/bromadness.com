@@ -53,6 +53,7 @@ interface Props {
   pickemPicks?: Pick[]
   brocketPicks?: Pick[]
   teamOwners?: Record<string, string>
+  userAuctionTeamIds?: string[]
 }
 
 // Constants for layout
@@ -73,7 +74,9 @@ function TeamSlot({
   isWinner,
   isLoser,
   isPicked,
+  isWrongPick,
   ownerName,
+  isUserOwned,
   viewMode,
   isTop,
   playInDisplayName,
@@ -84,7 +87,9 @@ function TeamSlot({
   isWinner: boolean
   isLoser: boolean
   isPicked: boolean
+  isWrongPick: boolean
   ownerName?: string
+  isUserOwned: boolean
   viewMode: ViewMode
   isTop: boolean
   playInDisplayName?: string | null
@@ -94,7 +99,7 @@ function TeamSlot({
       ? ownerName || team.short_name || team.name
       : team.short_name || team.name
     : ''
-  const recordSuffix = team?.record ? ` ${team.record}` : ''
+  const recordSuffix = (team?.record && viewMode !== 'auction') ? ` ${team.record}` : ''
   const displayName = playInDisplayName || (baseName + recordSuffix)
 
   const showPickIndicator = isPicked && (viewMode === 'brocket' || viewMode === 'pickem')
@@ -104,18 +109,18 @@ function TeamSlot({
       className={`
         flex items-center h-6 px-1.5 text-[11px]
         ${isTop ? 'border-b border-zinc-700' : ''}
-        ${isWinner ? 'bg-green-900/40 font-semibold' : ''}
-        ${isLoser && team ? 'text-zinc-500 line-through decoration-zinc-600' : ''}
+        ${isWrongPick ? 'bg-red-900/40' : isWinner ? 'bg-green-900/40 font-semibold' : ''}
+        ${isLoser && team && !isWrongPick ? 'text-zinc-500 line-through decoration-zinc-600' : ''}
       `}
     >
       {seed !== undefined && (
-        <span className="w-4 text-[10px] text-zinc-500 flex-shrink-0">{seed}</span>
+        <span className={`w-4 text-[10px] flex-shrink-0 ${isWrongPick ? 'text-red-400' : 'text-zinc-500'}`}>{seed}</span>
       )}
-      <span className={`flex-1 truncate ${isWinner ? 'text-white' : 'text-zinc-300'}`}>
+      <span className={`flex-1 truncate ${isWrongPick ? 'text-red-400 line-through decoration-red-600' : isWinner ? 'text-white' : 'text-zinc-300'}`}>
         {displayName}
       </span>
       {showPickIndicator && viewMode === 'brocket' && (
-        <svg className="w-3 h-3 flex-shrink-0 text-orange-400 mx-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <svg className={`w-3 h-3 flex-shrink-0 mx-0.5 ${isWrongPick ? 'text-red-400' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
         </svg>
       )}
@@ -124,7 +129,7 @@ function TeamSlot({
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       )}
-      {viewMode === 'auction' && ownerName && (
+      {viewMode === 'auction' && isUserOwned && (
         <img src="/auction.svg" alt="Auction" className="w-3 h-3 flex-shrink-0 mx-0.5 brightness-0 invert opacity-70" />
       )}
       {score !== undefined && score !== null && (
@@ -144,6 +149,8 @@ function Matchup({
   brocketPicks,
   pickemPicks,
   teamOwners,
+  userAuctionTeamIds,
+  wrongBrocketTeamIds,
   viewMode,
   showSeeds = true,
 }: {
@@ -153,6 +160,8 @@ function Matchup({
   brocketPicks: Pick[]
   pickemPicks: Pick[]
   teamOwners: Record<string, string>
+  userAuctionTeamIds: string[]
+  wrongBrocketTeamIds: Set<string>
   viewMode: ViewMode
   showSeeds?: boolean
 }) {
@@ -211,7 +220,9 @@ function Matchup({
         isWinner={team1IsWinner}
         isLoser={team1IsLoser}
         isPicked={isPicked(game?.team1_id || null, game?.round || 1)}
+        isWrongPick={viewMode === 'brocket' && !!game?.team1_id && wrongBrocketTeamIds.has(game.team1_id)}
         ownerName={game?.team1_id ? teamOwners[game.team1_id] : undefined}
+        isUserOwned={!!game?.team1_id && userAuctionTeamIds.includes(game.team1_id)}
         viewMode={viewMode}
         isTop={true}
         playInDisplayName={playInName1}
@@ -223,7 +234,9 @@ function Matchup({
         isWinner={team2IsWinner}
         isLoser={team2IsLoser}
         isPicked={isPicked(game?.team2_id || null, game?.round || 1)}
+        isWrongPick={viewMode === 'brocket' && !!game?.team2_id && wrongBrocketTeamIds.has(game.team2_id)}
         ownerName={game?.team2_id ? teamOwners[game.team2_id] : undefined}
+        isUserOwned={!!game?.team2_id && userAuctionTeamIds.includes(game.team2_id)}
         viewMode={viewMode}
         isTop={false}
         playInDisplayName={playInName2}
@@ -240,6 +253,8 @@ function RegionBracket({
   brocketPicks,
   pickemPicks,
   teamOwners,
+  userAuctionTeamIds,
+  wrongBrocketTeamIds,
   viewMode,
   direction,
 }: {
@@ -249,6 +264,8 @@ function RegionBracket({
   brocketPicks: Pick[]
   pickemPicks: Pick[]
   teamOwners: Record<string, string>
+  userAuctionTeamIds: string[]
+  wrongBrocketTeamIds: Set<string>
   viewMode: ViewMode
   direction: 'right' | 'left'
 }) {
@@ -291,6 +308,8 @@ function RegionBracket({
         brocketPicks={brocketPicks}
         pickemPicks={pickemPicks}
         teamOwners={teamOwners}
+        userAuctionTeamIds={userAuctionTeamIds}
+        wrongBrocketTeamIds={wrongBrocketTeamIds}
         viewMode={viewMode}
         showSeeds={showSeeds}
       />
@@ -508,8 +527,18 @@ export function BracketView({
   pickemPicks = [],
   brocketPicks = [],
   teamOwners = {},
+  userAuctionTeamIds = [],
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('pickem')
+
+  // Compute teams that were picked in brocket but lost their game
+  const wrongBrocketTeamIds = new Set<string>()
+  for (const pick of brocketPicks) {
+    const game = games.find(g => g.id === pick.game_id)
+    if (game?.winner_id && game.winner_id !== pick.picked_team_id) {
+      wrongBrocketTeamIds.add(pick.picked_team_id)
+    }
+  }
 
   const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
 
@@ -604,6 +633,8 @@ export function BracketView({
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
+                  userAuctionTeamIds={userAuctionTeamIds}
+                  wrongBrocketTeamIds={wrongBrocketTeamIds}
                   viewMode={viewMode}
                   direction="right"
                 />
@@ -642,6 +673,8 @@ export function BracketView({
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
+                  userAuctionTeamIds={userAuctionTeamIds}
+                  wrongBrocketTeamIds={wrongBrocketTeamIds}
                   viewMode={viewMode}
                   showSeeds={false}
                 />
@@ -665,6 +698,8 @@ export function BracketView({
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
+                  userAuctionTeamIds={userAuctionTeamIds}
+                  wrongBrocketTeamIds={wrongBrocketTeamIds}
                   viewMode={viewMode}
                   showSeeds={false}
                 />
@@ -694,6 +729,8 @@ export function BracketView({
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
+                  userAuctionTeamIds={userAuctionTeamIds}
+                  wrongBrocketTeamIds={wrongBrocketTeamIds}
                   viewMode={viewMode}
                   showSeeds={false}
                 />
@@ -720,6 +757,8 @@ export function BracketView({
                   brocketPicks={brocketPicks}
                   pickemPicks={pickemPicks}
                   teamOwners={teamOwners}
+                  userAuctionTeamIds={userAuctionTeamIds}
+                  wrongBrocketTeamIds={wrongBrocketTeamIds}
                   viewMode={viewMode}
                   direction="left"
                 />

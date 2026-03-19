@@ -185,7 +185,7 @@ export default async function Home() {
     const [{ data: games }, { data: allAuctionData }] = await Promise.all([
       supabase
         .from('games')
-        .select('winner_id')
+        .select('winner_id, team1_id, team2_id')
         .eq('tournament_id', tournament.id)
         .gt('round', 0)
         .not('winner_id', 'is', null),
@@ -197,9 +197,13 @@ export default async function Home() {
 
     // Pre-compute wins by team ID in O(n) instead of O(n*m)
     const winsByTeamId: Record<string, number> = {}
+    const eliminatedTeamIds = new Set<string>()
     for (const g of games || []) {
       if (g.winner_id) {
         winsByTeamId[g.winner_id] = (winsByTeamId[g.winner_id] || 0) + 1
+        // The loser is the other team in the game
+        if (g.team1_id && g.team1_id !== g.winner_id) eliminatedTeamIds.add(g.team1_id)
+        if (g.team2_id && g.team2_id !== g.winner_id) eliminatedTeamIds.add(g.team2_id)
       }
     }
 
@@ -229,6 +233,7 @@ export default async function Home() {
           bid_amount: a.bid_amount,
           wins,
           points,
+          isEliminated: teamData ? eliminatedTeamIds.has(teamData.id) : false,
         }
       })
 

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 const THRESHOLD = 60
 
@@ -10,7 +9,6 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const touchStartY = useRef(0)
   const pulling = useRef(false)
-  const router = useRouter()
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (window.scrollY <= 0 && !isRefreshing) {
@@ -37,15 +35,11 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
     if (pullDistance >= THRESHOLD) {
       setIsRefreshing(true)
       setPullDistance(40)
-      router.refresh()
-      setTimeout(() => {
-        setIsRefreshing(false)
-        setPullDistance(0)
-      }, 1000)
+      window.location.reload()
     } else {
       setPullDistance(0)
     }
-  }, [pullDistance, router])
+  }, [pullDistance])
 
   useEffect(() => {
     document.addEventListener('touchstart', handleTouchStart, { passive: true })

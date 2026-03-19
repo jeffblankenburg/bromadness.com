@@ -9,6 +9,7 @@ interface AuctionTeam {
   bid_amount: number
   wins: number
   points: number
+  isEliminated?: boolean
 }
 
 interface Props {
@@ -63,7 +64,7 @@ export function AuctionTeamsCard({ teams, totalPoints }: Props) {
                 return (
                   <div
                     key={idx}
-                    className="w-5 h-5 rounded-full flex items-center justify-center"
+                    className={`w-5 h-5 rounded-full flex items-center justify-center ${at.isEliminated ? 'opacity-40 ring-1 ring-red-500' : ''}`}
                     style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
                   >
                     {logoUrl ? (
@@ -98,7 +99,7 @@ export function AuctionTeamsCard({ teams, totalPoints }: Props) {
                 return (
                   <div
                     key={idx}
-                    className="flex items-center justify-between text-sm px-2 py-2 rounded-lg"
+                    className={`flex items-center justify-between text-sm px-2 py-2 rounded-lg ${at.isEliminated ? 'opacity-50' : ''}`}
                     style={{ backgroundColor: d1Team?.primaryColor ? d1Team.primaryColor + '40' : '#3f3f4640' }}
                   >
                     <div className="flex items-center gap-2">
@@ -113,7 +114,7 @@ export function AuctionTeamsCard({ teams, totalPoints }: Props) {
                           <span className="text-[10px] font-bold text-white">{d1Team?.abbreviation?.slice(0, 2) || at.team?.short_name?.slice(0, 2) || '?'}</span>
                         )}
                       </div>
-                      <span className="text-white">{d1Team?.shortName || at.team?.short_name || at.team?.name}</span>
+                      <span className={at.isEliminated ? 'text-zinc-400 line-through' : 'text-white'}>{d1Team?.shortName || at.team?.short_name || at.team?.name}</span>
                       <span className="text-xs text-zinc-400">${at.bid_amount}</span>
                     </div>
                     <span className="text-xs text-zinc-300">
