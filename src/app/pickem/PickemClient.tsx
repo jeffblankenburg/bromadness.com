@@ -171,6 +171,7 @@ export function PickemClient({
   const [saving, setSaving] = useState(false)
   const [earlyGamesExpanded, setEarlyGamesExpanded] = useState(true)
   const [lateGamesExpanded, setLateGamesExpanded] = useState(true)
+  const [expandedLeaderboardUsers, setExpandedLeaderboardUsers] = useState<Set<string>>(new Set())
   const router = useRouter()
   const supabase = createClient()
 
@@ -338,6 +339,7 @@ export function PickemClient({
 
       return {
         user_id: entry.user_id,
+        entry_id: entry.id,
         display_name: user?.display_name || 'Unknown',
         correct_picks: correctPicks,
         total_games: sessionGames.length,
@@ -485,7 +487,17 @@ export function PickemClient({
     )
   }
 
-  const renderLeaderboard = (sessionGames: Game[], _sessionLabel: string) => {
+  const toggleLeaderboardUser = (userId: string, sessionLabel: string) => {
+    const key = `${sessionLabel}:${userId}`
+    setExpandedLeaderboardUsers(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const renderLeaderboard = (sessionGames: Game[], sessionLabel: string) => {
     const standings = calculateSessionStandings(sessionGames)
     if (standings.length === 0) {
       return (
@@ -505,6 +517,11 @@ export function PickemClient({
       ).length
     }
 
+    // Sort session games by scheduled time for display
+    const sortedSessionGames = [...sessionGames].sort((a, b) =>
+      parseTimestamp(a.scheduled_at || '').getTime() - parseTimestamp(b.scheduled_at || '').getTime()
+    )
+
     return (
       <div className="space-y-1">
         {standings.map((standing, index) => {
@@ -523,41 +540,131 @@ export function PickemClient({
           )
           const showTiebreaker = othersWithSameScore.length > 0 && standing.first_loss !== null
 
+          const expandKey = `${sessionLabel}:${standing.user_id}`
+          const isExpanded = expandedLeaderboardUsers.has(expandKey)
+
+          // Get this user's picks for the session
+          const entryPicks = allPicks.filter(p =>
+            p.entry_id === standing.entry_id && p.game_id && sessionGames.some(g => g.id === p.game_id)
+          )
+
           return (
-            <div
-              key={standing.user_id}
-              className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg ${
-                standing.is_current_user ? 'bg-orange-500/20' : 'bg-zinc-800/30'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className={`w-6 text-sm font-bold ${
-                  rank === 1 ? 'text-yellow-400' :
-                  rank === 2 ? 'text-zinc-300' :
-                  rank === 3 ? 'text-orange-400' :
-                  'text-zinc-500'
-                }`}>
-                  {rank}
-                </span>
-                <div className="flex flex-col">
-                  <span className={standing.is_current_user ? 'font-medium' : ''}>
-                    {standing.display_name}
+            <div key={standing.user_id}>
+              <button
+                onClick={() => toggleLeaderboardUser(standing.user_id, sessionLabel)}
+                className={`w-full flex items-center justify-between text-sm py-2 px-3 rounded-lg ${
+                  standing.is_current_user ? 'bg-orange-500/20' : 'bg-zinc-800/30'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`w-6 text-sm font-bold ${
+                    rank === 1 ? 'text-yellow-400' :
+                    rank === 2 ? 'text-zinc-300' :
+                    rank === 3 ? 'text-orange-400' :
+                    'text-zinc-500'
+                  }`}>
+                    {rank}
                   </span>
-                  {showTiebreaker && (
-                    <span className="text-xs text-zinc-500">
-                      1st miss: G{standing.first_loss}{standing.second_loss ? `, 2nd: G${standing.second_loss}` : ''}
+                  <div className="flex flex-col text-left">
+                    <span className={standing.is_current_user ? 'font-medium' : ''}>
+                      {standing.display_name}
                     </span>
-                  )}
+                    {showTiebreaker && (
+                      <span className="text-xs text-zinc-500">
+                        1st miss: G{standing.first_loss}{standing.second_loss ? `, 2nd: G${standing.second_loss}` : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-zinc-400">
-                  {standing.correct_picks}/{standing.total_games}
-                </span>
-                {payout > 0 && (
-                  <span className="text-green-400 font-medium">${payout}</span>
-                )}
-              </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-400">
+                    {standing.correct_picks}/{standing.total_games}
+                  </span>
+                  {payout > 0 && (
+                    <span className="text-green-400 font-medium">${payout}</span>
+                  )}
+                  <svg
+                    className={`w-4 h-4 text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="ml-9 mr-3 mt-1 mb-2 space-y-1">
+                  {sortedSessionGames.map(game => {
+                    if (!game.team1 || !game.team2) return null
+                    const pick = entryPicks.find(p => p.game_id === game.id)
+                    const pickedTeam = pick
+                      ? (pick.picked_team_id === game.team1.id ? game.team1 : game.team2)
+                      : null
+                    const otherTeam = pick
+                      ? (pick.picked_team_id === game.team1.id ? game.team2 : game.team1)
+                      : null
+                    const isComplete = game.winner_id !== null
+                    const correctness = pick?.is_correct ?? (isComplete && pick ? isPickCorrect(game, pick.picked_team_id) : null)
+
+                    const d1Picked = pickedTeam ? findD1Team(pickedTeam.name) : null
+                    const logoPicked = d1Picked ? getTeamLogoUrl(d1Picked) : null
+
+                    return (
+                      <div
+                        key={game.id}
+                        className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-zinc-800/40 text-xs"
+                      >
+                        {pickedTeam ? (
+                          <>
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: d1Picked?.primaryColor || '#3f3f46' }}
+                            >
+                              {logoPicked ? (
+                                <img src={logoPicked} alt="" className="w-3.5 h-3.5 object-contain" style={{ filter: 'drop-shadow(0 0 1px white)' }} />
+                              ) : (
+                                <span className="text-[8px] font-bold text-white">{d1Picked?.abbreviation?.slice(0, 2) || pickedTeam.short_name?.slice(0, 2) || '?'}</span>
+                              )}
+                            </div>
+                            <span className="text-zinc-300 flex-1 truncate">
+                              <span className="text-zinc-500">{pickedTeam.seed}</span>{' '}
+                              {d1Picked?.shortName || pickedTeam.short_name || pickedTeam.name}
+                              <span className="text-zinc-600 ml-1">vs</span>{' '}
+                              <span className="text-zinc-500">{otherTeam?.seed} {otherTeam ? (findD1Team(otherTeam.name)?.shortName || otherTeam.short_name || otherTeam.name) : ''}</span>
+                            </span>
+                            {isComplete && correctness === true && (
+                              <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                            )}
+                            {isComplete && correctness === false && (
+                              <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                            )}
+                            {!isComplete && (
+                              <span className="text-zinc-600 flex-shrink-0">--</span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-5 h-5 rounded-full bg-zinc-700 flex-shrink-0" />
+                            <span className="text-zinc-600 flex-1 truncate">
+                              {game.team1.seed} {findD1Team(game.team1.name)?.shortName || game.team1.short_name || game.team1.name}
+                              {' vs '}
+                              {game.team2.seed} {findD1Team(game.team2.name)?.shortName || game.team2.short_name || game.team2.name}
+                            </span>
+                            <span className="text-zinc-600 text-[10px] flex-shrink-0">No pick</span>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         })}
