@@ -297,6 +297,62 @@ export function AuctionBoardClient({
     )
   }
 
+  // Countdown to 10:15 AM ET today
+  const [countdown, setCountdown] = useState('')
+  const [countdownOver, setCountdownOver] = useState(false)
+
+  useEffect(() => {
+    let audioPlayed = false
+
+    const playThemeSong = () => {
+      if (audioPlayed) return
+      audioPlayed = true
+      const audio = new Audio('/Bro Madness.mp3')
+      audio.currentTime = 0
+      audio.play().catch(() => {})
+      setTimeout(() => {
+        audio.pause()
+        audio.currentTime = 0
+      }, 4000)
+    }
+
+    const getTarget = () => {
+      const now = new Date()
+      const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+      const etOffset = now.getTime() - etNow.getTime()
+      const target = new Date(etNow)
+      target.setHours(10, 15, 0, 0)
+      return new Date(target.getTime() + etOffset)
+    }
+
+    const update = () => {
+      const now = new Date()
+      const target = getTarget()
+      const diff = target.getTime() - now.getTime()
+
+      if (diff <= 0) {
+        if (!countdownOver) playThemeSong()
+        setCountdownOver(true)
+        setCountdown('')
+        return
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+      if (hours > 0) {
+        setCountdown(`${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`)
+      } else {
+        setCountdown(`${minutes}:${String(seconds).padStart(2, '0')}`)
+      }
+    }
+
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [countdownOver])
+
   const emptySlots = colsPerRow - row3.length
 
   return (
@@ -339,6 +395,20 @@ export function AuctionBoardClient({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Countdown overlay */}
+      {!countdownOver && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-orange-400 text-3xl font-bold uppercase tracking-widest mb-4" style={{ fontFamily: 'var(--font-display)' }}>
+              Auction Starts In
+            </div>
+            <div className="text-orange-400 font-black tabular-nums" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(6rem, 20vw, 16rem)', lineHeight: 1 }}>
+              {countdown}
+            </div>
           </div>
         </div>
       )}
