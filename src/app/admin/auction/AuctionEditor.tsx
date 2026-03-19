@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { D1_TEAMS, getTeamLogoUrl } from '@/lib/data/d1-teams'
@@ -112,6 +112,40 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
   }, [expandedRegions])
   const router = useRouter()
   const supabase = createClient()
+  const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  // Set up broadcast channel for team selection (shown on auction board)
+  useEffect(() => {
+    const channel = supabase.channel(`auction-selection-${tournamentId}`)
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        broadcastChannelRef.current = channel
+      }
+    })
+
+    return () => {
+      broadcastChannelRef.current = null
+      supabase.removeChannel(channel)
+    }
+  }, [tournamentId, supabase])
+
+  // Broadcast team selection changes to the board
+  useEffect(() => {
+    if (!broadcastChannelRef.current) return
+    if (selectedTeam) {
+      broadcastChannelRef.current.send({
+        type: 'broadcast',
+        event: 'team_selected',
+        payload: { teamId: selectedTeam.id, teamName: selectedTeam.name },
+      })
+    } else {
+      broadcastChannelRef.current.send({
+        type: 'broadcast',
+        event: 'team_deselected',
+        payload: {},
+      })
+    }
+  }, [selectedTeam])
 
   const toggleRegion = (regionId: string) => {
     setExpandedRegions(prev => {

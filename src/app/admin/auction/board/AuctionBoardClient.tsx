@@ -92,6 +92,7 @@ export function AuctionBoardClient({
   auctionEntries,
 }: Props) {
   const [auctionTeams, setAuctionTeams] = useState<AuctionTeam[]>(initialAuctionTeams)
+  const [pendingTeam, setPendingTeam] = useState<{ teamId: string; teamName: string } | null>(null)
   const router = useRouter()
 
   // Subscribe to Realtime changes on auction_teams
@@ -120,6 +121,24 @@ export function AuctionBoardClient({
             })
         }
       )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [tournamentId])
+
+  // Subscribe to team selection broadcasts from admin editor
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`auction-selection-${tournamentId}`)
+      .on('broadcast', { event: 'team_selected' }, ({ payload }) => {
+        setPendingTeam(payload)
+      })
+      .on('broadcast', { event: 'team_deselected' }, () => {
+        setPendingTeam(null)
+      })
       .subscribe()
 
     return () => {
@@ -240,14 +259,24 @@ export function AuctionBoardClient({
     const fullName = user.display_name || user.phone
     const name = fullName.length > 10 ? fullName.slice(0, 10) : fullName
     const isCurrent = user.id === currentId
+    const done = isPlayerDone(user.id)
+
+    // Pending team overlay data
+    const pendingTeamData = (isCurrent && pendingTeam) ? teams.find(t => t.id === pendingTeam.teamId) : null
+    const pendingD1Team = pendingTeamData ? findD1Team(pendingTeamData.name) : null
+    const pendingLogo = pendingD1Team ? getTeamLogoUrl(pendingD1Team) : null
 
     return (
       <div
         key={user.id}
-        className={`flex flex-col min-h-0 border-r border-zinc-800/40 last:border-r-0 ${isCurrent ? 'bg-white/10' : ''}`}
+        className={`flex flex-col min-h-0 border-r border-zinc-800/40 last:border-r-0 relative ${
+          done ? 'bg-green-900/30' : isCurrent ? 'bg-white/10' : ''
+        }`}
       >
         {/* Name + Balance stacked */}
-        <div className={`px-3 py-1.5 border-b flex-shrink-0 text-center ${isCurrent ? 'bg-white/20 border-white/30' : 'bg-zinc-900/80 border-zinc-800/40'}`}>
+        <div className={`px-3 py-1.5 border-b flex-shrink-0 text-center ${
+          done ? 'bg-green-900/60 border-green-700/40' : isCurrent ? 'bg-white/20 border-white/30' : 'bg-zinc-900/80 border-zinc-800/40'
+        }`}>
           <div className="font-bold text-white text-2xl leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
             {name}
           </div>
@@ -296,6 +325,41 @@ export function AuctionBoardClient({
             )
           })}
         </div>
+
+        {/* Pending team overlay on current bidder */}
+        {isCurrent && pendingD1Team && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center p-2"
+            style={{ backgroundColor: pendingD1Team.primaryColor || '#1a1a2e' }}
+          >
+            {pendingLogo && (
+              <img
+                src={pendingLogo}
+                alt=""
+                className="w-24 h-24 object-contain mb-2"
+                style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.4))' }}
+              />
+            )}
+            <div
+              className="text-3xl font-black text-center leading-tight"
+              style={{
+                fontFamily: 'var(--font-display)',
+                color: getContrastColor(pendingD1Team.primaryColor || '#1a1a2e'),
+              }}
+            >
+              {pendingD1Team.shortName || pendingTeamData?.short_name || pendingTeamData?.name}
+            </div>
+            <div
+              className="text-lg font-bold mt-1 opacity-70"
+              style={{
+                fontFamily: 'var(--font-display)',
+                color: getContrastColor(pendingD1Team.primaryColor || '#1a1a2e'),
+              }}
+            >
+              #{pendingTeamData?.seed} seed
+            </div>
+          </div>
+        )}
       </div>
     )
   }

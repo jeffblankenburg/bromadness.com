@@ -382,52 +382,73 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
             return (
               <div key={parlay.id} className={`bg-zinc-800/50 rounded-xl border ${config.border} overflow-hidden`}>
                 {/* Collapsible Header */}
-                <button
-                  onClick={() => toggleParlay(parlay.id)}
-                  className="w-full p-4 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-orange-400">
-                      {getUserName(parlay.user_id)}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${config.bg} ${config.text}`}>
-                      {config.label}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {picks.map(pick => (
-                        pick.is_correct === true ? (
-                          <svg key={pick.id} className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
-                        ) : pick.is_correct === false ? (
-                          <svg key={pick.id} className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
-                        ) : (
-                          <svg key={pick.id} className="w-4 h-4 text-zinc-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          </svg>
-                        )
-                      ))}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-sm text-zinc-300">${parlay.bet_amount}</span>
-                      <span className="text-zinc-500"> &rarr; </span>
-                      <span className={parlay.status === 'won' ? 'text-yellow-400 font-bold text-sm' : 'text-zinc-400 text-sm'}>${payout}</span>
+                <div className="p-4 flex items-center gap-3">
+                  {/* Clickable area to expand/collapse */}
+                  <div
+                    onClick={() => toggleParlay(parlay.id)}
+                    className="flex-1 flex items-center justify-between cursor-pointer min-w-0"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium text-orange-400 truncate">
+                        {getUserName(parlay.user_id)}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${config.bg} ${config.text}`}>
+                        {config.label}
+                      </span>
+                      <span className="flex items-center gap-1 flex-shrink-0">
+                        {picks.map(pick => (
+                          pick.is_correct === true ? (
+                            <svg key={pick.id} className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          ) : pick.is_correct === false ? (
+                            <svg key={pick.id} className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          ) : (
+                            <svg key={pick.id} className="w-4 h-4 text-zinc-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          )
+                        ))}
+                      </span>
                     </div>
-                    <svg
-                      className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                    </svg>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="text-right">
+                        <span className="text-sm text-zinc-300">${parlay.bet_amount}</span>
+                        <span className="text-zinc-500"> &rarr; </span>
+                        <span className={parlay.status === 'won' ? 'text-yellow-400 font-bold text-sm' : 'text-zinc-400 text-sm'}>${payout}</span>
+                      </div>
+                      <svg
+                        className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                      </svg>
+                    </div>
                   </div>
-                </button>
+
+                  {/* Payment toggle - always visible */}
+                  <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+                    <button
+                      onClick={() => handleToggleHasPaid(parlay)}
+                      disabled={saving === `has_paid_${parlay.id}`}
+                      className={`relative w-10 h-6 rounded-full transition-colors ${
+                        parlay.has_paid ? 'bg-green-600' : 'bg-zinc-700'
+                      } ${saving === `has_paid_${parlay.id}` ? 'opacity-50' : ''}`}
+                      title={parlay.has_paid ? 'Paid' : 'Not paid'}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          parlay.has_paid ? 'translate-x-4' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
 
                 {/* Expanded Content */}
                 {isExpanded && (
@@ -437,26 +458,18 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
                       {picks.map(pick => renderPickGameCard(pick))}
                     </div>
 
-                    {/* Footer: toggles */}
-                    <div className="flex items-center justify-end gap-4 pt-1 border-t border-zinc-700/50">
-                      {/* Entry payment toggle - always visible */}
-                      {renderToggle(
-                        parlay.has_paid,
-                        saving === `has_paid_${parlay.id}`,
-                        () => handleToggleHasPaid(parlay),
-                        `${getUserName(parlay.user_id)} Paid`,
-                        'text-green-400'
-                      )}
-
-                      {/* Winner payout toggle - only for won parlays */}
-                      {parlay.status === 'won' && renderToggle(
-                        parlay.is_paid,
-                        saving === `is_paid_${parlay.id}`,
-                        () => handleToggleIsPaid(parlay),
-                        `Paid ${getUserName(parlay.user_id)}`,
-                        'text-yellow-400'
-                      )}
-                    </div>
+                    {/* Footer: winner payout toggle (only for won parlays) */}
+                    {parlay.status === 'won' && (
+                      <div className="flex items-center justify-end gap-4 pt-1 border-t border-zinc-700/50">
+                        {renderToggle(
+                          parlay.is_paid,
+                          saving === `is_paid_${parlay.id}`,
+                          () => handleToggleIsPaid(parlay),
+                          `Paid ${getUserName(parlay.user_id)}`,
+                          'text-yellow-400'
+                        )}
+                      </div>
+                    )}
                     <div className="text-[10px] text-zinc-600 text-right">
                       {new Date(parlay.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </div>
