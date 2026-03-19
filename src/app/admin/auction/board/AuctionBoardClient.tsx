@@ -297,47 +297,51 @@ export function AuctionBoardClient({
     )
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {[row1, row2].map((row, i) => (
-        <div
-          key={i}
-          className="flex-1 grid min-h-0 border-b border-zinc-700"
-          style={{ gridTemplateColumns: `repeat(${colsPerRow}, 1fr)` }}
-        >
-          {row.map(renderParticipant)}
-        </div>
-      ))}
+  const emptySlots = colsPerRow - row3.length
 
-      {/* Bottom row with optional "Next Up" block */}
-      <div
-        className="flex-1 grid min-h-0"
-        style={{ gridTemplateColumns: `repeat(${colsPerRow}, 1fr)` }}
-      >
-        {row3.map(renderParticipant)}
-        {lastRowHasEmpty && currentThrowerName && (
-          <div className="flex items-center justify-center bg-orange-500" style={{ gridColumn: `span ${colsPerRow - row3.length}` }}>
-            <div className="text-center">
-              <div className="text-black text-lg font-bold uppercase tracking-wider opacity-60" style={{ fontFamily: 'var(--font-display)' }}>
-                Next Up
-              </div>
-              <div className="text-black text-5xl font-black leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                {currentThrowerName}
-              </div>
-              {onDeckName && (
-                <>
-                  <div className="text-black text-sm font-bold uppercase tracking-wider opacity-40 mt-4" style={{ fontFamily: 'var(--font-display)' }}>
-                    On Deck
-                  </div>
-                  <div className="text-black text-2xl font-black leading-tight opacity-70" style={{ fontFamily: 'var(--font-display)' }}>
-                    {onDeckName}
-                  </div>
-                </>
-              )}
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black grid"
+      style={{
+        gridTemplateColumns: `repeat(${colsPerRow}, 1fr)`,
+        gridTemplateRows: 'repeat(3, 1fr)',
+      }}
+    >
+      {/* Row 1 */}
+      {row1.map(p => renderParticipant(p))}
+
+      {/* Row 2 */}
+      {row2.map(p => renderParticipant(p))}
+
+      {/* Row 3 */}
+      {row3.map(p => renderParticipant(p))}
+
+      {/* Next Up / On Deck block fills remaining slot(s) */}
+      {emptySlots > 0 && currentThrowerName && (
+        <div
+          className="flex items-center justify-center bg-orange-500"
+          style={{ gridColumn: `span ${emptySlots}` }}
+        >
+          <div className="text-center">
+            <div className="text-black text-lg font-bold uppercase tracking-wider opacity-60" style={{ fontFamily: 'var(--font-display)' }}>
+              Next Up
             </div>
+            <div className="text-black text-5xl font-black leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              {currentThrowerName}
+            </div>
+            {onDeckName && (
+              <>
+                <div className="text-black text-sm font-bold uppercase tracking-wider opacity-40 mt-4" style={{ fontFamily: 'var(--font-display)' }}>
+                  On Deck
+                </div>
+                <div className="text-black text-2xl font-black leading-tight opacity-70" style={{ fontFamily: 'var(--font-display)' }}>
+                  {onDeckName}
+                </div>
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
