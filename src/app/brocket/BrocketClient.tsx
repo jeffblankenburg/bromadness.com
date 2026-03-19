@@ -233,10 +233,12 @@ export function BrocketClient({
 
   // Build a map of R2 game ID -> feeder R1 games for projected matchups
   // R1 games have next_game_id pointing to R2 games, is_team1_slot indicates which slot
-  const getR2ProjectedTeams = (r2GameId: string): { team1: Team | null; team2: Team | null } => {
+  const getR2ProjectedTeams = (r2GameId: string): { team1: Team | null; team2: Team | null; team1Eliminated: boolean; team2Eliminated: boolean } => {
     const feederGames = r1Games.filter(g => g.next_game_id === r2GameId)
     let projectedTeam1: Team | null = null
     let projectedTeam2: Team | null = null
+    let team1Eliminated = false
+    let team2Eliminated = false
 
     for (const feeder of feederGames) {
       // Resolve teams including play-in synthetic teams for empty slots
@@ -249,14 +251,19 @@ export function BrocketClient({
         ? (resolvedTeam1?.id === pickTeamId ? resolvedTeam1 : resolvedTeam2?.id === pickTeamId ? resolvedTeam2 : null)
         : null
 
+      // Check if the picked team was eliminated in R1
+      const eliminated = !!(pick && feeder.winner_id && feeder.winner_id !== pick.id)
+
       if (feeder.is_team1_slot === true) {
         projectedTeam1 = pick
+        team1Eliminated = eliminated
       } else if (feeder.is_team1_slot === false) {
         projectedTeam2 = pick
+        team2Eliminated = eliminated
       }
     }
 
-    return { team1: projectedTeam1, team2: projectedTeam2 }
+    return { team1: projectedTeam1, team2: projectedTeam2, team1Eliminated, team2Eliminated }
   }
 
   // Get games for selected region (sorted by bracket order)
@@ -437,6 +444,8 @@ export function BrocketClient({
     let team2 = game.team2
     let team1IsPlayIn = false
     let team2IsPlayIn = false
+    let team1Eliminated = false
+    let team2Eliminated = false
 
     // For Round 1, fill in play-in game info for empty slots
     if (game.round === 1) {
@@ -455,6 +464,8 @@ export function BrocketClient({
       const projected = getR2ProjectedTeams(game.id)
       team1 = projected.team1
       team2 = projected.team2
+      team1Eliminated = projected.team1Eliminated
+      team2Eliminated = projected.team2Eliminated
     }
 
     // Check if both teams are available (for R2, user may not have made all R1 picks)
@@ -470,7 +481,7 @@ export function BrocketClient({
     const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
     const gameLocked = isGameLocked(game)
 
-    const renderTeamRow = (team: Team | null, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isPlayIn = false) => {
+    const renderTeamRow = (team: Team | null, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isPlayIn = false, isEliminated = false) => {
       if (!team) {
         return (
           <div className="w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-zinc-700/30">
@@ -488,7 +499,9 @@ export function BrocketClient({
       const isCorrect = isPicked && isWinner
 
       let ringClass = ''
-      if (isPicked) {
+      if (isEliminated) {
+        ringClass = 'ring-2 ring-red-500'
+      } else if (isPicked) {
         ringClass = isComplete
           ? (isCorrect ? 'ring-2 ring-green-500' : 'ring-2 ring-red-500')
           : 'ring-2 ring-orange-500'
@@ -557,8 +570,8 @@ export function BrocketClient({
             <span className="px-1 py-0.5 bg-zinc-800 rounded">{game.channel}</span>
           )}
         </div>
-        {renderTeamRow(team1, d1Top, logoTop, team1IsPlayIn)}
-        {renderTeamRow(team2, d1Bottom, logoBottom, team2IsPlayIn)}
+        {renderTeamRow(team1, d1Top, logoTop, team1IsPlayIn, team1Eliminated)}
+        {renderTeamRow(team2, d1Bottom, logoBottom, team2IsPlayIn, team2Eliminated)}
       </div>
     )
   }
