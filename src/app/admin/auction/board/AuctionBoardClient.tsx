@@ -183,12 +183,15 @@ export function AuctionBoardClient({
     (draftOrderIndex.get(a.user.id) ?? 99) - (draftOrderIndex.get(b.user.id) ?? 99)
   )
 
+  const getTeamCount = (userId: string) =>
+    auctionTeams.filter(a => a.user_id === userId).length
+
   const getPaidTeamCount = (userId: string) =>
     auctionTeams.filter(a => a.user_id === userId && a.bid_amount > 0).length
 
   const isPlayerDone = (userId: string) => getPaidTeamCount(userId) >= teamsPerPlayer
 
-  const totalPaidTeams = draftOrder.reduce((sum, u) => sum + getPaidTeamCount(u.id), 0)
+  const totalAssignedTeams = draftOrder.reduce((sum, u) => sum + getTeamCount(u.id), 0)
 
   const truncName = (user: User) => {
     const full = user.display_name || user.phone
@@ -199,7 +202,7 @@ export function AuctionBoardClient({
   const getNextTwoThrowers = () => {
     if (draftOrder.length === 0) return { currentId: null, currentName: null, onDeckName: null }
 
-    let baseIndex = totalPaidTeams % draftOrder.length
+    let baseIndex = totalAssignedTeams % draftOrder.length
     let attempts = 0
     while (isPlayerDone(draftOrder[baseIndex].id) && attempts < draftOrder.length) {
       baseIndex = (baseIndex + 1) % draftOrder.length

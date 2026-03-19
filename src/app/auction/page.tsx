@@ -159,11 +159,12 @@ export default async function AuctionPage() {
       .map(e => e.user_id)
   )
 
-  // Get completed games to determine winners
+  // Get completed games to determine winners (exclude play-in round 0)
   const { data: games } = await supabase
     .from('games')
     .select('id, round, winner_id')
     .eq('tournament_id', tournament.id)
+    .gt('round', 0)
     .not('winner_id', 'is', null)
 
   // Calculate points for each user
