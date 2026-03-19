@@ -502,15 +502,23 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     }
   }
 
+  // Play-in (First Four) games - round 0
+  const playInGames = games.filter(g => g.round === 0)
+
+  // Teams that lost a resolved play-in game (exclude from region counts)
+  const playInLoserIds = new Set(
+    playInGames
+      .filter(g => g.winner_id)
+      .map(g => g.team1_id === g.winner_id ? g.team2_id : g.team1_id)
+      .filter((id): id is string => id !== null)
+  )
+
   const currentRegion = sortedRegions.find(r => r.id === activeTab)
-  const regionTeamCount = teams.filter(t => t.region_id === activeTab).length
+  const regionTeamCount = teams.filter(t => t.region_id === activeTab && !playInLoserIds.has(t.id)).length
   const isFirstFourTab = activeTab === FIRST_FOUR_TAB
   const isRegionTab = currentRegion !== undefined
   const isFinalFourTab = activeTab === FINAL_FOUR_TAB
   const isChampionshipTab = activeTab === CHAMPIONSHIP_TAB
-
-  // Play-in (First Four) games - round 0
-  const playInGames = games.filter(g => g.round === 0)
 
   // Get Final Four games (round 5)
   const finalFourGames = games.filter(g => g.round === 5).sort((a, b) => a.game_number - b.game_number)
@@ -525,7 +533,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
       {/* Region Tabs */}
       <div className="flex gap-1 bg-zinc-800/50 p-1 rounded-xl">
         {sortedRegions.map((region) => {
-          const count = teams.filter(t => t.region_id === region.id).length
+          const count = teams.filter(t => t.region_id === region.id && !playInLoserIds.has(t.id)).length
           const isActive = region.id === activeTab
           return (
             <button

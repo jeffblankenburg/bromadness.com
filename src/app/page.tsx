@@ -22,17 +22,17 @@ import { getEasternNow } from '@/lib/timezone'
 function getTournamentDay(startDate: string | null): string {
   if (!startDate) return 'Wednesday'
 
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
   const start = new Date(startDate + 'T00:00:00')
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
-  const days = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
-  if (diffDays < 0) return 'Wednesday' // Before tournament, show Wednesday
-  if (diffDays > 4) return 'Sunday' // After tournament, show Sunday
-  return days[diffDays]
+  if (diffDays < 0) return dayNames[start.getDay()] // Before tournament, show start day
+  if (diffDays > 4) return dayNames[(start.getDay() + 4) % 7] // After tournament, show last day
+  return dayNames[(start.getDay() + diffDays) % 7]
 }
 
 export default async function Home() {
