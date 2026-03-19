@@ -31,11 +31,12 @@ export default async function AuctionPage() {
     .select('id, display_name, phone')
     .order('display_name')
 
-  // Get all teams for this tournament
+  // Get all teams for this tournament (exclude play-in losers)
   const { data: teams } = await supabase
     .from('teams')
     .select('id, name, short_name, seed, region_id')
     .eq('tournament_id', tournament.id)
+    .eq('is_eliminated', false)
     .order('seed')
 
   // Get auction assignments
