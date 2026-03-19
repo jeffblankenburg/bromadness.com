@@ -538,7 +538,7 @@ export default async function AuctionPage() {
       {!auctionComplete && regions && regions.length > 0 && (
         <AuctionTeamList
           regions={regions}
-          teams={teams || []}
+          teams={(teams || []).filter(t => !t.is_eliminated)}
           auctionTeams={auctionTeams || []}
           users={users || []}
         />
