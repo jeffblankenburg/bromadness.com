@@ -51,6 +51,8 @@ export default async function AuctionBoardPage() {
       tournamentName={tournament.name}
       salaryCap={tournament.salary_cap ?? 100}
       teamsPerPlayer={tournament.teams_per_player ?? 3}
+      auctionOrderSeed={tournament.auction_order_seed || tournament.id}
+      firstParticipantId={tournament.auction_first_participant_id ?? null}
       users={users || []}
       teams={teams || []}
       initialAuctionTeams={auctionTeams || []}
