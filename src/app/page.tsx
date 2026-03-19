@@ -187,6 +187,7 @@ export default async function Home() {
         .from('games')
         .select('winner_id')
         .eq('tournament_id', tournament.id)
+        .gt('round', 0)
         .not('winner_id', 'is', null),
       supabase
         .from('auction_teams')
