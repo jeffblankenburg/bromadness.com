@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminNav } from './AdminNav'
+import { PullToRefresh } from '@/components/PullToRefresh'
 
 export default async function AdminLayout({
   children,
@@ -26,15 +27,17 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white">
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur sticky top-0 z-40">
-        <div className="px-4 py-3">
-          <AdminNav />
+    <PullToRefresh>
+      <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-black text-white">
+        <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur sticky top-0 z-40">
+          <div className="px-4 py-3">
+            <AdminNav />
+          </div>
+        </header>
+        <div className="p-4">
+          {children}
         </div>
-      </header>
-      <div className="p-4">
-        {children}
       </div>
-    </div>
+    </PullToRefresh>
   )
 }

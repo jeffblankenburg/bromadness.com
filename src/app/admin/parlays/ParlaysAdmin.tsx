@@ -168,7 +168,8 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
 
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId)
-    return user?.display_name || 'Unknown'
+    const name = user?.display_name || 'Unknown'
+    return name.length > 9 ? name.slice(0, 9) : name
   }
 
   const toggleParlay = (parlayId: string) => {
@@ -392,9 +393,11 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
                       <span className="text-sm font-medium text-orange-400 truncate">
                         {getUserName(parlay.user_id)}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${config.bg} ${config.text}`}>
-                        {config.label}
-                      </span>
+                      {parlay.status !== 'open' && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${config.bg} ${config.text}`}>
+                          {config.label}
+                        </span>
+                      )}
                       <span className="flex items-center gap-1 flex-shrink-0">
                         {picks.map(pick => (
                           pick.is_correct === true ? (
