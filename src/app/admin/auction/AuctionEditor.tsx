@@ -17,6 +17,7 @@ interface Team {
   short_name: string | null
   seed: number
   region_id: string
+  is_eliminated: boolean
 }
 
 interface Region {
@@ -407,6 +408,47 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
     }
   }
 
+  const [recalculating, setRecalculating] = useState(false)
+
+  const handleRecalculateEliminations = async () => {
+    setRecalculating(true)
+    try {
+      // 1. Reset all teams to not eliminated
+      await supabase
+        .from('teams')
+        .update({ is_eliminated: false })
+        .eq('tournament_id', tournamentId)
+
+      // 2. Get all completed games (have a winner)
+      const { data: completedGames } = await supabase
+        .from('games')
+        .select('team1_id, team2_id, winner_id')
+        .eq('tournament_id', tournamentId)
+        .not('winner_id', 'is', null)
+
+      if (completedGames && completedGames.length > 0) {
+        // 3. Collect all loser IDs
+        const loserIds = completedGames
+          .map(g => g.team1_id === g.winner_id ? g.team2_id : g.team1_id)
+          .filter((id): id is string => id !== null)
+
+        // 4. Mark all losers as eliminated in one call
+        if (loserIds.length > 0) {
+          await supabase
+            .from('teams')
+            .update({ is_eliminated: true })
+            .in('id', loserIds)
+        }
+      }
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to recalculate eliminations:', err)
+    } finally {
+      setRecalculating(false)
+    }
+  }
+
   // Group teams by region
   const teamsByRegion = regions.map(region => ({
     region,
@@ -583,7 +625,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
               return (
                 <div
                   key={team.id}
-                  className="flex items-center gap-2 p-2 rounded-lg"
+                  className={`flex items-center gap-2 p-2 rounded-lg ${team.is_eliminated ? 'opacity-40' : ''}`}
                   style={{ backgroundColor: d1Team ? d1Team.primaryColor + '30' : '#3f3f4620' }}
                 >
                   <button
@@ -769,7 +811,7 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
                   return (
                     <div
                       key={team.id}
-                      className="flex items-center gap-2 p-2 rounded-lg"
+                      className={`flex items-center gap-2 p-2 rounded-lg ${team.is_eliminated ? 'opacity-40' : ''}`}
                       style={{ backgroundColor: d1Team ? d1Team.primaryColor + '30' : '#3f3f4620' }}
                     >
                       <button
@@ -824,6 +866,15 @@ export function AuctionEditor({ tournamentId, users, teams, regions, auctionTeam
           </div>
         )
       })}
+
+      {/* Recalculate Eliminations */}
+      <button
+        onClick={handleRecalculateEliminations}
+        disabled={recalculating}
+        className="w-full py-2 px-4 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 text-sm font-medium rounded-xl transition-colors"
+      >
+        {recalculating ? 'Recalculating...' : 'Recalculate Eliminations'}
+      </button>
     </div>
   )
 }
