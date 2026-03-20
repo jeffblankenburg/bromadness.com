@@ -223,7 +223,7 @@ export async function POST(request: Request) {
       console.error('Error creating parlay picks:', picksError)
       // Clean up the parlay if picks failed
       await dbClient.from('parlays').delete().eq('id', parlay.id)
-      return NextResponse.json({ error: 'Failed to create parlay picks' }, { status: 500 })
+      return NextResponse.json({ error: `Failed to create parlay picks: ${picksError.message}` }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, parlayId: parlay.id })
