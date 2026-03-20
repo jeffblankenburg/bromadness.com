@@ -235,10 +235,11 @@ export function PickemClient({
   // Check if this day has no games yet
   const dayHasNoGames = !currentDay || dayGames.length === 0
 
-  // Split into sessions
+  // Split into sessions (skip for Saturday — single session)
+  const isSingleSession = selectedDayName === 'Saturday' || selectedDayName === 'Sunday'
   const midpoint = Math.ceil(dayGames.length / 2)
-  const session1Games = dayGames.slice(0, midpoint)
-  const session2Games = dayGames.slice(midpoint)
+  const session1Games = isSingleSession ? dayGames : dayGames.slice(0, midpoint)
+  const session2Games = isSingleSession ? [] : dayGames.slice(midpoint)
 
   // Auto-collapse early sessions once all early games are complete (once per day)
   useEffect(() => {
@@ -906,6 +907,14 @@ export function PickemClient({
           </div>
         )
 
+        if (isSingleSession) {
+          return (
+            <div className="space-y-2">
+              {dayGames.map(game => renderGame(game))}
+            </div>
+          )
+        }
+
         return (
           <div className="space-y-4">
             {lateGamesStarted ? (
@@ -936,7 +945,7 @@ export function PickemClient({
           {/* Payouts */}
           {(sessionPayouts.first > 0 || sessionPayouts.second > 0 || sessionPayouts.third > 0) && (
             <div className="bg-zinc-800/50 rounded-xl px-4 py-3 text-center">
-              <div className="text-xs text-zinc-500 mb-1">Session Payouts</div>
+              <div className="text-xs text-zinc-500 mb-1">{isSingleSession ? 'Payouts' : 'Session Payouts'}</div>
               <div className="flex justify-center gap-6 text-sm">
                 <span><span className="text-yellow-400">1st</span> ${sessionPayouts.first}</span>
                 <span><span className="text-zinc-300">2nd</span> ${sessionPayouts.second}</span>
@@ -945,49 +954,57 @@ export function PickemClient({
             </div>
           )}
 
-          {/* Session 1 Leaderboard */}
-          <div>
-            <button
-              onClick={toggleEarlyLeaderboard}
-              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
-                earlyLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
-              }`}
-            >
-              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 1 - Early Games</h3>
-              <svg
-                className={`w-4 h-4 text-zinc-400 transition-transform ${earlyLeaderboardExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-              </svg>
-            </button>
-            {earlyLeaderboardExpanded && renderLeaderboard(session1Games, 'Session 1')}
-          </div>
+          {isSingleSession ? (
+            <div>
+              {renderLeaderboard(dayGames, 'Saturday')}
+            </div>
+          ) : (
+            <>
+              {/* Session 1 Leaderboard */}
+              <div>
+                <button
+                  onClick={toggleEarlyLeaderboard}
+                  className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                    earlyLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+                  }`}
+                >
+                  <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 1 - Early Games</h3>
+                  <svg
+                    className={`w-4 h-4 text-zinc-400 transition-transform ${earlyLeaderboardExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                  </svg>
+                </button>
+                {earlyLeaderboardExpanded && renderLeaderboard(session1Games, 'Session 1')}
+              </div>
 
-          {/* Session 2 Leaderboard */}
-          <div>
-            <button
-              onClick={toggleLateLeaderboard}
-              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
-                lateLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
-              }`}
-            >
-              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 2 - Late Games</h3>
-              <svg
-                className={`w-4 h-4 text-zinc-400 transition-transform ${lateLeaderboardExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-              </svg>
-            </button>
-            {lateLeaderboardExpanded && renderLeaderboard(session2Games, 'Session 2')}
-          </div>
+              {/* Session 2 Leaderboard */}
+              <div>
+                <button
+                  onClick={toggleLateLeaderboard}
+                  className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                    lateLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+                  }`}
+                >
+                  <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 2 - Late Games</h3>
+                  <svg
+                    className={`w-4 h-4 text-zinc-400 transition-transform ${lateLeaderboardExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                  </svg>
+                </button>
+                {lateLeaderboardExpanded && renderLeaderboard(session2Games, 'Session 2')}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
