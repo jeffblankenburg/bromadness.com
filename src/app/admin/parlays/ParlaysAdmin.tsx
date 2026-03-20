@@ -91,8 +91,68 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
   const [activeFilter, setActiveFilter] = useState<'all' | 'open' | 'won' | 'lost'>('all')
   const [saving, setSaving] = useState<string | null>(null)
   const [expandedParlays, setExpandedParlays] = useState<Record<string, boolean>>({})
+  const [resolving, setResolving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Detect unresolved picks on completed games
+  const unresolvedPicks = parlayPicks.filter(pick => {
+    if (pick.is_correct !== null) return false
+    const game = games.find(g => g.id === pick.game_id)
+    return game?.winner_id !== null
+  })
+
+  const handleResolveAll = async () => {
+    setResolving(true)
+    try {
+      const affectedParlayIds = new Set<string>()
+
+      for (const pick of unresolvedPicks) {
+        const game = games.find(g => g.id === pick.game_id)
+        if (!game || !game.team1 || !game.team2 || game.spread === null || game.team1_score === null || game.team2_score === null) continue
+
+        const margin = game.team1_score - game.team2_score
+        const team1IsLowerSeed = game.team1.seed < game.team2.seed
+        const adjustedMargin = team1IsLowerSeed
+          ? margin + game.spread
+          : margin - game.spread
+        const spreadWinnerId = adjustedMargin > 0 ? game.team1.id : game.team2.id
+
+        const isCorrect = pick.picked_team_id === spreadWinnerId
+        await supabase
+          .from('parlay_picks')
+          .update({ is_correct: isCorrect })
+          .eq('id', pick.id)
+
+        affectedParlayIds.add(pick.parlay_id)
+      }
+
+      // Re-evaluate status for each affected parlay
+      for (const parlayId of affectedParlayIds) {
+        const { data: allPicks } = await supabase
+          .from('parlay_picks')
+          .select('is_correct')
+          .eq('parlay_id', parlayId)
+
+        if (!allPicks) continue
+
+        const hasLoss = allPicks.some(p => p.is_correct === false)
+        const allCorrect = allPicks.every(p => p.is_correct === true)
+        const newStatus = hasLoss ? 'lost' : allCorrect ? 'won' : 'open'
+
+        await supabase
+          .from('parlays')
+          .update({ status: newStatus })
+          .eq('id', parlayId)
+      }
+
+      router.refresh()
+    } catch (err) {
+      console.error('Failed to re-resolve parlays:', err)
+    } finally {
+      setResolving(false)
+    }
+  }
 
   const filteredParlays = activeFilter === 'all'
     ? localParlays
@@ -346,6 +406,27 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
           </div>
         </div>
       </div>
+
+      {/* Unresolved Picks Warning */}
+      {unresolvedPicks.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-yellow-400 text-sm font-medium">
+              {unresolvedPicks.length} unresolved pick{unresolvedPicks.length !== 1 ? 's' : ''} on completed games
+            </div>
+            <div className="text-yellow-400/60 text-xs mt-0.5">
+              These picks were not resolved when results were entered.
+            </div>
+          </div>
+          <button
+            onClick={handleResolveAll}
+            disabled={resolving}
+            className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {resolving ? 'Resolving...' : 'Re-resolve'}
+          </button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2">
