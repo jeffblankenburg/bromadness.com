@@ -237,7 +237,7 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
   }
 
   const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
-    open: { label: 'Open', bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30' },
+    open: { label: 'Open', bg: 'bg-zinc-500/20', text: 'text-zinc-400', border: 'border-zinc-500/30' },
     lost: { label: 'Lost', bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
     won: { label: 'Won', bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/30' },
   }
@@ -456,7 +456,15 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
       ) : (
         <div className="space-y-3">
           {filteredParlays.map(parlay => {
-            const picks = parlayPicks.filter(p => p.parlay_id === parlay.id)
+            const picks = parlayPicks
+              .filter(p => p.parlay_id === parlay.id)
+              .sort((a, b) => {
+                const gameA = games.find(g => g.id === a.game_id)
+                const gameB = games.find(g => g.id === b.game_id)
+                const timeA = gameA?.scheduled_at ? new Date(gameA.scheduled_at).getTime() : 0
+                const timeB = gameB?.scheduled_at ? new Date(gameB.scheduled_at).getTime() : 0
+                return timeA - timeB
+              })
             const config = statusConfig[parlay.status] || statusConfig.open
             const payout = parlay.bet_amount * 9
             const isExpanded = expandedParlays[parlay.id] ?? false
