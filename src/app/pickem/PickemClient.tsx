@@ -165,7 +165,13 @@ export function PickemClient({
     return getEasternNow()
   }
 
-  const [selectedDayName, setSelectedDayName] = useState(enabledDays[0] || 'Thursday')
+  // Default to today's day if it's an enabled day, otherwise first enabled day
+  const getDefaultDay = () => {
+    const now = simulatedTime ? parseTimestamp(simulatedTime) : serverNow ? new Date(serverNow) : getEasternNow()
+    const todayName = now.toLocaleDateString('en-US', { weekday: 'long' })
+    return enabledDays.includes(todayName) ? todayName : (enabledDays[0] || 'Thursday')
+  }
+  const [selectedDayName, setSelectedDayName] = useState(getDefaultDay)
   const [activeTab, setActiveTab] = useState<'picks' | 'leaderboard'>('picks')
   const [localPicks, setLocalPicks] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
