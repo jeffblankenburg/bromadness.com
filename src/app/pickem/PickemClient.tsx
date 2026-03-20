@@ -171,6 +171,8 @@ export function PickemClient({
   const [saving, setSaving] = useState(false)
   const [earlyGamesExpanded, setEarlyGamesExpanded] = useState(true)
   const [lateGamesExpanded, setLateGamesExpanded] = useState(true)
+  const [earlyLeaderboardExpanded, setEarlyLeaderboardExpanded] = useState(true)
+  const [lateLeaderboardExpanded, setLateLeaderboardExpanded] = useState(true)
   const [expandedLeaderboardUsers, setExpandedLeaderboardUsers] = useState<Set<string>>(new Set())
   const router = useRouter()
   const supabase = createClient()
@@ -185,6 +187,10 @@ export function PickemClient({
     const storedLate = localStorage.getItem('pickem-late-expanded')
     if (storedEarly !== null) setEarlyGamesExpanded(storedEarly === 'true')
     if (storedLate !== null) setLateGamesExpanded(storedLate === 'true')
+    const storedEarlyLb = localStorage.getItem('pickem-early-lb-expanded')
+    const storedLateLb = localStorage.getItem('pickem-late-lb-expanded')
+    if (storedEarlyLb !== null) setEarlyLeaderboardExpanded(storedEarlyLb === 'true')
+    if (storedLateLb !== null) setLateLeaderboardExpanded(storedLateLb === 'true')
   }, [])
 
   const handleTabChange = (tab: 'picks' | 'leaderboard') => {
@@ -204,6 +210,18 @@ export function PickemClient({
     localStorage.setItem('pickem-late-expanded', String(newValue))
   }
 
+  const toggleEarlyLeaderboard = () => {
+    const newValue = !earlyLeaderboardExpanded
+    setEarlyLeaderboardExpanded(newValue)
+    localStorage.setItem('pickem-early-lb-expanded', String(newValue))
+  }
+
+  const toggleLateLeaderboard = () => {
+    const newValue = !lateLeaderboardExpanded
+    setLateLeaderboardExpanded(newValue)
+    localStorage.setItem('pickem-late-lb-expanded', String(newValue))
+  }
+
   // Find the pickem_day that matches the selected day name
   const currentDay = pickemDays.find(d => formatDayName(d.contest_date) === selectedDayName)
 
@@ -221,6 +239,20 @@ export function PickemClient({
   const midpoint = Math.ceil(dayGames.length / 2)
   const session1Games = dayGames.slice(0, midpoint)
   const session2Games = dayGames.slice(midpoint)
+
+  // Auto-collapse early sessions once all early games are complete (once per day)
+  useEffect(() => {
+    if (session1Games.length > 0 && session1Games.every(g => g.winner_id !== null)) {
+      const autoCollapseKey = `pickem-early-auto-collapsed-${currentDay?.id || ''}`
+      if (localStorage.getItem(autoCollapseKey) !== 'true') {
+        setEarlyGamesExpanded(false)
+        localStorage.setItem('pickem-early-expanded', 'false')
+        setEarlyLeaderboardExpanded(false)
+        localStorage.setItem('pickem-early-lb-expanded', 'false')
+        localStorage.setItem(autoCollapseKey, 'true')
+      }
+    }
+  }, [session1Games, currentDay?.id])
 
   // Get session payouts from manual day prizes
   const sessionPayouts = dayPrizes[selectedDayName] || { first: 0, second: 0, third: 0 }
@@ -810,7 +842,9 @@ export function PickemClient({
           <div>
             <button
               onClick={toggleEarlyGames}
-              className="w-full flex items-center justify-between py-2"
+              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                earlyGamesExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+              }`}
             >
               <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Early Games</h3>
               <div className="flex items-center gap-2">
@@ -842,7 +876,9 @@ export function PickemClient({
           <div>
             <button
               onClick={toggleLateGames}
-              className="w-full flex items-center justify-between py-2"
+              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                lateGamesExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+              }`}
             >
               <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Late Games</h3>
               <div className="flex items-center gap-2">
@@ -911,14 +947,46 @@ export function PickemClient({
 
           {/* Session 1 Leaderboard */}
           <div>
-            <h3 className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 1 - Early Games</h3>
-            {renderLeaderboard(session1Games, 'Session 1')}
+            <button
+              onClick={toggleEarlyLeaderboard}
+              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                earlyLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+              }`}
+            >
+              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 1 - Early Games</h3>
+              <svg
+                className={`w-4 h-4 text-zinc-400 transition-transform ${earlyLeaderboardExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {earlyLeaderboardExpanded && renderLeaderboard(session1Games, 'Session 1')}
           </div>
 
           {/* Session 2 Leaderboard */}
           <div>
-            <h3 className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 2 - Late Games</h3>
-            {renderLeaderboard(session2Games, 'Session 2')}
+            <button
+              onClick={toggleLateLeaderboard}
+              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                lateLeaderboardExpanded ? '' : 'bg-zinc-800 hover:bg-zinc-700'
+              }`}
+            >
+              <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide" style={{ fontFamily: 'var(--font-display)' }}>Session 2 - Late Games</h3>
+              <svg
+                className={`w-4 h-4 text-zinc-400 transition-transform ${lateLeaderboardExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {lateLeaderboardExpanded && renderLeaderboard(session2Games, 'Session 2')}
           </div>
         </div>
       )}
