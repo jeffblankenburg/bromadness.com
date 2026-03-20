@@ -46,7 +46,7 @@ export default async function AdminParlaysPage() {
   const { data: parlayPicks } = parlayIds.length > 0
     ? await supabase
         .from('parlay_picks')
-        .select('id, parlay_id, game_id, picked_team_id, is_correct')
+        .select('id, parlay_id, game_id, picked_team_id, is_correct, pick_type, picked_over_under')
         .in('parlay_id', parlayIds)
     : { data: [] }
 
@@ -57,7 +57,7 @@ export default async function AdminParlaysPage() {
         .from('games')
         .select(`
           id, scheduled_at, team1_score, team2_score, winner_id,
-          spread, favorite_team_id, round, location, channel,
+          spread, favorite_team_id, over_under_total, round, location, channel,
           team1:teams!games_team1_id_fkey(id, name, short_name, seed),
           team2:teams!games_team2_id_fkey(id, name, short_name, seed)
         `)

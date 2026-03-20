@@ -91,10 +91,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bet amount must be between $1 and $10' }, { status: 400 })
     }
 
-    // Validate all game IDs are distinct
+    // Validate no duplicate pick types on the same game
     const gameIds = picks.map((p: { gameId: string }) => p.gameId)
-    if (new Set(gameIds).size !== 4) {
-      return NextResponse.json({ error: 'Cannot pick the same game twice' }, { status: 400 })
+    const pickKeys = picks.map((p: { gameId: string; pickType?: string }) => `${p.gameId}:${p.pickType || 'spread'}`)
+    if (new Set(pickKeys).size !== 4) {
+      return NextResponse.json({ error: 'Cannot have duplicate picks of the same type on the same game' }, { status: 400 })
     }
 
     // Check simulation mode
@@ -119,19 +120,32 @@ export async function POST(request: Request) {
 
     // Validate all picks have required fields
     for (const pick of picks) {
-      const { gameId, teamId } = pick as { gameId: string; teamId: string }
-      if (!gameId || !teamId) {
-        return NextResponse.json({ error: 'Each pick must have gameId and teamId' }, { status: 400 })
+      const { gameId, pickType } = pick as { gameId: string; pickType?: string; teamId?: string; pickedOverUnder?: string }
+      if (!gameId) {
+        return NextResponse.json({ error: 'Each pick must have gameId' }, { status: 400 })
+      }
+      const type = pickType || 'spread'
+      if (type === 'spread') {
+        if (!pick.teamId) {
+          return NextResponse.json({ error: 'Spread picks must have teamId' }, { status: 400 })
+        }
+      } else if (type === 'over_under') {
+        if (!pick.pickedOverUnder || !['over', 'under'].includes(pick.pickedOverUnder)) {
+          return NextResponse.json({ error: 'O/U picks must specify over or under' }, { status: 400 })
+        }
+      } else {
+        return NextResponse.json({ error: 'Invalid pick type' }, { status: 400 })
       }
     }
 
     // Batch fetch all games at once instead of one-by-one
+    const uniqueGameIds = [...new Set(gameIds)]
     const { data: allGames } = await supabase
       .from('games')
-      .select('id, tournament_id, spread, team1_id, team2_id, scheduled_at')
-      .in('id', gameIds)
+      .select('id, tournament_id, spread, over_under_total, team1_id, team2_id, scheduled_at')
+      .in('id', uniqueGameIds)
 
-    if (!allGames || allGames.length !== 4) {
+    if (!allGames || allGames.length !== uniqueGameIds.length) {
       return NextResponse.json({ error: 'One or more games not found' }, { status: 404 })
     }
 
@@ -142,7 +156,8 @@ export async function POST(request: Request) {
 
     // Validate all picks before inserting anything
     for (const pick of picks) {
-      const { gameId, teamId } = pick as { gameId: string; teamId: string }
+      const { gameId, teamId, pickType, pickedOverUnder } = pick as { gameId: string; teamId?: string; pickType?: string; pickedOverUnder?: string }
+      const type = pickType || 'spread'
       const game = gamesById.get(gameId)
 
       if (!game) {
@@ -153,12 +168,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Game does not belong to this tournament' }, { status: 400 })
       }
 
-      if (game.spread === null) {
-        return NextResponse.json({ error: 'Game does not have a spread assigned' }, { status: 400 })
-      }
-
-      if (teamId !== game.team1_id && teamId !== game.team2_id) {
-        return NextResponse.json({ error: 'Team does not belong to the selected game' }, { status: 400 })
+      if (type === 'spread') {
+        if (game.spread === null) {
+          return NextResponse.json({ error: 'Game does not have a spread assigned' }, { status: 400 })
+        }
+        if (teamId !== game.team1_id && teamId !== game.team2_id) {
+          return NextResponse.json({ error: 'Team does not belong to the selected game' }, { status: 400 })
+        }
+      } else {
+        if (game.over_under_total === null) {
+          return NextResponse.json({ error: 'Game does not have an O/U total assigned' }, { status: 400 })
+        }
       }
 
       if (game.scheduled_at) {
@@ -186,10 +206,12 @@ export async function POST(request: Request) {
     }
 
     // Insert the 4 picks
-    const pickRows = picks.map((p: { gameId: string; teamId: string }) => ({
+    const pickRows = picks.map((p: { gameId: string; teamId?: string; pickType?: string; pickedOverUnder?: string }) => ({
       parlay_id: parlay.id,
       game_id: p.gameId,
-      picked_team_id: p.teamId,
+      pick_type: p.pickType || 'spread',
+      picked_team_id: (p.pickType || 'spread') === 'spread' ? p.teamId : null,
+      picked_over_under: p.pickType === 'over_under' ? p.pickedOverUnder : null,
       is_correct: null,
     }))
 

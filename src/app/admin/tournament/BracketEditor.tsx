@@ -38,6 +38,7 @@ interface Game {
   scheduled_at: string | null
   spread: number | null
   favorite_team_id: string | null
+  over_under_total: number | null
   channel: string | null
   location: string | null
   next_game_id: string | null
@@ -286,6 +287,32 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
     if (error) {
       console.error('Failed to update spread:', error)
       alert('Failed to save spread: ' + error.message)
+    } else {
+      router.refresh()
+    }
+  }
+
+  const handleTotalChange = async (gameId: string, value: string) => {
+    const total = parseFloat(value)
+
+    let error
+    if (!value || isNaN(total)) {
+      const result = await supabase
+        .from('games')
+        .update({ over_under_total: null })
+        .eq('id', gameId)
+      error = result.error
+    } else {
+      const result = await supabase
+        .from('games')
+        .update({ over_under_total: total })
+        .eq('id', gameId)
+      error = result.error
+    }
+
+    if (error) {
+      console.error('Failed to update O/U total:', error)
+      alert('Failed to save O/U total: ' + error.message)
     } else {
       router.refresh()
     }
@@ -1098,7 +1125,7 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                         )}
                       </button>
                     )}
-                    {/* Record + spacer to match spread width */}
+                    {/* Record + O/U total (aligned with spread column) */}
                     {!isSelected2 && !playInName2 && (
                       <>
                         <div className="w-[52px] flex-shrink-0">
@@ -1114,7 +1141,26 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                             <span className="block w-full py-1 text-center text-[10px] text-zinc-600">—</span>
                           )}
                         </div>
-                        <div className="w-[52px] flex-shrink-0" />
+                        <div className="w-[52px] flex-shrink-0">
+                          {game?.over_under_total ? (
+                            <input
+                              type="text"
+                              defaultValue={game.over_under_total}
+                              onBlur={(e) => game && handleTotalChange(game.id, e.target.value)}
+                              className="w-full px-1 py-1 bg-zinc-900 border border-zinc-700 rounded text-center text-[10px] text-zinc-400"
+                            />
+                          ) : displayTeam1 ? (
+                            <input
+                              type="text"
+                              defaultValue=""
+                              onBlur={(e) => game && handleTotalChange(game.id, e.target.value)}
+                              placeholder="O/U"
+                              className="w-full px-1 py-1 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
+                            />
+                          ) : (
+                            <span className="block w-full py-1 text-center text-[10px] text-zinc-600">—</span>
+                          )}
+                        </div>
                       </>
                     )}
                   </div>
@@ -1293,7 +1339,26 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                                 </span>
                               )}
                             </div>
-                            <div className="w-[72px] flex-shrink-0" />
+                            <div className="w-[72px] flex-shrink-0">
+                              {game.over_under_total ? (
+                                <input
+                                  type="text"
+                                  defaultValue={game.over_under_total}
+                                  onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                                  className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
+                                />
+                              ) : team1 ? (
+                                <input
+                                  type="text"
+                                  defaultValue=""
+                                  onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                                  placeholder="O/U"
+                                  className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-[10px] text-zinc-500 placeholder-zinc-600"
+                                />
+                              ) : (
+                                <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )
@@ -1450,7 +1515,26 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                           <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
                         )}
                       </div>
-                      <div className="w-[72px] flex-shrink-0" />
+                      <div className="w-[72px] flex-shrink-0">
+                        {game.over_under_total ? (
+                          <input
+                            type="text"
+                            defaultValue={game.over_under_total}
+                            onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                            className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
+                          />
+                        ) : team1 ? (
+                          <input
+                            type="text"
+                            defaultValue=""
+                            onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                            placeholder="O/U"
+                            className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-xs text-zinc-500 placeholder-zinc-600"
+                          />
+                        ) : (
+                          <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -1603,7 +1687,26 @@ export function BracketEditor({ tournament, regions, teams, games }: Props) {
                           <span className="flex-1 text-zinc-500 italic text-sm text-center">TBD</span>
                         )}
                       </div>
-                      <div className="w-[72px] flex-shrink-0" />
+                      <div className="w-[72px] flex-shrink-0">
+                        {game.over_under_total ? (
+                          <input
+                            type="text"
+                            defaultValue={game.over_under_total}
+                            onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                            className="w-full px-2 py-2 bg-zinc-900 border border-zinc-700 rounded text-center text-xs text-zinc-400"
+                          />
+                        ) : team1 ? (
+                          <input
+                            type="text"
+                            defaultValue=""
+                            onBlur={(e) => handleTotalChange(game.id, e.target.value)}
+                            placeholder="O/U"
+                            className="w-full px-1 py-2 bg-zinc-900/50 border border-dashed border-zinc-700 rounded text-center text-xs text-zinc-500 placeholder-zinc-600"
+                          />
+                        ) : (
+                          <span className="block w-full py-2 text-center text-xs text-zinc-600">—</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )

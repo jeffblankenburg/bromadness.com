@@ -36,7 +36,7 @@ export default async function ResultsPage() {
   // Get all games with next_game info and spread
   const { data: games } = await supabase
     .from('games')
-    .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at, next_game_id, is_team1_slot, spread, favorite_team_id, location, channel')
+    .select('id, round, region_id, game_number, team1_id, team2_id, winner_id, team1_score, team2_score, scheduled_at, next_game_id, is_team1_slot, spread, favorite_team_id, over_under_total, location, channel')
     .eq('tournament_id', tournament.id)
     .order('round')
     .order('game_number')

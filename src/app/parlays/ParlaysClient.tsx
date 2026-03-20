@@ -21,6 +21,7 @@ interface Game {
   winner_id: string | null
   spread: number | null
   favorite_team_id: string | null
+  over_under_total: number | null
   round: number
   location?: string | null
   channel?: string | null
@@ -41,8 +42,10 @@ interface ParlayPick {
   id: string
   parlay_id: string
   game_id: string
-  picked_team_id: string
+  picked_team_id: string | null
   is_correct: boolean | null
+  pick_type: string
+  picked_over_under: string | null
 }
 
 interface Props {
@@ -102,8 +105,10 @@ export function ParlaysClient({
     return getEasternNow()
   }
 
+  // Each game can have a spread pick, an O/U pick, or both — each counts toward the 4-pick limit
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list')
-  const [selectedPicks, setSelectedPicks] = useState<Record<string, string>>({})
+  const [selectedSpreads, setSelectedSpreads] = useState<Record<string, string>>({}) // gameId -> teamId
+  const [selectedOverUnders, setSelectedOverUnders] = useState<Record<string, 'over' | 'under'>>({}) // gameId -> over/under
   const [betAmount, setBetAmount] = useState(1)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -112,7 +117,7 @@ export function ParlaysClient({
   const [expandedParlays, setExpandedParlays] = useState<Record<string, boolean>>({})
   const router = useRouter()
 
-  const selectedCount = Object.keys(selectedPicks).length
+  const selectedCount = Object.keys(selectedSpreads).length + Object.keys(selectedOverUnders).length
 
   // Filter games available for new parlays (not yet started, have both teams)
   const availableGames = games.filter(g => {
@@ -125,13 +130,11 @@ export function ParlaysClient({
   }
 
   const handlePickTeam = (gameId: string, teamId: string) => {
-    setSelectedPicks(prev => {
+    setSelectedSpreads(prev => {
       const next = { ...prev }
       if (next[gameId] === teamId) {
-        // Deselect
         delete next[gameId]
-      } else if (Object.keys(next).length >= 4 && !next[gameId]) {
-        // Already have 4 picks and trying to add a new game
+      } else if (selectedCount >= 4 && !next[gameId]) {
         return prev
       } else {
         next[gameId] = teamId
@@ -140,13 +143,31 @@ export function ParlaysClient({
     })
   }
 
+  const handlePickOverUnder = (gameId: string, pick: 'over' | 'under') => {
+    setSelectedOverUnders(prev => {
+      const next = { ...prev }
+      if (next[gameId] === pick) {
+        delete next[gameId]
+      } else if (selectedCount >= 4 && !next[gameId]) {
+        return prev
+      } else {
+        next[gameId] = pick
+      }
+      return next
+    })
+  }
+
   const handleSubmit = async () => {
     setSaving(true)
     try {
-      const picks = Object.entries(selectedPicks).map(([gameId, teamId]) => ({
-        gameId,
-        teamId,
-      }))
+      const picks = [
+        ...Object.entries(selectedSpreads).map(([gameId, teamId]) => ({
+          gameId, teamId, pickType: 'spread',
+        })),
+        ...Object.entries(selectedOverUnders).map(([gameId, pick]) => ({
+          gameId, pickType: 'over_under', pickedOverUnder: pick,
+        })),
+      ]
 
       const res = await fetch('/api/parlays', {
         method: 'POST',
@@ -165,7 +186,8 @@ export function ParlaysClient({
         throw new Error(data.error || 'Failed to create parlay')
       }
 
-      setSelectedPicks({})
+      setSelectedSpreads({})
+      setSelectedOverUnders({})
       setBetAmount(1)
       setShowConfirm(false)
       setActiveTab('list')
@@ -238,9 +260,10 @@ export function ParlaysClient({
     const channelNum = getChannelNumber(game.channel || null)
     const isComplete = game.winner_id !== null
     const isStarted = game.scheduled_at && parseTimestamp(game.scheduled_at) <= getCurrentTime()
+    const isOverUnderPick = pick.pick_type === 'over_under'
 
     const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
-      const isPicked = pick.picked_team_id === team.id
+      const isPicked = !isOverUnderPick && pick.picked_team_id === team.id
       const spreadValue = game.spread ? Math.abs(game.spread) : null
       const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
       const isWinner = isComplete && game.winner_id === team.id
@@ -322,6 +345,22 @@ export function ParlaysClient({
         </div>
         {renderTeamRow(favoriteTeam, d1Favorite, logoFavorite, true)}
         {renderTeamRow(underdogTeam, d1Underdog, logoUnderdog, false)}
+        {isOverUnderPick && (
+          <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${
+            isComplete
+              ? (pick.is_correct === true ? 'ring-2 ring-green-500' : pick.is_correct === false ? 'ring-2 ring-red-500' : 'ring-2 ring-orange-500')
+              : 'ring-2 ring-orange-500'
+          } ${pick.picked_over_under === 'over' ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
+            <span className={`text-xs font-bold ${pick.picked_over_under === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
+              {pick.picked_over_under === 'over' ? 'OVER' : 'UNDER'} {game.over_under_total}
+            </span>
+            {isComplete && game.team1_score !== null && game.team2_score !== null && (
+              <span className="text-xs text-zinc-400 ml-auto">
+                Total: {game.team1_score + game.team2_score}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -436,10 +475,10 @@ export function ParlaysClient({
     const channelNum = getChannelNumber(game.channel || null)
 
     const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
-      const isPicked = selectedPicks[game.id] === team.id
+      const isPicked = selectedSpreads[game.id] === team.id
       const spreadValue = game.spread ? Math.abs(game.spread) : null
       const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
-      const canPick = !gameLocked && (selectedCount < 4 || selectedPicks[game.id] !== undefined)
+      const canPick = !gameLocked && (selectedCount < 4 || selectedSpreads[game.id] !== undefined)
 
       let ringClass = ''
       if (isPicked) {
@@ -449,10 +488,10 @@ export function ParlaysClient({
       return (
         <button
           key={team.id}
-          onClick={() => handlePickTeam(game.id, team.id)}
-          disabled={gameLocked || !canPick}
+          onClick={() => game.spread !== null ? handlePickTeam(game.id, team.id) : undefined}
+          disabled={gameLocked || !canPick || game.spread === null}
           className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${ringClass} ${
-            gameLocked || !canPick ? 'cursor-default opacity-60' : 'hover:opacity-80 active:scale-[0.99]'
+            gameLocked || !canPick || game.spread === null ? 'cursor-default opacity-60' : 'hover:opacity-80 active:scale-[0.99]'
           }`}
           style={{ backgroundColor: d1Team ? d1Team.primaryColor + '40' : '#3f3f4640' }}
         >
@@ -480,6 +519,8 @@ export function ParlaysClient({
       )
     }
 
+    const canPickOU = !gameLocked && (selectedCount < 4 || selectedOverUnders[game.id] !== undefined)
+
     return (
       <div key={game.id} className="bg-zinc-800/50 rounded-xl p-3 space-y-2">
         <div className="flex items-center gap-2 text-[10px] text-zinc-400">
@@ -504,6 +545,37 @@ export function ParlaysClient({
         </div>
         {renderTeamRow(favoriteTeam, d1Favorite, logoFavorite, true)}
         {renderTeamRow(underdogTeam, d1Underdog, logoUnderdog, false)}
+        {game.over_under_total !== null && (
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-[10px] text-zinc-500 w-12 text-right">O/U {game.over_under_total}</span>
+            <button
+              onClick={() => handlePickOverUnder(game.id, 'over')}
+              disabled={gameLocked || !canPickOU}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                selectedOverUnders[game.id] === 'over'
+                  ? 'ring-2 ring-orange-500 bg-green-500/20 text-green-400'
+                  : gameLocked || !canPickOU
+                    ? 'bg-zinc-800/50 text-zinc-600 cursor-default'
+                    : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700/50'
+              }`}
+            >
+              OVER
+            </button>
+            <button
+              onClick={() => handlePickOverUnder(game.id, 'under')}
+              disabled={gameLocked || !canPickOU}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                selectedOverUnders[game.id] === 'under'
+                  ? 'ring-2 ring-orange-500 bg-blue-500/20 text-blue-400'
+                  : gameLocked || !canPickOU
+                    ? 'bg-zinc-800/50 text-zinc-600 cursor-default'
+                    : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700/50'
+              }`}
+            >
+              UNDER
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -522,14 +594,14 @@ export function ParlaysClient({
           </h3>
 
           <div className="space-y-2">
-            {Object.entries(selectedPicks).map(([gameId, teamId]) => {
+            {Object.entries(selectedSpreads).map(([gameId, teamId]) => {
               const game = games.find(g => g.id === gameId)
               if (!game) return null
               const { name, seed, spreadDisplay, d1Team } = getTeamDisplay(game, teamId)
               const logo = d1Team ? getTeamLogoUrl(d1Team) : null
 
               return (
-                <div key={gameId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-zinc-800/50">
+                <div key={`s-${gameId}`} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-zinc-800/50">
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: d1Team?.primaryColor || '#3f3f46' }}
@@ -545,6 +617,21 @@ export function ParlaysClient({
                   {spreadDisplay && (
                     <span className="text-xs text-zinc-400">{spreadDisplay}</span>
                   )}
+                </div>
+              )
+            })}
+            {Object.entries(selectedOverUnders).map(([gameId, pick]) => {
+              const game = games.find(g => g.id === gameId)
+              if (!game) return null
+
+              return (
+                <div key={`ou-${gameId}`} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-zinc-800/50">
+                  <span className={`text-xs font-bold ${pick === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
+                    {pick === 'over' ? 'OVER' : 'UNDER'} {game.over_under_total}
+                  </span>
+                  <span className="flex-1 text-sm text-zinc-400 truncate">
+                    {game.team1 && game.team2 ? `${findD1Team(game.team1.name)?.shortName || game.team1.short_name || game.team1.name} vs ${findD1Team(game.team2.name)?.shortName || game.team2.short_name || game.team2.name}` : 'TBD'}
+                  </span>
                 </div>
               )
             })}
@@ -589,7 +676,7 @@ export function ParlaysClient({
           </svg>
           Parlays
         </h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Pick 4 teams against the spread. All 4 must win. Payout: 8:1.</p>
+        <p className="text-xs text-zinc-500 mt-0.5">Pick 4 spread or over/under bets. All 4 must hit. Payout: 8:1.</p>
       </div>
 
       {/* Tabs */}
@@ -710,7 +797,7 @@ export function ParlaysClient({
           {availableGames.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-zinc-400">No games available for parlays right now.</p>
-              <p className="text-zinc-500 text-sm mt-1">Games with spreads that haven&apos;t started will appear here.</p>
+              <p className="text-zinc-500 text-sm mt-1">Games with spreads or O/U totals that haven&apos;t started will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -725,7 +812,7 @@ export function ParlaysClient({
             className="w-full py-3 rounded-xl bg-orange-500 text-white font-bold uppercase tracking-wide hover:bg-orange-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            {selectedCount === 4 ? 'Place Parlay' : `Select ${4 - selectedCount} more ${4 - selectedCount === 1 ? 'team' : 'teams'}`}
+            {selectedCount === 4 ? 'Place Parlay' : `Select ${4 - selectedCount} more ${4 - selectedCount === 1 ? 'pick' : 'picks'}`}
           </button>
         </div>
       )}

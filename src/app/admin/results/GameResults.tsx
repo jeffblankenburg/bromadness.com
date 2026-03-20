@@ -30,6 +30,7 @@ interface Game {
   is_team1_slot: boolean | null
   spread: number | null
   favorite_team_id: string | null
+  over_under_total: number | null
   location: string | null
   channel: string | null
 }
@@ -305,30 +306,49 @@ export function GameResults({ tournament, teams, games }: Props) {
   // Update parlay results when a game result is entered
   const updateParlayResults = async (game: Game, team1Score: number, team2Score: number) => {
     try {
-      if (game.spread === null) return
+      if (game.spread === null && game.over_under_total === null) return
 
       const team1 = teams.find(t => t.id === game.team1_id)
       const team2 = teams.find(t => t.id === game.team2_id)
       if (!team1 || !team2) return
 
-      const margin = team1Score - team2Score
-      const team1IsLowerSeed = team1.seed < team2.seed
-      const adjustedMargin = team1IsLowerSeed
-        ? margin + game.spread
-        : margin - game.spread
-      const spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
+      // Calculate spread winner if spread exists
+      let spreadWinnerId: string | null = null
+      if (game.spread !== null) {
+        const margin = team1Score - team2Score
+        const team1IsLowerSeed = team1.seed < team2.seed
+        const adjustedMargin = team1IsLowerSeed
+          ? margin + game.spread
+          : margin - game.spread
+        spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
+      }
+
+      // Calculate O/U result if total exists
+      const totalScore = team1Score + team2Score
 
       // Get all parlay picks for this game
       const { data: picks } = await supabase
         .from('parlay_picks')
-        .select('id, parlay_id, picked_team_id')
+        .select('id, parlay_id, picked_team_id, pick_type, picked_over_under')
         .eq('game_id', game.id)
 
       if (!picks || picks.length === 0) return
 
       // Update is_correct for each parlay pick
       for (const pick of picks) {
-        const isCorrect = pick.picked_team_id === spreadWinnerId
+        let isCorrect: boolean
+        if (pick.pick_type === 'over_under') {
+          if (game.over_under_total === null) continue
+          // Push (total equals line exactly) treated as a win
+          if (pick.picked_over_under === 'over') {
+            isCorrect = totalScore >= game.over_under_total
+          } else {
+            isCorrect = totalScore <= game.over_under_total
+          }
+        } else {
+          if (spreadWinnerId === null) continue
+          isCorrect = pick.picked_team_id === spreadWinnerId
+        }
         await supabase
           .from('parlay_picks')
           .update({ is_correct: isCorrect })
@@ -795,12 +815,12 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
       </div>
 
       {/* No Spread Warning */}
-      {canEnterResult && !hasSpread && game.round > 0 && (
+      {canEnterResult && !hasSpread && game.over_under_total === null && game.round > 0 && (
         <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
           <svg className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
           </svg>
-          <span className="text-yellow-400 text-xs font-medium">No spread set — pick&apos;em and parlay results will not resolve</span>
+          <span className="text-yellow-400 text-xs font-medium">No spread or O/U set — pick&apos;em and parlay results will not resolve</span>
         </div>
       )}
 

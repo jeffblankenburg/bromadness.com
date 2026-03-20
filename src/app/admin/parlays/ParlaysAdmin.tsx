@@ -21,6 +21,7 @@ interface Game {
   winner_id: string | null
   spread: number | null
   favorite_team_id: string | null
+  over_under_total: number | null
   round: number
   location?: string | null
   channel?: string | null
@@ -43,8 +44,10 @@ interface ParlayPick {
   id: string
   parlay_id: string
   game_id: string
-  picked_team_id: string
+  picked_team_id: string | null
   is_correct: boolean | null
+  pick_type: string
+  picked_over_under: string | null
 }
 
 interface User {
@@ -109,16 +112,29 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
 
       for (const pick of unresolvedPicks) {
         const game = games.find(g => g.id === pick.game_id)
-        if (!game || !game.team1 || !game.team2 || game.spread === null || game.team1_score === null || game.team2_score === null) continue
+        if (!game || !game.team1 || !game.team2 || game.team1_score === null || game.team2_score === null) continue
 
-        const margin = game.team1_score - game.team2_score
-        const team1IsLowerSeed = game.team1.seed < game.team2.seed
-        const adjustedMargin = team1IsLowerSeed
-          ? margin + game.spread
-          : margin - game.spread
-        const spreadWinnerId = adjustedMargin > 0 ? game.team1.id : game.team2.id
+        let isCorrect: boolean
 
-        const isCorrect = pick.picked_team_id === spreadWinnerId
+        if (pick.pick_type === 'over_under') {
+          if (game.over_under_total === null) continue
+          const totalScore = game.team1_score + game.team2_score
+          if (pick.picked_over_under === 'over') {
+            isCorrect = totalScore >= game.over_under_total
+          } else {
+            isCorrect = totalScore <= game.over_under_total
+          }
+        } else {
+          if (game.spread === null) continue
+          const margin = game.team1_score - game.team2_score
+          const team1IsLowerSeed = game.team1.seed < game.team2.seed
+          const adjustedMargin = team1IsLowerSeed
+            ? margin + game.spread
+            : margin - game.spread
+          const spreadWinnerId = adjustedMargin > 0 ? game.team1.id : game.team2.id
+          isCorrect = pick.picked_team_id === spreadWinnerId
+        }
+
         await supabase
           .from('parlay_picks')
           .update({ is_correct: isCorrect })
@@ -280,9 +296,10 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
 
     const channelNum = getChannelNumber(game.channel || null)
     const isComplete = game.winner_id !== null
+    const isOverUnderPick = pick.pick_type === 'over_under'
 
     const renderTeamRow = (team: Team, d1Team: typeof D1_TEAMS[0] | undefined, logo: string | null, isFavorite: boolean) => {
-      const isPicked = pick.picked_team_id === team.id
+      const isPicked = !isOverUnderPick && pick.picked_team_id === team.id
       const spreadValue = game.spread ? Math.abs(game.spread) : null
       const spreadDisplay = spreadValue ? (isFavorite ? `-${spreadValue}` : `+${spreadValue}`) : null
       const isWinner = isComplete && game.winner_id === team.id
@@ -363,6 +380,22 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
         </div>
         {renderTeamRow(favoriteTeam, d1Favorite, logoFavorite, true)}
         {renderTeamRow(underdogTeam, d1Underdog, logoUnderdog, false)}
+        {isOverUnderPick && (
+          <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${
+            isComplete
+              ? (pick.is_correct === true ? 'ring-2 ring-green-500' : pick.is_correct === false ? 'ring-2 ring-red-500' : 'ring-2 ring-orange-500')
+              : 'ring-2 ring-orange-500'
+          } ${pick.picked_over_under === 'over' ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
+            <span className={`text-xs font-bold ${pick.picked_over_under === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
+              {pick.picked_over_under === 'over' ? 'OVER' : 'UNDER'} {game.over_under_total}
+            </span>
+            {isComplete && game.team1_score !== null && game.team2_score !== null && (
+              <span className="text-xs text-zinc-400 ml-auto">
+                Total: {game.team1_score + game.team2_score}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     )
   }
