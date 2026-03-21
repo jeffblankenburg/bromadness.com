@@ -11,18 +11,19 @@ self.addEventListener('push', (event) => {
   const { title, body, icon, badge, data: notificationData } = data
 
   // Show the notification
+  const isPickReminder = notificationData?.type === 'pick_reminder'
   const options = {
     body: body || 'New message',
     icon: icon || '/icons/icon-192x192.png',
     badge: badge || '/icons/icon-192x192.png',
-    tag: 'chat-notification',
+    tag: isPickReminder ? 'pick-reminder' : 'chat-notification',
     renotify: true,
     data: notificationData,
     vibrate: [100, 50, 100],
     actions: [
       {
         action: 'open',
-        title: 'Open Chat'
+        title: isPickReminder ? 'Make Picks' : 'Open Chat'
       },
       {
         action: 'dismiss',
@@ -51,8 +52,11 @@ self.addEventListener('notificationclick', (event) => {
     return
   }
 
-  // Open or focus the app on the chat page
-  const urlToOpen = new URL('/chat', self.location.origin).href
+  // Open or focus the app - use data.url if provided, otherwise default to /chat
+  const urlToOpen = new URL(
+    event.notification.data?.url || '/chat',
+    self.location.origin
+  ).href
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {

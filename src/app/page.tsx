@@ -13,6 +13,7 @@ import { ThemeSongButton } from '@/components/ThemeSongButton'
 import { getActiveUserId } from '@/lib/simulation'
 import { extractRelation } from '@/lib/supabase/helpers'
 import { getEasternNow } from '@/lib/timezone'
+import { PicksDueBanner } from '@/components/PicksDueBanner'
 
 // Toggle to show/hide dev tools on home page
 
@@ -102,6 +103,8 @@ export default async function Home() {
   let tripBalance = 0
   let simulatedTime: string | null = null
   let totalWinnings = 0
+  let pickemMissing = 0
+  let brocketMissing = 0
 
   if (tournament) {
     simulatedTime = tournament.dev_simulated_time as string | null
@@ -135,6 +138,13 @@ export default async function Home() {
     } else {
       nowDate = getEasternNow()
     }
+
+    const todayStr = formatTimestamp(nowDate).split('T')[0]
+
+    // Check if today is first Thursday of tournament (brocket reminder day)
+    const thursdayDate = new Date(tournament.start_date + 'T00:00:00')
+    thursdayDate.setDate(thursdayDate.getDate() + 1) // Wednesday + 1 = Thursday
+    const isFirstThursday = todayStr === formatTimestamp(thursdayDate).split('T')[0]
 
     const pastCutoff = formatTimestamp(new Date(nowDate.getTime() - 150 * 60 * 1000))
     const futureCutoff = formatTimestamp(new Date(nowDate.getTime() + 15 * 60 * 1000))
@@ -251,6 +261,9 @@ export default async function Home() {
         parlayResult,
         tripCostResult,
         payoutsResult,
+        todayPickemDayResult,
+        todayGamesResult,
+        allBrocketGamesResult,
       ] = await Promise.all([
         // Pickem picks
         currentGameIds.length > 0
@@ -266,6 +279,14 @@ export default async function Home() {
         supabase.from('trip_costs').select('id, amount_owed').eq('tournament_id', tournament.id).eq('user_id', activeUserId).maybeSingle(),
         // Paid payouts
         supabase.from('payouts').select('amount').eq('tournament_id', tournament.id).eq('user_id', activeUserId).eq('is_paid', true),
+        // Today's pickem day (for picks due banner)
+        supabase.from('pickem_days').select('id').eq('tournament_id', tournament.id).eq('contest_date', todayStr).maybeSingle(),
+        // Today's games for pickem count
+        supabase.from('games').select('id').eq('tournament_id', tournament.id).in('round', [1, 2]).gte('scheduled_at', todayStr + 'T00:00:00').lte('scheduled_at', todayStr + 'T23:59:59'),
+        // All R1+R2 games for brocket count (only fetched on first Thursday)
+        isFirstThursday
+          ? supabase.from('games').select('id, scheduled_at').eq('tournament_id', tournament.id).in('round', [1, 2])
+          : Promise.resolve({ data: null }),
       ])
 
       // Process pickem picks
@@ -312,6 +333,54 @@ export default async function Home() {
 
       // Process winnings
       totalWinnings = (payoutsResult.data || []).reduce((sum, p) => sum + p.amount, 0)
+
+      // Check for incomplete picks due today
+      const todayPickemDay = todayPickemDayResult.data
+      const todayGamesList = todayGamesResult.data || []
+      if (todayPickemDay && todayGamesList.length > 0) {
+        const { data: todayEntry } = await supabase
+          .from('pickem_entries')
+          .select('id')
+          .eq('user_id', activeUserId)
+          .eq('pickem_day_id', todayPickemDay.id)
+          .maybeSingle()
+
+        if (todayEntry) {
+          const todayGameIds = todayGamesList.map((g: { id: string }) => g.id)
+          const { data: todayPicks } = await supabase
+            .from('pickem_picks')
+            .select('id')
+            .eq('entry_id', todayEntry.id)
+            .in('game_id', todayGameIds)
+
+          pickemMissing = todayGamesList.length - (todayPicks?.length || 0)
+        } else {
+          pickemMissing = todayGamesList.length
+        }
+      }
+
+      // Check brocket picks (only on first Thursday)
+      if (isFirstThursday) {
+        const allBrocketGames = (allBrocketGamesResult.data || []).filter((g: { id: string; scheduled_at: string | null }) => {
+          if (!g.scheduled_at) return false
+          const d = new Date(g.scheduled_at.split('T')[0] + 'T12:00:00')
+          return [4, 5, 6].includes(d.getDay())
+        })
+        if (allBrocketGames.length > 0) {
+          if (brocketEntryResult.data) {
+            const brocketGameIds = allBrocketGames.map((g: { id: string }) => g.id)
+            const { data: brocketPicksData } = await supabase
+              .from('brocket_picks')
+              .select('game_id')
+              .eq('entry_id', brocketEntryResult.data.id)
+              .in('game_id', brocketGameIds)
+
+            brocketMissing = allBrocketGames.length - (brocketPicksData?.length || 0)
+          } else {
+            brocketMissing = allBrocketGames.length
+          }
+        }
+      }
     }
   }
 
@@ -335,6 +404,7 @@ export default async function Home() {
       <div className="text-center space-y-4 w-full max-w-sm">
         <InstallPrompt />
         <NotificationPrompt />
+        <PicksDueBanner pickemMissing={pickemMissing} brocketMissing={brocketMissing} />
             <div className="space-y-3">
               {/* Name and Winnings */}
               {(() => {

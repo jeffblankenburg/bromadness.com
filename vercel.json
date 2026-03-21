@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/countdown",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/pick-reminder",
+      "schedule": "0 13 * * *"
     }
   ]
 }

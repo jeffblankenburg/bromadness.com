@@ -16,6 +16,7 @@ if (vapidPublicKey && vapidPrivateKey) {
 
 interface SendPushRequest {
   excludeUserId?: string
+  userIds?: string[]
   title: string
   body: string
   data?: Record<string, unknown>
@@ -35,14 +36,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'VAPID keys not configured' }, { status: 500 })
     }
 
-    const { excludeUserId, title, body, data }: SendPushRequest = await request.json()
+    const { excludeUserId, userIds, title, body, data }: SendPushRequest = await request.json()
 
     const supabase = createAdminClient()
 
-    // Get all push subscriptions except for the excluded user
+    // Get push subscriptions, optionally filtered to specific users
     let query = supabase.from('push_subscriptions').select('*')
 
-    if (excludeUserId) {
+    if (userIds && userIds.length > 0) {
+      query = query.in('user_id', userIds)
+    } else if (excludeUserId) {
       query = query.neq('user_id', excludeUserId)
     }
 
