@@ -169,17 +169,9 @@ export function GameResults({ tournament, teams, games }: Props) {
       const team2 = teams.find(t => t.id === game.team2_id)
       if (!team1 || !team2) return
 
-      // Calculate who covered the spread
-      // Spread is always assigned to the LOWER SEED:
-      // - Negative spread = lower seed is favorite (must win by more than |spread|)
-      // - Positive spread = lower seed is underdog (can lose by less than spread)
+      // Spread is relative to team1: negative = team1 favored
       const margin = team1Score - team2Score // positive = team1 won outright
-      const team1IsLowerSeed = team1.seed < team2.seed
-
-      // Adjusted margin: add spread if team1 is lower seed, subtract if team2 is lower seed
-      const adjustedMargin = team1IsLowerSeed
-        ? margin + game.spread
-        : margin - game.spread
+      const adjustedMargin = margin + game.spread
 
       // Winner against the spread
       const spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
@@ -313,13 +305,11 @@ export function GameResults({ tournament, teams, games }: Props) {
       if (!team1 || !team2) return
 
       // Calculate spread winner if spread exists
+      // Spread is relative to team1: negative = team1 favored
       let spreadWinnerId: string | null = null
       if (game.spread !== null) {
         const margin = team1Score - team2Score
-        const team1IsLowerSeed = team1.seed < team2.seed
-        const adjustedMargin = team1IsLowerSeed
-          ? margin + game.spread
-          : margin - game.spread
+        const adjustedMargin = margin + game.spread
         spreadWinnerId = adjustedMargin > 0 ? game.team1_id : game.team2_id
       }
 
@@ -675,14 +665,14 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
   const logo1 = d1Team1 ? getTeamLogoUrl(d1Team1) : null
   const logo2 = d1Team2 ? getTeamLogoUrl(d1Team2) : null
 
-  // Get spread display for a team based on seed comparison
-  const getSpreadDisplay = (team: Team | null, otherTeam: Team | null) => {
-    if (!hasSpread || !team || !otherTeam) return null
-    if (team.seed < otherTeam.seed) {
-      // Lower seed - show spread as-is
+  // Get spread display for a team (spread is relative to team1)
+  const getSpreadDisplay = (team: Team | null) => {
+    if (!hasSpread || !team) return null
+    if (team.id === game.team1_id) {
+      // Team1 - show spread as-is
       return `${game.spread! > 0 ? '+' : ''}${game.spread}`
     } else {
-      // Higher seed - show inverted spread
+      // Team2 - show inverted spread
       const inverted = game.spread! * -1
       return `${inverted > 0 ? '+' : ''}${inverted}`
     }
@@ -754,7 +744,7 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
           {d1Team1?.shortName || team1?.short_name || team1?.name || 'TBD'}
           {team1?.record && <span className="text-zinc-400 text-xs ml-0.5">{team1.record}</span>}
           {hasSpread && team1 && team2 && (
-            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team1, team2)}</span>
+            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team1)}</span>
           )}
         </span>
         {canEnterResult ? (
@@ -795,7 +785,7 @@ function GameCard({ game, team1, team2, saving, onSetWinner, onClearResult }: Ga
           {d1Team2?.shortName || team2?.short_name || team2?.name || 'TBD'}
           {team2?.record && <span className="text-zinc-400 text-xs ml-0.5">{team2.record}</span>}
           {hasSpread && team1 && team2 && (
-            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team2, team1)}</span>
+            <span className="text-xs text-zinc-400 ml-1">{getSpreadDisplay(team2)}</span>
           )}
         </span>
         {canEnterResult ? (

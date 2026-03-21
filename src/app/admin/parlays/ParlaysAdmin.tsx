@@ -127,10 +127,8 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
         } else {
           if (game.spread === null) continue
           const margin = game.team1_score - game.team2_score
-          const team1IsLowerSeed = game.team1.seed < game.team2.seed
-          const adjustedMargin = team1IsLowerSeed
-            ? margin + game.spread
-            : margin - game.spread
+          // Spread is relative to team1: negative = team1 favored
+          const adjustedMargin = margin + game.spread
           const spreadWinnerId = adjustedMargin > 0 ? game.team1.id : game.team2.id
           isCorrect = pick.picked_team_id === spreadWinnerId
         }
@@ -283,11 +281,10 @@ export function ParlaysAdmin({ tournamentId, parlays, parlayPicks, games, users 
     const game = games.find(g => g.id === pick.game_id)
     if (!game || !game.team1 || !game.team2) return null
 
-    const lowerSeedTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
-    const higherSeedTeam = game.team1.seed < game.team2.seed ? game.team2 : game.team1
-    const lowerSeedIsFavorite = game.spread ? game.spread < 0 : true
-    const favoriteTeam = lowerSeedIsFavorite ? lowerSeedTeam : higherSeedTeam
-    const underdogTeam = lowerSeedIsFavorite ? higherSeedTeam : lowerSeedTeam
+    // Spread is relative to team1: negative = team1 favored
+    const team1IsFavorite = game.spread ? game.spread < 0 : game.team1.seed < game.team2.seed
+    const favoriteTeam = team1IsFavorite ? game.team1 : game.team2
+    const underdogTeam = team1IsFavorite ? game.team2 : game.team1
 
     const d1Favorite = findD1Team(favoriteTeam.name)
     const d1Underdog = findD1Team(underdogTeam.name)

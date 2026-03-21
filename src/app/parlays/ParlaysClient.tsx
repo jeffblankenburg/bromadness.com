@@ -228,12 +228,10 @@ export function ParlaysClient({
     const d1Team = findD1Team(team.name)
     const displayName = d1Team?.shortName || team.short_name || team.name
 
-    const lowerSeedTeam = game.team1 && game.team2
-      ? (game.team1.seed < game.team2.seed ? game.team1 : game.team2)
-      : null
-    const isLowerSeed = lowerSeedTeam?.id === team.id
+    // Spread is relative to team1: negative = team1 favored
+    const isTeam1 = game.team1?.id === team.id
     const spreadValue = game.spread ? Math.abs(game.spread) : null
-    const spreadDisplay = spreadValue ? (isLowerSeed && game.spread! < 0 ? `-${spreadValue}` : `+${spreadValue}`) : ''
+    const spreadDisplay = spreadValue ? (isTeam1 ? `${game.spread! > 0 ? '+' : ''}${game.spread}` : `${(game.spread! * -1) > 0 ? '+' : ''}${game.spread! * -1}`) : ''
 
     return { name: displayName, seed: team.seed, spreadDisplay, d1Team }
   }
@@ -246,11 +244,10 @@ export function ParlaysClient({
     const game = games.find(g => g.id === pick.game_id)
     if (!game || !game.team1 || !game.team2) return null
 
-    const lowerSeedTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
-    const higherSeedTeam = game.team1.seed < game.team2.seed ? game.team2 : game.team1
-    const lowerSeedIsFavorite = game.spread ? game.spread < 0 : true
-    const favoriteTeam = lowerSeedIsFavorite ? lowerSeedTeam : higherSeedTeam
-    const underdogTeam = lowerSeedIsFavorite ? higherSeedTeam : lowerSeedTeam
+    // Spread is relative to team1: negative = team1 favored
+    const team1IsFavorite = game.spread ? game.spread < 0 : game.team1.seed < game.team2.seed
+    const favoriteTeam = team1IsFavorite ? game.team1 : game.team2
+    const underdogTeam = team1IsFavorite ? game.team2 : game.team1
 
     const d1Favorite = findD1Team(favoriteTeam.name)
     const d1Underdog = findD1Team(underdogTeam.name)
@@ -460,11 +457,10 @@ export function ParlaysClient({
   const renderGameCard = (game: Game) => {
     if (!game.team1 || !game.team2) return null
 
-    const lowerSeedTeam = game.team1.seed < game.team2.seed ? game.team1 : game.team2
-    const higherSeedTeam = game.team1.seed < game.team2.seed ? game.team2 : game.team1
-    const lowerSeedIsFavorite = game.spread ? game.spread < 0 : true
-    const favoriteTeam = lowerSeedIsFavorite ? lowerSeedTeam : higherSeedTeam
-    const underdogTeam = lowerSeedIsFavorite ? higherSeedTeam : lowerSeedTeam
+    // Spread is relative to team1: negative = team1 favored
+    const team1IsFavorite = game.spread ? game.spread < 0 : game.team1.seed < game.team2.seed
+    const favoriteTeam = team1IsFavorite ? game.team1 : game.team2
+    const underdogTeam = team1IsFavorite ? game.team2 : game.team1
 
     const d1Favorite = findD1Team(favoriteTeam.name)
     const d1Underdog = findD1Team(underdogTeam.name)
