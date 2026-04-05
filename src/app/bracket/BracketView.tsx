@@ -542,7 +542,7 @@ export function BracketView({
 
   const sortedRegions = [...regions].sort((a, b) => a.position - b.position)
 
-  // Positions 1,2 on left, 3,4 on right
+  // Positions 1,2 on left, 3,4 on right (matching Bracket Settings pairing: 1v2 and 3v4)
   const leftRegions = sortedRegions.filter(r => r.position <= 2)
   const rightRegions = sortedRegions.filter(r => r.position > 2)
 
