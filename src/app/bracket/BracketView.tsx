@@ -546,8 +546,23 @@ export function BracketView({
   const leftRegions = sortedRegions.filter(r => r.position <= 2)
   const rightRegions = sortedRegions.filter(r => r.position > 2)
 
-  const finalFourGames = games.filter(g => g.round === 5).sort((a, b) => a.game_number - b.game_number)
+  const allFinalFourGames = games.filter(g => g.round === 5).sort((a, b) => a.game_number - b.game_number)
   const championshipGame = games.find(g => g.round === 6)
+
+  // Determine which FF game belongs to the left side by following E8 game links
+  const leftRegionIds = new Set(leftRegions.map(r => r.id))
+  const e8Games = games.filter(g => g.round === 4)
+  const leftE8Game = e8Games.find(g => g.region_id && leftRegionIds.has(g.region_id))
+  const leftFFGameId = leftE8Game?.next_game_id
+
+  // Left FF game connects from left side, right FF game connects from right side
+  const leftFFGame = leftFFGameId
+    ? (allFinalFourGames.find(g => g.id === leftFFGameId) ?? allFinalFourGames[0])
+    : allFinalFourGames[0]
+  const rightFFGame = leftFFGameId
+    ? (allFinalFourGames.find(g => g.id !== leftFFGameId) ?? allFinalFourGames[1])
+    : allFinalFourGames[1]
+  const finalFourGames = [leftFFGame, rightFFGame].filter(Boolean)
 
   // Get champion
   const getTeam = (teamId: string | null) =>
