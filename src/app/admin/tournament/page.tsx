@@ -87,6 +87,7 @@ export default async function TournamentPage() {
       <RegionOrderEditor
         regions={tournament.regions || []}
         tournamentId={tournament.id}
+        games={games}
       />
     </div>
   )
